@@ -10,12 +10,13 @@ export function PirlsLogo({ className, ...props }: PirlsLogoProps) {
   return (
     <div className={className} {...props}>
       <Image
-        src="/images/logo.png" // Assumes the image is saved at public/images/logo.png
-        alt="Shih Men Elementary School Logo" // Updated alt text to reflect the new image
-        width={800} // Intrinsic width of the provided image
-        height={786} // Intrinsic height of the provided image
-        className="object-contain h-full w-full" // Ensure image fits and maintains aspect ratio
-        priority // Optional: if logo is LCP, consider adding priority
+        src="https://placehold.co/800x786.png" // Temporarily using a placeholder
+        alt="Shih Men Elementary School Logo"
+        width={800}
+        height={786}
+        className="object-contain h-full w-full"
+        priority
+        data-ai-hint="logo school" // Added AI hint for placeholder
       />
     </div>
   );
