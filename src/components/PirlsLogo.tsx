@@ -1,31 +1,22 @@
-import type { SVGProps } from 'react';
+import Image from 'next/image';
+import type { HTMLAttributes } from 'react';
 
-export function PirlsLogo(props: SVGProps<SVGSVGElement>) {
+interface PirlsLogoProps extends HTMLAttributes<HTMLDivElement> {
+  // className will be passed via ...props
+  // Optional: add other specific props if needed
+}
+
+export function PirlsLogo({ className, ...props }: PirlsLogoProps) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 200 50"
-      width="200"
-      height="50"
-      aria-label="PIRLS QuestionCraft Logo"
-      {...props}
-    >
-      <style>
-        {`
-          .logo-text {
-            font-family: var(--font-geist-sans), Arial, sans-serif;
-            font-size: 24px;
-            font-weight: 600;
-            fill: hsl(var(--primary));
-          }
-          .logo-tagline {
-            font-family: var(--font-geist-sans), Arial, sans-serif;
-            font-size: 10px;
-            fill: hsl(var(--muted-foreground));
-          }
-        `}
-      </style>
-      <text x="10" y="30" className="logo-text">PIRLS QuestionCraft</text>
-    </svg>
+    <div className={className} {...props}>
+      <Image
+        src="/images/logo.png" // Assumes the image is saved at public/images/logo.png
+        alt="Shih Men Elementary School Logo" // Updated alt text to reflect the new image
+        width={800} // Intrinsic width of the provided image
+        height={786} // Intrinsic height of the provided image
+        className="object-contain h-full w-full" // Ensure image fits and maintains aspect ratio
+        priority // Optional: if logo is LCP, consider adding priority
+      />
+    </div>
   );
 }
