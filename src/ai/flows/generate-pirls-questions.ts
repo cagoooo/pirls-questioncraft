@@ -15,28 +15,28 @@ import {z} from 'genkit';
 const GeneratePirlsQuestionsInputSchema = z.object({
   extractedText: z
     .string()
-    .describe('The extracted text from the uploaded images.'),
+    .describe('從上傳圖片中提取的文字內容。'),
 });
 export type GeneratePirlsQuestionsInput = z.infer<typeof GeneratePirlsQuestionsInputSchema>;
 
 const PirlsQuestionSchema = z.object({
-  question: z.string().describe('The question text.'),
-  options: z.array(z.string()).length(4).describe('Four answer options, only one correct.'),
+  question: z.string().describe('問題的文字內容。'),
+  options: z.array(z.string()).length(4).describe('四個答案選項，其中只有一個是正確的。'),
   correctAnswerIndex: z
     .number()
     .min(0)
     .max(3)
-    .describe('The index (0-3) of the correct answer in the options array.'),
+    .describe('正確答案在選項陣列中的索引（0-3）。'),
   explanation: z
     .string()
-    .describe('Explanation of why the answer is correct, with reference to the text.'),
+    .describe('解釋為何該答案是正確的，需參考文本內容，並使用台灣常用語彙的繁體中文。'),
   pirlsLevel: z
     .enum(['locate & retrieve', 'make straightforward inferences', 'interpret & integrate', 'evaluate & critique'])
-    .describe('The PIRLS reading literacy level of the question.'),
+    .describe('問題對應的PIRLS閱讀素養層次。'),
 });
 
 const GeneratePirlsQuestionsOutputSchema = z.object({
-  questions: z.array(PirlsQuestionSchema).length(8).describe('Eight PIRLS-style multiple-choice questions.'),
+  questions: z.array(PirlsQuestionSchema).length(8).describe('八個PIRLS風格的選擇題。'),
 });
 
 export type GeneratePirlsQuestionsOutput = z.infer<typeof GeneratePirlsQuestionsOutputSchema>;
@@ -51,23 +51,25 @@ const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsPrompt',
   input: {schema: GeneratePirlsQuestionsInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
-  prompt: `You are an expert in designing questions for the PIRLS (Progress in International Reading Literacy Study) reading comprehension assessment.
+  prompt: `您是一位專門為PIRLS（國際閱讀素養進展研究）閱讀理解評估設計題目的專家。
 
-  Your task is to generate eight multiple-choice questions based on the provided text. Each question should align with one of the four PIRLS reading literacy levels:
+您的任務是根據提供的文本生成八個選擇題。每個問題都應符合PIRLS四個閱讀素養層次之一：
 
-  1. Locate and Retrieve: These questions require students to find explicitly stated information within the text.
-  2. Make Straightforward Inferences: These questions ask students to draw simple conclusions based on information presented in the text.
-  3. Interpret and Integrate: These questions require students to combine information from different parts of the text to understand the author's meaning or purpose.
-  4. Evaluate and Critique: These questions challenge students to assess the quality and credibility of the text.
+1.  訊息提取與檢索（Locate and Retrieve）：這類問題要求學生在文本中找到明確陳述的資訊。
+2.  直接推論（Make Straightforward Inferences）：這類問題要求學生根據文本中呈現的資訊做出簡單的結論。
+3.  詮釋與整合（Interpret and Integrate）：這類問題要求學生結合文本不同部分的資訊來理解作者的含義或目的。
+4.  評估與批判（Evaluate and Critique）：這類問題挑戰學生評估文本的品質和可信度。
 
-  You must generate two questions for each of the four PIRLS levels, for a total of eight questions.
+您必須為每個PIRLS層次生成兩個問題，總共八個問題。
 
-  Each question must have four answer options, with only one correct answer. Provide the index of the correct answer (0-3). Also, provide a brief explanation of why the chosen answer is correct, referencing the specific paragraph or sentence in the text where the answer can be found. Each question must also have a designated pirlsLevel.
+每個問題必須有四個答案選項，其中只有一個是正確答案。請提供正確答案的索引（0-3）。
+此外，請針對正確答案，以**完全繁體中文**提供說明，解釋為何該選項正確，並指出在文本中能夠找到答案的段落或句子。**說明文字需符合台灣讀者習慣的語氣與詞彙**。
+每個問題還必須標明其PIRLS層次（pirlsLevel）。
 
-  Text:
-  {{extractedText}}
+提供的文本內容如下：
+{{extractedText}}
 
-  Ensure the output is a valid JSON object conforming to the output schema.
+請確保輸出的結果是一個有效的JSON物件，且其結構需符合指定的輸出結構描述。
   `,
 });
 
