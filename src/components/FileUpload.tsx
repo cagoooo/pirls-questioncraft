@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
   const [dialogImageScale, setDialogImageScale] = useState(1);
-  const imageDialogRef = useRef<HTMLDivElement>(null);
+  const imageDisplayAreaRef = useRef<HTMLDivElement>(null); // Changed from imageDialogRef
 
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -89,7 +89,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       const filesArray = Array.from(event.target.files);
       processNewFiles(filesArray);
       if (event.target) {
-        event.target.value = ''; // Reset file input to allow re-selection of the same file
+        event.target.value = ''; 
       }
     }
   }, [processNewFiles]);
@@ -137,41 +137,33 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [handlePaste]);
 
   useEffect(() => {
-    // Create new previews
-    const newPreviews = selectedFiles.map(file => {
-      const url = URL.createObjectURL(file);
-      return url;
-    });
+    const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+    const oldPreviews = imagePreviews;
     
-    // Revoke old previews that are no longer in use
-    const previousPreviews = imagePreviews;
     setImagePreviews(newPreviews);
-    
-    previousPreviews.forEach(oldUrl => {
-      if (!newPreviews.includes(oldUrl)) {
-        URL.revokeObjectURL(oldUrl);
-      }
-    });
-
     onFilesSelected(selectedFiles);
 
-    // Cleanup all current previews when the component unmounts
-    // or if selectedFiles becomes empty (handled by newPreviews becoming empty).
     return () => {
-      newPreviews.forEach(url => URL.revokeObjectURL(url));
+      oldPreviews.forEach(url => {
+        if (!newPreviews.includes(url)) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      // Also revoke new previews if component unmounts or selectedFiles changes to empty
+      if (newPreviews.length === 0) {
+          oldPreviews.forEach(URL.revokeObjectURL);
+      } else if (selectedFiles.length === 0) { // Ensure cleanup if selectedFiles is emptied directly
+          newPreviews.forEach(URL.revokeObjectURL);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles, onFilesSelected]); // onFilesSelected is included per exhaustive-deps, though its identity should be stable from parent page
-
+  }, [selectedFiles]); // onFilesSelected is stable due to parent's useCallback
 
   const removeImage = (indexToRemove: number) => {
-    // The useEffect for imagePreviews will handle revoking the specific URL
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
   };
 
-
   const clearAllImages = () => {
-    // The useEffect for imagePreviews will handle revoking all URLs
     setSelectedFiles([]);
   };
   
@@ -188,8 +180,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const handleDragLeave = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    // Check if the mouse is leaving the label to one of its children
-    // If so, do not set isDraggingOver to false
     if (event.currentTarget.contains(event.relatedTarget as Node)) {
         return;
     }
@@ -197,10 +187,10 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
 
   const handleDragOver = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault(); // Necessary to allow dropping
+    event.preventDefault(); 
     event.stopPropagation();
     if (!isLoading && canUploadMore && !isDraggingOver) {
-        setIsDraggingOver(true); // Set true if dragged over from outside
+        setIsDraggingOver(true); 
     }
   };
 
@@ -227,17 +217,17 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
 
   const handleDialogImageWheel = useCallback((event: WheelEvent) => {
-    // For debugging: // console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
+    // 用於調試: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
-      if (event.deltaY < 0) { // Zoom in
+      if (event.deltaY < 0) { 
         newScale = prevScale + SCALE_STEP;
-      } else { // Zoom out
+      } else { 
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-      // For debugging: // console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
+      // 用於調試: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
         setImageOffset({ x: 0, y: 0 });
       }
@@ -246,19 +236,19 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [setDialogImageScale, setImageOffset]); 
   
   useEffect(() => {
-    const currentImageDialogEl = imageDialogRef.current;
-    // For debugging: // console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDialogEl);
-    if (isImageDialogOpen && currentImageDialogEl) {
-      currentImageDialogEl.addEventListener('wheel', handleDialogImageWheel, { passive: false });
-      // For debugging: // console.log('Wheel listener ATTACHED to:', currentImageDialogEl);
+    const currentImageDisplayArea = imageDisplayAreaRef.current; // Target the image display area
+    // 用於調試: console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDisplayArea);
+    if (isImageDialogOpen && currentImageDisplayArea) {
+      currentImageDisplayArea.addEventListener('wheel', handleDialogImageWheel, { passive: false });
+      // 用於調試: console.log('Wheel listener ATTACHED to:', currentImageDisplayArea);
     }
     return () => {
-      if (currentImageDialogEl) {
-        currentImageDialogEl.removeEventListener('wheel', handleDialogImageWheel);
-        // For debugging: // console.log('Wheel listener REMOVED from:', currentImageDialogEl);
+      if (currentImageDisplayArea) {
+        currentImageDisplayArea.removeEventListener('wheel', handleDialogImageWheel);
+        // 用於調試: console.log('Wheel listener REMOVED from:', currentImageDisplayArea);
       }
     };
-  }, [isImageDialogOpen, handleDialogImageWheel, imageDialogRef]);
+  }, [isImageDialogOpen, handleDialogImageWheel, imageDisplayAreaRef]); // Added imageDisplayAreaRef
 
   const zoomIn = () => setDialogImageScale(s => {
     const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
@@ -289,9 +279,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   useEffect(() => {
     const handleGlobalPanMove = (e: MouseEvent | TouchEvent) => {
       if (!isPanning) return;
-      // For touchmove, prevent default page scroll if not already handled by touch-action
       if ('touches' in e && e.cancelable) e.preventDefault();
-
 
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -308,10 +296,10 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
     if (isPanning) {
       window.addEventListener('mousemove', handleGlobalPanMove);
-      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false }); // passive: false for preventDefault
+      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false }); 
       window.addEventListener('mouseup', handleGlobalPanEnd);
       window.addEventListener('touchend', handleGlobalPanEnd);
-      window.addEventListener('mouseleave', handleGlobalPanEnd); // Handle mouse leaving window
+      window.addEventListener('mouseleave', handleGlobalPanEnd); 
     }
 
     return () => {
@@ -471,12 +459,14 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
       <DialogContent 
         className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
-        ref={imageDialogRef} 
       >
         <DialogTitle className="sr-only">放大的圖片預覽</DialogTitle>
         <DialogDescription className="sr-only">詳細檢視上傳的圖片內容，可使用按鈕或滑鼠滾輪進行縮放，以及拖曳平移圖片。</DialogDescription>
         {selectedImageForDialog && (
-          <div className="relative w-full h-full flex justify-center items-center overflow-hidden">
+          <div 
+            ref={imageDisplayAreaRef} // Attach ref here
+            className="relative w-full h-full flex justify-center items-center overflow-hidden"
+          >
             <Image
               src={selectedImageForDialog}
               alt="放大的圖片預覽"
@@ -517,3 +507,5 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
+
+    
