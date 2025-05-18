@@ -26,13 +26,16 @@ export default function PIRLSQuestionCraftPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
+  const [fileGenerationMessage, setFileGenerationMessage] = useState('');
+
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
-    // Ensure this only runs on the client after hydration
     setCurrentYear(new Date().getFullYear());
   }, []);
 
@@ -72,13 +75,11 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
-    // Total steps: 1 (start) + N images for extraction + 1 (combine) + 1 (generate questions) + 1 (final success)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
-      // Ensure progress is always between 0 and 100.
       const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
       setLoadingProgress(progress); 
     };
@@ -104,7 +105,6 @@ export default function PIRLSQuestionCraftPage() {
           }
         }
       } else {
-        // If no images, skip extraction steps for progress calculation
         completedSteps += currentImageFilesCount; 
       }
 
@@ -140,8 +140,7 @@ export default function PIRLSQuestionCraftPage() {
         throw new Error('APP未能成功生成題目。');
       }
 
-    } catch (err: any)
-      {
+    } catch (err: any) {
       console.error("生成題目時發生錯誤:", err);
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
       setError(errorMessage);
@@ -155,16 +154,20 @@ export default function PIRLSQuestionCraftPage() {
 
     } finally {
       setIsLoading(false);
-      // Ensure progress hits 100% on success, or stays at current if error
       if (!error && generatedQuestionsOutput) {
          updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
       } else if (error) {
-        // Message already set in catch, progress already updated to show where it failed
+        // Message already set in catch
       } else if (!generatedQuestionsOutput && !error) {
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, loadingMessage, error, generatedQuestionsOutput]);
+  }, [imageFiles, toast, generatedQuestionsOutput, error, loadingMessage]);
+
+  const fileProgressCallback = (progress: number, message: string) => {
+    setFileGenerationProgress(progress);
+    setFileGenerationMessage(message);
+  };
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -176,8 +179,10 @@ export default function PIRLSQuestionCraftPage() {
       return;
     }
     setIsGeneratingPdf(true);
+    setFileGenerationProgress(0);
+    setFileGenerationMessage('正在初始化 PDF 產生程序...');
     try {
-      await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast);
+      await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (pdfError: any) {
       console.error("PDF 生成失敗:", pdfError);
       toast({
@@ -185,8 +190,13 @@ export default function PIRLSQuestionCraftPage() {
         description: pdfError.message || '無法生成 PDF 檔案，請稍後再試。',
         variant: 'destructive',
       });
+      setFileGenerationMessage(`PDF 生成失敗: ${pdfError.message || '未知錯誤'}`);
+      setFileGenerationProgress(0); // Or some error indication
     } finally {
       setIsGeneratingPdf(false);
+      // Optionally reset progress after a delay or keep it at 100 if successful before hiding
+      // setFileGenerationProgress(0); 
+      // setFileGenerationMessage('');
     }
   };
 
@@ -200,8 +210,10 @@ export default function PIRLSQuestionCraftPage() {
       return;
     }
     setIsGeneratingExcel(true);
+    setFileGenerationProgress(0);
+    setFileGenerationMessage('正在初始化 Excel 產生程序...');
     try {
-      await exportPIRLStoExcel(generatedQuestionsOutput, toast);
+      await exportPIRLStoExcel(generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (excelError: any) {
       console.error("Excel 生成失敗:", excelError);
       toast({
@@ -209,6 +221,8 @@ export default function PIRLSQuestionCraftPage() {
         description: excelError.message || '無法生成 Excel 檔案，請稍後再試。',
         variant: 'destructive',
       });
+      setFileGenerationMessage(`Excel 生成失敗: ${excelError.message || '未知錯誤'}`);
+      setFileGenerationProgress(0);
     } finally {
       setIsGeneratingExcel(false);
     }
@@ -239,7 +253,10 @@ export default function PIRLSQuestionCraftPage() {
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
-        <FileUpload onFilesSelected={handleImageFilesChange} isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} />
+        <FileUpload 
+          onFilesSelected={handleImageFilesChange} 
+          isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} 
+        />
 
         <Button
           onClick={handleGenerateQuestions}
@@ -295,13 +312,13 @@ export default function PIRLSQuestionCraftPage() {
                 <div className="flex space-x-2">
                   <Button
                       onClick={handleDownloadPdf}
-                      disabled={isGeneratingPdf || isGeneratingExcel || !generatedQuestionsOutput || imageFiles.length === 0}
+                      disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
                       variant="outline"
                   >
                       {isGeneratingPdf ? (
                           <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              PDF產生中...
+                              PDF準備中...
                           </>
                       ) : (
                           <>
@@ -312,13 +329,13 @@ export default function PIRLSQuestionCraftPage() {
                   </Button>
                   <Button
                       onClick={handleDownloadExcel}
-                      disabled={isGeneratingPdf || isGeneratingExcel || !generatedQuestionsOutput}
+                      disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput}
                       variant="outline"
                   >
                       {isGeneratingExcel ? (
                           <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Excel產生中...
+                              Excel準備中...
                           </>
                       ) : (
                           <>
@@ -335,6 +352,23 @@ export default function PIRLSQuestionCraftPage() {
               ))}
             </Accordion>
           </section>
+        )}
+
+        {(isGeneratingPdf || isGeneratingExcel) && (
+          <Card className="w-full shadow-md mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl font-semibold">
+                <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
+                檔案處理中...
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
+              <Progress value={fileGenerationProgress} className="w-full h-3" />
+              <p className="text-sm text-muted-foreground text-center">
+                {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
+              </p>
+            </CardContent>
+          </Card>
         )}
       </main>
       
@@ -354,4 +388,3 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
-

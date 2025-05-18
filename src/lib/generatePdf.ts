@@ -8,6 +8,8 @@ import type { Toast } from '@/hooks/use-toast';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
+type ProgressCallback = (progress: number, message: string) => void;
+
 const convertFileToDataUri = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -24,7 +26,6 @@ const pirlsLevelLabels: Record<PirlsQuestion['pirlsLevel'], string> = {
   'evaluate & critique': '評估與批判',
 };
 
-// RGB colors for PDF elements, chosen to complement UI badge/border colors
 const pirlsLevelRgbColors: Record<PirlsQuestion['pirlsLevel'], [number, number, number]> = {
   'locate & retrieve': [29, 78, 216],    // Blue-700
   'make straightforward inferences': [4, 120, 87], // Green-700
@@ -33,15 +34,14 @@ const pirlsLevelRgbColors: Record<PirlsQuestion['pirlsLevel'], [number, number, 
 };
 
 const themeColors = {
-  primary: [117, 169, 255], // Approximates HSL(217 100% 73%) --primary
-  accent: [163, 135, 217],  // Approximates HSL(265 45% 69%) --accent
+  primary: [37, 99, 235], // Updated to reflect new primary HSL(217 90% 60%)
+  accent: [163, 135, 217],
   textDefault: [0, 0, 0],
   textMuted: [100, 100, 100],
   borderDefault: [200, 200, 200],
 };
 
 
-// Helper function to load and register a single font
 async function loadAndRegisterFont(
   doc: jsPDF,
   fontFileName: string, 
@@ -79,7 +79,7 @@ async function loadAndRegisterFont(
   return true;
 }
 
-async function loadAllFonts(doc: jsPDF, showToast: typeof Toast) {
+async function loadAllFonts(doc: jsPDF, showToast: typeof Toast, updateProgress: ProgressCallback) {
   const fontBaseName = 'NotoSansTC';
   const fontsToLoad = [
     { fileName: 'NotoSansTC-Regular.ttf', style: 'normal' },
@@ -91,7 +91,9 @@ async function loadAllFonts(doc: jsPDF, showToast: typeof Toast) {
   ];
 
   let allCustomFontsLoadedSuccessfully = true;
-  for (const font of fontsToLoad) {
+  for (let i = 0; i < fontsToLoad.length; i++) {
+    const font = fontsToLoad[i];
+    updateProgress(5 + Math.round((i / fontsToLoad.length) * 10), `載入字型 ${font.fileName}...`);
     const success = await loadAndRegisterFont(doc, font.fileName, fontBaseName, font.style, showToast);
     if (!success) {
       allCustomFontsLoadedSuccessfully = false;
@@ -100,8 +102,10 @@ async function loadAllFonts(doc: jsPDF, showToast: typeof Toast) {
 
   if (allCustomFontsLoadedSuccessfully) {
     doc.setFont(fontBaseName, 'normal'); 
+    updateProgress(15, "所有字型已載入");
   } else {
     doc.setFont('helvetica', 'normal'); 
+    updateProgress(15, "部分字型載入失敗，使用預設字型");
     showToast({
         title: "部分字型載入失敗",
         description: "由於部分自訂字型未能成功載入，PDF 將嘗試使用預設字型，部分文字樣式可能不如預期。",
@@ -113,15 +117,17 @@ async function loadAllFonts(doc: jsPDF, showToast: typeof Toast) {
 export async function exportPIRLStoPDF(
   imageFiles: File[],
   questionsOutput: GeneratePirlsQuestionsOutput,
-  showToast: typeof Toast
+  showToast: typeof Toast,
+  updateProgressCallback: ProgressCallback
 ) {
+  updateProgressCallback(0, '開始準備 PDF...');
   const doc = new jsPDF({
     orientation: 'p',
     unit: 'mm',
     format: 'a4',
   });
 
-  await loadAllFonts(doc, showToast);
+  await loadAllFonts(doc, showToast, updateProgressCallback); // Passes callback
 
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -137,14 +143,14 @@ export async function exportPIRLStoPDF(
     }
   }
 
-  // Title
+  updateProgressCallback(15, '設定 PDF 標題...');
   doc.setFont('NotoSansTC', 'black');
   doc.setFontSize(20);
   doc.setTextColor(...themeColors.textDefault);
   doc.text('PIRLS 閱讀素養題組', pageWidth / 2, yPos, { align: 'center' });
   yPos += 15;
 
-  // Images Section Title
+  updateProgressCallback(20, '準備圖片區塊...');
   checkPageBreak(12);
   const imagesSectionTitle = '一、閱讀文本 (圖片內容)';
   doc.setFont('NotoSansTC', 'bold');
@@ -154,7 +160,7 @@ export async function exportPIRLStoPDF(
   doc.setDrawColor(...themeColors.primary);
   doc.setLineWidth(0.5);
   doc.line(margin, yPos + 1.5, margin + imagesSectionTitleWidth, yPos + 1.5);
-  doc.setDrawColor(...themeColors.borderDefault); // Reset to default border color
+  doc.setDrawColor(...themeColors.borderDefault); 
   doc.setLineWidth(defaultLineWidth);
   yPos += 10;
 
@@ -165,9 +171,11 @@ export async function exportPIRLStoPDF(
     checkPageBreak(10);
     doc.text('未上傳任何圖片。', margin, yPos);
     yPos += 7;
+    updateProgressCallback(50, '圖片區塊完成 (無圖片)');
   } else {
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
+      updateProgressCallback(20 + Math.round((i / imageFiles.length) * 30), `正在處理圖片 ${i + 1} / ${imageFiles.length}...`);
       try {
         const dataUri = await convertFileToDataUri(file);
         const imgProps = doc.getImageProperties(dataUri);
@@ -199,10 +207,11 @@ export async function exportPIRLStoPDF(
         yPos += 7;
       }
     }
+    updateProgressCallback(50, '所有圖片已加入 PDF');
   }
   yPos += 8; 
 
-  // Questions Section Title
+  updateProgressCallback(55, '準備題目區塊...');
   checkPageBreak(14);
   const questionsSectionTitle = '二、PIRLS 題組題目';
   doc.setFont('NotoSansTC', 'bold');
@@ -219,23 +228,22 @@ export async function exportPIRLStoPDF(
   const optionLabels = ['(A)', '(B)', '(C)', '(D)'];
 
   questionsOutput.questions.forEach((q, index) => {
-    let questionBlockNeededHeight = 25; // Initial estimate
+    updateProgressCallback(55 + Math.round(((index + 1) / questionsOutput.questions.length) * 40), `正在處理題目 ${index + 1} / ${questionsOutput.questions.length}...`);
+    let questionBlockNeededHeight = 25; 
     
-    // Rough estimation (can be improved with more precise text measurement)
     doc.setFont('NotoSansTC', 'medium'); 
     doc.setFontSize(12);
     questionBlockNeededHeight += doc.splitTextToSize(q.question, contentWidth - doc.getTextWidth(`${index + 1}. `)).length * 6;
     doc.setFont('NotoSansTC', 'normal');
     doc.setFontSize(10);
     q.options.forEach(opt => { questionBlockNeededHeight += doc.splitTextToSize(opt, contentWidth - 10).length * 5; });
-    questionBlockNeededHeight += 18; // Answer, explanation header, level
+    questionBlockNeededHeight += 18; 
     questionBlockNeededHeight += doc.splitTextToSize(q.explanation, contentWidth).length * 5;
 
     checkPageBreak(questionBlockNeededHeight);
     
-    const questionStartY = yPos; // For drawing the left vertical line
+    const questionStartY = yPos; 
 
-    // Question Number (Bold) and Text (Medium)
     const questionNumberText = `${index + 1}. `;
     doc.setFontSize(12);
     doc.setFont('NotoSansTC', 'bold');
@@ -247,7 +255,6 @@ export async function exportPIRLStoPDF(
     doc.text(questionTextLines, margin + questionNumberWidth, yPos);
     yPos += questionTextLines.length * 6 + 2;
 
-    // PIRLS Level
     doc.setFont('NotoSansTC', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...themeColors.textMuted); 
@@ -255,7 +262,6 @@ export async function exportPIRLStoPDF(
     doc.setTextColor(...themeColors.textDefault); 
     yPos += 7;
 
-    // Options
     doc.setFont('NotoSansTC', 'normal');
     doc.setFontSize(10);
     q.options.forEach((option, optIndex) => {
@@ -267,7 +273,6 @@ export async function exportPIRLStoPDF(
     });
     yPos += 4; 
 
-    // Correct Answer
     doc.setFont('NotoSansTC', 'bold');
     doc.setFontSize(10);
     const correctAnswerText = `正確答案：${optionLabels[q.correctAnswerIndex]}`;
@@ -275,7 +280,6 @@ export async function exportPIRLStoPDF(
     doc.text(correctAnswerText, margin, yPos);
     yPos += 7;
     
-    // Explanation Header
     doc.setFont('NotoSansTC', 'bold');
     doc.setFontSize(10);
     const explanationHeaderText = "答案說明：";
@@ -283,29 +287,28 @@ export async function exportPIRLStoPDF(
     doc.text(explanationHeaderText, margin, yPos);
     yPos += 5;
     
-    // Explanation Text
     doc.setFont('NotoSansTC', 'normal');
     doc.setFontSize(10);
     const explanationTextLines = doc.splitTextToSize(q.explanation, contentWidth - 8); 
     checkPageBreak(explanationTextLines.length * 5 + 8); 
     doc.text(explanationTextLines, margin + 5, yPos);
     
-    const questionEndY = yPos + explanationTextLines.length * 5; // Approximate end of text
+    const questionEndY = yPos + explanationTextLines.length * 5; 
     
-    // Draw colored left vertical line for the question block
     const borderColorRgb = pirlsLevelRgbColors[q.pirlsLevel];
     doc.setDrawColor(borderColorRgb[0], borderColorRgb[1], borderColorRgb[2]);
     doc.setLineWidth(1.5); 
-    // Adjust vertical line position slightly for better visual balance
     doc.line(margin - 3, questionStartY - 2, margin - 3, questionEndY - 1); 
     doc.setDrawColor(...themeColors.borderDefault); 
     doc.setLineWidth(defaultLineWidth);
 
-    yPos += explanationTextLines.length * 5 + 10; // Spacing after each question block
+    yPos += explanationTextLines.length * 5 + 10; 
   });
 
+  updateProgressCallback(98, '準備儲存 PDF 檔案...');
   try {
     doc.save('PIRLS_QuestionCraft_題組.pdf');
+    updateProgressCallback(100, 'PDF 檔案已開始下載！');
     showToast({
       title: "成功下載",
       description: "PIRLS 題組 PDF 已成功下載。請檢查您的下載資料夾。",
@@ -314,6 +317,7 @@ export async function exportPIRLStoPDF(
     });
   } catch (e: any) {
      console.error("儲存 PDF 時發生錯誤:", e);
+     updateProgressCallback(100, 'PDF 檔案儲存失敗。');
      showToast({
       title: "PDF 儲存失敗",
       description: `無法儲存 PDF 檔案: ${e.message || '未知錯誤'}`,
