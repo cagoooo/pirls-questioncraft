@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useCallback } from 'react';
@@ -11,12 +12,14 @@ import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download } from 'lucide-react';
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
@@ -49,7 +52,7 @@ export default function PIRLSQuestionCraftPage() {
     setLoadingMessage('準備開始處理...');
 
     try {
-      const totalSteps = imageFiles.length + 2; 
+      const totalSteps = imageFiles.length + 2;
       let currentStep = 0;
 
       const updateProgress = (message: string) => {
@@ -105,9 +108,33 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsLoading(false);
       setLoadingProgress(100);
-      // setLoadingMessage(error ? '處理失敗' : '處理完成！'); // Message is set by error state or success toast
     }
   }, [imageFiles, toast]);
+
+  const handleDownloadPdf = async () => {
+    if (!generatedQuestionsOutput || imageFiles.length === 0) {
+      toast({
+        title: '無法下載 PDF',
+        description: '請先生成題目並確認已上傳圖片。',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsGeneratingPdf(true);
+    try {
+      await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast);
+      // Success toast is handled within exportPIRLStoPDF
+    } catch (pdfError: any) {
+      console.error("PDF 生成失敗:", pdfError);
+      toast({
+        title: 'PDF 生成失敗',
+        description: pdfError.message || '無法生成 PDF 檔案，請稍後再試。',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
 
   return (
@@ -121,11 +148,11 @@ export default function PIRLSQuestionCraftPage() {
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
-        <FileUpload onFilesSelected={setImageFiles} isLoading={isLoading} />
+        <FileUpload onFilesSelected={setImageFiles} isLoading={isLoading || isGeneratingPdf} />
 
         <Button
           onClick={handleGenerateQuestions}
-          disabled={isLoading || imageFiles.length === 0}
+          disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
           className="w-full text-lg py-6"
           size="lg"
         >
@@ -169,10 +196,29 @@ export default function PIRLSQuestionCraftPage() {
 
         {generatedQuestionsOutput && !isLoading && (
           <section className="mt-8">
-            <h2 className="text-2xl font-semibold mb-4 text-center flex items-center justify-center">
-              <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-              為您生成的PIRLS題目
-            </h2>
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
+                <h2 className="text-2xl font-semibold text-center flex items-center justify-center mb-2 sm:mb-0">
+                <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
+                為您生成的PIRLS題目
+                </h2>
+                <Button
+                    onClick={handleDownloadPdf}
+                    disabled={isGeneratingPdf || !generatedQuestionsOutput}
+                    variant="outline"
+                >
+                    {isGeneratingPdf ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            PDF產生中...
+                        </>
+                    ) : (
+                        <>
+                            <Download className="mr-2 h-4 w-4" />
+                            下載 PDF
+                        </>
+                    )}
+                </Button>
+            </div>
             <Accordion type="single" collapsible className="w-full">
               {generatedQuestionsOutput.questions.map((q, index) => (
                 <QuestionCard key={index} questionItem={q} questionNumber={index + 1} />
@@ -184,6 +230,7 @@ export default function PIRLSQuestionCraftPage() {
       
       <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} PIRLS QuestionCraft. All rights reserved.</p>
+        <p className="text-xs mt-1">請確認您已將 NotoSansTC-Regular.ttf 字型檔放置於 public/fonts/ 資料夾中，以確保PDF中文內容正確顯示。</p>
       </footer>
     </div>
   );
