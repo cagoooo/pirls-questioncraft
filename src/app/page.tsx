@@ -34,7 +34,7 @@ export default function PIRLSQuestionCraftPage() {
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
-  const fileProgressSectionRef = useRef<HTMLDivElement>(null); // Ref for file progress section
+  const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -83,6 +83,7 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
+    // Total steps: 1 (prep) + N (extract) + 1 (combine) + 1 (generate) + 1 (display)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
@@ -108,15 +109,23 @@ export default function PIRLSQuestionCraftPage() {
           
           if (extractionResult.success && extractionResult.extractedText) {
             extractedTextsArray.push(extractionResult.extractedText);
-          } else if (!extractionResult.success) {
-            throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
+          } else {
+            // Don't throw. Log and show a non-critical toast for this specific file.
+            console.warn(`Text extraction failed for ${file.name}: ${extractionResult.error || 'No text extracted or an error occurred'}`);
+            toast({
+              title: `圖片 "${file.name}" 處理提示`,
+              description: extractionResult.error || '無法提取文字或圖片中無文字。',
+              variant: 'default', 
+            });
           }
         }
       } else {
+        // This case should be caught by the initial imageFiles.length === 0 check
+        // but ensure completedSteps for extraction part is consistent.
         completedSteps += currentImageFilesCount; 
       }
 
-
+      // After processing all images, check if any text was actually extracted
       if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
@@ -125,11 +134,9 @@ export default function PIRLSQuestionCraftPage() {
       updateDisplayProgress(completedSteps, '整合文字內容...');
       const combinedText = extractedTextsArray.join('\n\n---\n\n');
       
-
       completedSteps++;
       updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
-      
       
       if (questionsResult && questionsResult.questions) {
         completedSteps++;
@@ -157,20 +164,26 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
+      // Ensure progress message reflects error at current stage if possible
       const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
       updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
 
     } finally {
       setIsLoading(false);
+      // Update progress to 100% only on clear success or known failure point
       if (!error && generatedQuestionsOutput) {
-         updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
+         // Final step to ensure progress bar shows 100% on success.
+         // The last step updateDisplayProgress in the try block should handle this.
+         // If not, uncomment: updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
       } else if (error) {
         // Message already set in catch
-      } else if (!generatedQuestionsOutput && !error) {
+      } else if (!generatedQuestionsOutput && !error && imageFiles.length > 0) {
+        // This case might indicate an unexpected flow where no questions were generated
+        // without an explicit error.
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, error, loadingMessage]);
+  }, [imageFiles, toast, loadingMessage, generatedQuestionsOutput, error]);
 
   const fileProgressCallback = (progress: number, message: string) => {
     setFileGenerationProgress(progress);
@@ -401,5 +414,6 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
+    
 
     
