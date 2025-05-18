@@ -63,14 +63,12 @@ export default function PIRLSQuestionCraftPage() {
     setError(null); 
     setGeneratedQuestionsOutput(null); 
     
-    // Recalculate totalSteps based on current imageFiles.length
     const currentImageFilesCount = imageFiles.length;
-    const totalSteps = currentImageFilesCount + 2; // +1 for combining, +1 for generating questions
+    const totalSteps = currentImageFilesCount + 2; 
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
-      // Ensure progress doesn't exceed 100 or go below 0
       const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
       setLoadingProgress(progress); 
     };
@@ -81,7 +79,7 @@ export default function PIRLSQuestionCraftPage() {
       const extractedTextsArray: string[] = [];
       if (currentImageFilesCount > 0) {
         for (let i = 0; i < currentImageFilesCount; i++) {
-          const file = imageFiles[i]; // Use the imageFiles from the closure, which is the state at the time of calling
+          const file = imageFiles[i]; 
           updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${currentImageFilesCount})`);
           
           const photoDataUri = await convertFileToDataUri(file);
@@ -133,23 +131,20 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Update progress on error, but don't mark as 100% complete
       const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
       updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
 
     } finally {
       setIsLoading(false);
-      // Only set to 100% if successful and all steps completed
       if (!error && generatedQuestionsOutput && completedSteps === totalSteps) {
          updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
       } else if (error) {
         // Message already set in catch, progress already updated
       } else if (!generatedQuestionsOutput && !error) {
-        // Handle cases where generation might finish without error but no output (should be rare)
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]);
+  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]); // Removed setLoadingProgress from dependency array as it's not directly used in useCallback's logic
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -192,7 +187,7 @@ export default function PIRLSQuestionCraftPage() {
         <Button
           onClick={handleGenerateQuestions}
           disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
-          className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg"
+          className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
           size="lg"
         >
           {isLoading ? (
