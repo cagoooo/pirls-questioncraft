@@ -14,13 +14,17 @@ const geistMono = Geist_Mono({
 });
 
 const siteTitle = 'PIRLS 閱讀素養題組生成站';
-const siteDescription = '上傳圖片，APP 為您分析內容並設計PIRLS四層次選擇題。支援圖片貼上、PDF及Excel匯出。';
+const siteDescription = '上傳圖片或直接貼上截圖，APP 為您分析內容並設計PIRLS四層次選擇題。支援圖片貼上、PDF及Excel匯出。專為教育工作者設計的AI輔助工具。';
 // 建議在 public/images/ 建立一張名為 social-preview.png 的圖片 (推薦尺寸 1200x630)
 const socialPreviewImageUrl = '/images/social-preview.png'; 
 
 export const metadata: Metadata = {
   title: siteTitle,
   description: siteDescription,
+  icons: {
+    icon: '/images/logo.png', // Sets the favicon to use logo.png from public/images
+    // apple: '/images/apple-icon.png', // You can add other icon types if needed
+  },
   openGraph: {
     title: siteTitle,
     description: siteDescription,
@@ -46,8 +50,8 @@ export const metadata: Metadata = {
     // creator: '@您的Twitter帳號', // 可選
   },
   // 為了更好的搜尋引擎索引和可訪問性，可以加入其他標籤
-  // keywords: ['PIRLS', '閱讀素養', '題目生成', '教育科技', 'AI輔助教學'], // 可選
-  // authors: [{ name: '桃園市石門國小資訊組 阿凱老師', url: 'https://www.smes.tyc.edu.tw/' }], // 可選
+  keywords: ['PIRLS', '閱讀素養', '題目生成', '教育科技', 'AI輔助教學', '繁體中文', '台灣適用', '圖片轉文字', '自動出題'], // 可選
+  authors: [{ name: '桃園市石門國小資訊組 阿凱老師', url: 'https://www.smes.tyc.edu.tw/' }], // 可選
 };
 
 export default function RootLayout({
