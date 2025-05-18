@@ -55,7 +55,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     }
   }, [toast, selectedFiles.length]);
 
-  const handlePaste = useCallback(async (event: ClipboardEvent) => {
+  const handlePaste = useCallback(async (event: ClipboardEvent<Document>) => {
     if (isLoading) return;
 
     const items = event.clipboardData?.items;
@@ -107,23 +107,25 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [selectedFiles, toast, isLoading]);
 
   useEffect(() => {
-    document.addEventListener('paste', handlePaste);
+    const pasteHandler = (event: Event) => handlePaste(event as ClipboardEvent<Document>);
+    document.addEventListener('paste', pasteHandler);
     return () => {
-      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('paste', pasteHandler);
     };
   }, [handlePaste]);
 
   useEffect(() => {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    imagePreviews.forEach(url => URL.revokeObjectURL(url));
+    imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke old previews
     setImagePreviews(newPreviews);
     onFilesSelected(selectedFiles);
 
+    // Cleanup function to revoke object URLs when component unmounts or selectedFiles change
     return () => {
       newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]);
+  }, [selectedFiles]); // Removed onFilesSelected from dependencies, as it might cause re-renders if its identity changes.
 
   const removeImage = (index: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
@@ -202,7 +204,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                       src={previewUrl}
                       alt={`預覽 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
                       fill={true}
-                      sizes="(max-width: 640px) 50vw, 25vw" // Example sizes, adjust as needed
+                      sizes="(max-width: 640px) 50vw, 25vw"
                       className="rounded-md border object-cover"
                       data-ai-hint="document scan"
                     />
