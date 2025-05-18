@@ -31,7 +31,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
   const [dialogImageScale, setDialogImageScale] = useState(1);
-  const imageDisplayAreaRef = useRef<HTMLDivElement>(null); // Changed from imageDialogRef
+  const imageDisplayAreaRef = useRef<HTMLDivElement>(null); 
 
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -141,7 +141,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     const oldPreviews = imagePreviews;
     
     setImagePreviews(newPreviews);
-    onFilesSelected(selectedFiles);
+    onFilesSelected(selectedFiles); // Make sure this is correctly handled in parent for scrolling
 
     return () => {
       oldPreviews.forEach(url => {
@@ -149,15 +149,14 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           URL.revokeObjectURL(url);
         }
       });
-      // Also revoke new previews if component unmounts or selectedFiles changes to empty
       if (newPreviews.length === 0) {
           oldPreviews.forEach(URL.revokeObjectURL);
-      } else if (selectedFiles.length === 0) { // Ensure cleanup if selectedFiles is emptied directly
+      } else if (selectedFiles.length === 0) { 
           newPreviews.forEach(URL.revokeObjectURL);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]); // onFilesSelected is stable due to parent's useCallback
+  }, [selectedFiles, onFilesSelected]); 
 
   const removeImage = (indexToRemove: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
@@ -215,9 +214,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     setIsPanning(false);
     setIsImageDialogOpen(true);
   };
-
-  const handleDialogImageWheel = useCallback((event: WheelEvent) => {
-    // 用於調試: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
+  
+  const handleDialogImageWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    // For debugging: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
@@ -227,28 +226,13 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-      // 用於調試: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
+      // For debugging: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
         setImageOffset({ x: 0, y: 0 });
       }
       return clampedScale;
     });
   }, [setDialogImageScale, setImageOffset]); 
-  
-  useEffect(() => {
-    const currentImageDisplayArea = imageDisplayAreaRef.current; // Target the image display area
-    // 用於調試: console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDisplayArea);
-    if (isImageDialogOpen && currentImageDisplayArea) {
-      currentImageDisplayArea.addEventListener('wheel', handleDialogImageWheel, { passive: false });
-      // 用於調試: console.log('Wheel listener ATTACHED to:', currentImageDisplayArea);
-    }
-    return () => {
-      if (currentImageDisplayArea) {
-        currentImageDisplayArea.removeEventListener('wheel', handleDialogImageWheel);
-        // 用於調試: console.log('Wheel listener REMOVED from:', currentImageDisplayArea);
-      }
-    };
-  }, [isImageDialogOpen, handleDialogImageWheel, imageDisplayAreaRef]); // Added imageDisplayAreaRef
 
   const zoomIn = () => setDialogImageScale(s => {
     const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
@@ -464,8 +448,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         <DialogDescription className="sr-only">詳細檢視上傳的圖片內容，可使用按鈕或滑鼠滾輪進行縮放，以及拖曳平移圖片。</DialogDescription>
         {selectedImageForDialog && (
           <div 
-            ref={imageDisplayAreaRef} // Attach ref here
+            ref={imageDisplayAreaRef}
             className="relative w-full h-full flex justify-center items-center overflow-hidden"
+            onWheel={handleDialogImageWheel} // Direct onWheel prop
           >
             <Image
               src={selectedImageForDialog}
@@ -507,5 +492,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
-
-    
