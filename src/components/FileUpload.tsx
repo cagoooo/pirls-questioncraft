@@ -31,7 +31,11 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
   const [dialogImageScale, setDialogImageScale] = useState(1);
-  const imageDialogRef = useRef<HTMLDivElement>(null);
+  const imageDialogRef = useRef<HTMLDivElement>(null); // For wheel event on DialogContent
+
+  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
 
 
   const processNewFiles = useCallback((newFilesArray: File[]) => {
@@ -145,7 +149,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           URL.revokeObjectURL(url);
         }
       });
-      if (selectedFiles.length === 0) {
+      if (selectedFiles.length === 0 && newPreviews.length > 0) { // Ensure all are revoked if selection becomes empty
         newPreviews.forEach(url => URL.revokeObjectURL(url));
       }
     };
@@ -209,7 +213,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   const handleImagePreviewClick = (previewUrl: string) => {
     setSelectedImageForDialog(previewUrl);
-    setDialogImageScale(1); // Reset scale when new image is opened
+    setDialogImageScale(1); 
+    setImageOffset({ x: 0, y: 0 });
+    setIsPanning(false);
     setIsImageDialogOpen(true);
   };
 
@@ -217,30 +223,94 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
-      if (event.deltaY < 0) { // Zoom in
+      if (event.deltaY < 0) { 
         newScale = prevScale + SCALE_STEP;
-      } else { // Zoom out
+      } else { 
         newScale = prevScale - SCALE_STEP;
       }
-      return Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      if (clampedScale === 1) {
+        setImageOffset({ x: 0, y: 0 }); // Reset offset if scale is 1
+      }
+      return clampedScale;
     });
   };
   
   useEffect(() => {
-    const currentImageDialogRef = imageDialogRef.current;
-    if (isImageDialogOpen && currentImageDialogRef) {
-      currentImageDialogRef.addEventListener('wheel', handleDialogImageWheel, { passive: false });
+    const currentImageDialogEl = imageDialogRef.current;
+    if (isImageDialogOpen && currentImageDialogEl) {
+      currentImageDialogEl.addEventListener('wheel', handleDialogImageWheel, { passive: false });
     }
     return () => {
-      if (currentImageDialogRef) {
-        currentImageDialogRef.removeEventListener('wheel', handleDialogImageWheel);
+      if (currentImageDialogEl) {
+        currentImageDialogEl.removeEventListener('wheel', handleDialogImageWheel);
       }
     };
   }, [isImageDialogOpen]);
 
-  const zoomIn = () => setDialogImageScale(s => Math.min(s + SCALE_STEP, MAX_SCALE));
-  const zoomOut = () => setDialogImageScale(s => Math.max(s - SCALE_STEP, MIN_SCALE));
-  const resetZoom = () => setDialogImageScale(1);
+  const zoomIn = () => setDialogImageScale(s => {
+    const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
+    if (newScale === 1) setImageOffset({ x: 0, y: 0 });
+    return newScale;
+  });
+  const zoomOut = () => setDialogImageScale(s => {
+    const newScale = Math.max(s - SCALE_STEP, MIN_SCALE);
+    if (newScale === 1) setImageOffset({ x: 0, y: 0 });
+    return newScale;
+  });
+  const resetZoom = () => {
+    setDialogImageScale(1);
+    setImageOffset({ x: 0, y: 0 });
+  };
+
+  const handlePanStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (dialogImageScale <= 1) return;
+    e.preventDefault(); 
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    panStartRef.current = { x: clientX - imageOffset.x, y: clientY - imageOffset.y };
+    setIsPanning(true);
+  };
+
+  useEffect(() => {
+    const handleGlobalPanMove = (e: MouseEvent | TouchEvent) => {
+      if (!isPanning) return;
+      // For touchmove, prevent default scrolling if not handled by touch-action
+      if ('touches' in e) e.preventDefault();
+
+
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      
+      setImageOffset({
+        x: clientX - panStartRef.current.x,
+        y: clientY - panStartRef.current.y,
+      });
+    };
+
+    const handleGlobalPanEnd = () => {
+      setIsPanning(false);
+    };
+
+    if (isPanning) {
+      window.addEventListener('mousemove', handleGlobalPanMove);
+      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false });
+      window.addEventListener('mouseup', handleGlobalPanEnd);
+      window.addEventListener('touchend', handleGlobalPanEnd);
+      window.addEventListener('mouseleave', handleGlobalPanEnd); // Handle mouse leaving window
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalPanMove);
+      window.removeEventListener('touchmove', handleGlobalPanMove);
+      window.removeEventListener('mouseup', handleGlobalPanEnd);
+      window.removeEventListener('touchend', handleGlobalPanEnd);
+      window.removeEventListener('mouseleave', handleGlobalPanEnd);
+    };
+  }, [isPanning]);
+
 
   return (
     <Dialog 
@@ -249,7 +319,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             setIsImageDialogOpen(isOpen);
             if (!isOpen) {
                 setSelectedImageForDialog(null);
-                setDialogImageScale(1); // Reset scale on close
+                setDialogImageScale(1); 
+                setImageOffset({ x: 0, y: 0 });
+                setIsPanning(false);
             }
         }}
     >
@@ -358,7 +430,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                           size="icon"
                           className="absolute top-1.5 right-1.5 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10"
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent dialog from opening
+                            e.stopPropagation(); 
                             removeImage(index);
                           }}
                           disabled={isLoading}
@@ -387,11 +459,11 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
       <DialogContent 
         className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
-        ref={imageDialogRef} // Ref for wheel event
+        ref={imageDialogRef} 
       >
         <DialogTitle className="sr-only">放大的圖片預覽</DialogTitle>
         {selectedImageForDialog && (
-          <div className="relative w-full h-full flex justify-center items-center overflow-hidden"> {/* Added overflow-hidden */}
+          <div className="relative w-full h-full flex justify-center items-center overflow-hidden">
             <Image
               src={selectedImageForDialog}
               alt="放大的圖片預覽"
@@ -401,14 +473,19 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                   width: 'auto',
                   height: 'auto',
                   maxWidth: '100%',
-                  maxHeight: 'calc(85vh - 2rem - 40px)', // Account for buttons
+                  maxHeight: 'calc(85vh - 2rem - 40px)', 
                   objectFit: 'contain',
-                  transform: `scale(${dialogImageScale})`,
-                  transition: 'transform 0.1s ease-out',
-                  cursor: dialogImageScale > 1 ? 'grab' : 'default',
+                  transform: `scale(${dialogImageScale}) translate(${imageOffset.x}px, ${imageOffset.y}px)`,
+                  cursor: isPanning ? 'grabbing' : (dialogImageScale > 1 ? 'grab' : 'default'),
+                  transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                  userSelect: 'none',
+                  touchAction: dialogImageScale > 1 ? 'none' : 'auto',
               }}
               className="rounded-md shadow-xl"
               data-ai-hint="document scan enlarged"
+              onMouseDown={handlePanStart}
+              onTouchStart={handlePanStart}
+              draggable="false"
             />
           </div>
         )}
@@ -427,3 +504,5 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
+
+      
