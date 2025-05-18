@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -23,8 +23,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewsSectionRef = useRef<HTMLDivElement>(null);
-
+  
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
 
@@ -130,12 +129,22 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     const oldPreviews = [...imagePreviews];
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
     setImagePreviews(newPreviews);
+    
+    // Call onFilesSelected after selectedFiles and imagePreviews are updated
     onFilesSelected(selectedFiles);
 
     return () => {
-      oldPreviews.forEach(url => URL.revokeObjectURL(url));
-      // Also ensure current newPreviews are cleaned up if component unmounts before next selectedFiles change
-      newPreviews.forEach(url => URL.revokeObjectURL(url)); 
+      // Clean up old previews that are no longer in selectedFiles
+      oldPreviews.forEach(url => {
+        if (!newPreviews.includes(url)) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      // Also ensure current newPreviews are cleaned up if component unmounts
+      // or if selectedFiles is cleared
+      if (selectedFiles.length === 0) {
+        newPreviews.forEach(url => URL.revokeObjectURL(url));
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFiles, onFilesSelected]);
@@ -199,7 +208,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   const handleImagePreviewClick = (previewUrl: string) => {
     setSelectedImageForDialog(previewUrl);
-    // setIsImageDialogOpen(true); // DialogTrigger now handles opening via onOpenChange on Dialog
+    // DialogTrigger now handles opening via onOpenChange on Dialog
   };
 
   return (
@@ -284,7 +293,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             </div>
 
             {selectedFiles.length > 0 && (
-              <div className="space-y-4" ref={previewsSectionRef}>
+              <div className="space-y-4">
                 <h3 className="text-md font-semibold text-foreground">已選圖片預覽：</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {imagePreviews.map((previewUrl, index) => (
@@ -295,7 +304,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             handleImagePreviewClick(previewUrl);
-                            // DialogTrigger will handle actual dialog opening if it receives focus and enter/space
                           }
                         }}
                         tabIndex={0}
@@ -343,6 +351,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       </Card>
 
       <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm">
+        <DialogTitle className="sr-only">放大的圖片預覽</DialogTitle>
         {selectedImageForDialog && (
           <div className="relative max-h-[85vh] w-full flex justify-center items-center p-2">
             <Image
@@ -366,5 +375,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
-
-    
