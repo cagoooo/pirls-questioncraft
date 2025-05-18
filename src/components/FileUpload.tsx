@@ -81,7 +81,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             });
         }
     }
-  }, [selectedFiles.length, toast, isLoading, setSelectedFiles]);
+  }, [selectedFiles.length, toast, isLoading]);
 
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -137,44 +137,41 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [handlePaste]);
 
   useEffect(() => {
-    const oldPreviews = [...imagePreviews];
-    const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+    // Create new previews
+    const newPreviews = selectedFiles.map(file => {
+      const url = URL.createObjectURL(file);
+      return url;
+    });
+    
+    // Revoke old previews that are no longer in use
+    const previousPreviews = imagePreviews;
     setImagePreviews(newPreviews);
     
+    previousPreviews.forEach(oldUrl => {
+      if (!newPreviews.includes(oldUrl)) {
+        URL.revokeObjectURL(oldUrl);
+      }
+    });
+
     onFilesSelected(selectedFiles);
 
+    // Cleanup all current previews when the component unmounts
+    // or if selectedFiles becomes empty (handled by newPreviews becoming empty).
     return () => {
-      oldPreviews.forEach(url => {
-        if (!newPreviews.includes(url)) {
-          URL.revokeObjectURL(url);
-        }
-      });
-      // Ensure all are revoked if selection becomes empty or component unmounts with previews
-      if (selectedFiles.length === 0 && newPreviews.length > 0) { 
-        newPreviews.forEach(url => URL.revokeObjectURL(url));
-      } else if (newPreviews.length > 0 && selectedFiles.length > 0) { // On unmount, if files still selected
-         // No, this logic is flawed. The first part of return handles unmount logic when selectedFiles changes.
-         // If selectedFiles itself becomes empty, the newPreviews become empty, and oldPreviews are revoked.
-         // If component unmounts while selectedFiles are present, this cleanup will run.
-      }
+      newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFiles, onFilesSelected]);
 
 
   const removeImage = (indexToRemove: number) => {
-    const urlToRevoke = imagePreviews[indexToRemove];
-    URL.revokeObjectURL(urlToRevoke);
-
+    // The useEffect for imagePreviews will handle revoking the specific URL
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
-    // imagePreviews will update via the useEffect listening to selectedFiles
   };
 
 
   const clearAllImages = () => {
-    imagePreviews.forEach(url => URL.revokeObjectURL(url));
-    setImagePreviews([]); // This will trigger the useEffect to revoke if imagePreviews was the source
-    setSelectedFiles([]); // This is the primary state driving previews
+    // The useEffect for imagePreviews will handle revoking all URLs
+    setSelectedFiles([]);
   };
   
   const canUploadMore = selectedFiles.length < 4;
@@ -190,6 +187,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const handleDragLeave = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    // Check if the mouse is leaving the label to one of its children
+    // If so, do not set isDraggingOver to false
     if (event.currentTarget.contains(event.relatedTarget as Node)) {
         return;
     }
@@ -197,10 +196,10 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
 
   const handleDragOver = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault(); 
+    event.preventDefault(); // Necessary to allow dropping
     event.stopPropagation();
     if (!isLoading && canUploadMore && !isDraggingOver) {
-        setIsDraggingOver(true); 
+        setIsDraggingOver(true); // Set true if dragged over from outside
     }
   };
 
@@ -227,6 +226,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
 
   const handleDialogImageWheel = useCallback((event: WheelEvent) => {
+    // For debugging: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
@@ -236,21 +236,25 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      // For debugging: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
-        setImageOffset({ x: 0, y: 0 }); // Reset offset if scale is 1
+        setImageOffset({ x: 0, y: 0 });
       }
       return clampedScale;
     });
-  }, [setDialogImageScale, setImageOffset]); // SCALE_STEP, MIN_SCALE, MAX_SCALE are constants outside
+  }, [setDialogImageScale, setImageOffset]); 
   
   useEffect(() => {
     const currentImageDialogEl = imageDialogRef.current;
+    // For debugging: console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDialogEl);
     if (isImageDialogOpen && currentImageDialogEl) {
       currentImageDialogEl.addEventListener('wheel', handleDialogImageWheel, { passive: false });
+      // For debugging: console.log('Wheel listener ATTACHED to:', currentImageDialogEl);
     }
     return () => {
       if (currentImageDialogEl) {
         currentImageDialogEl.removeEventListener('wheel', handleDialogImageWheel);
+        // For debugging: console.log('Wheel listener REMOVED from:', currentImageDialogEl);
       }
     };
   }, [isImageDialogOpen, handleDialogImageWheel]);
@@ -284,7 +288,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   useEffect(() => {
     const handleGlobalPanMove = (e: MouseEvent | TouchEvent) => {
       if (!isPanning) return;
-      if ('touches' in e) e.preventDefault(); // Prevent page scroll on touch
+      // For touchmove, prevent default page scroll if not already handled by touch-action
+      if ('touches' in e && e.cancelable) e.preventDefault();
 
 
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -302,10 +307,10 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
     if (isPanning) {
       window.addEventListener('mousemove', handleGlobalPanMove);
-      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false });
+      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false }); // passive: false for preventDefault
       window.addEventListener('mouseup', handleGlobalPanEnd);
       window.addEventListener('touchend', handleGlobalPanEnd);
-      window.addEventListener('mouseleave', handleGlobalPanEnd);
+      window.addEventListener('mouseleave', handleGlobalPanEnd); // Handle mouse leaving window
     }
 
     return () => {
@@ -510,3 +515,4 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
+
