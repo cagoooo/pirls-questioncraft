@@ -42,7 +42,7 @@ async function loadFont(doc: jsPDF, showToast: typeof Toast) {
 
     doc.addFileToVFS('NotoSansTC-Regular.ttf', fontBase64);
     doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-    doc.setFont('NotoSansTC'); // Set font for the document
+    doc.setFont('NotoSansTC', 'normal'); // Set font for the document explicitly to normal
   } catch (error: any) {
     console.error("載入字型時發生錯誤:", error);
     doc.setFont('helvetica', 'normal'); // Fallback font
@@ -65,7 +65,7 @@ export async function exportPIRLStoPDF(
     format: 'a4',
   });
 
-  await loadFont(doc, showToast);
+  await loadFont(doc, showToast); // Font is set to NotoSansTC normal here
 
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -82,15 +82,16 @@ export async function exportPIRLStoPDF(
 
   // Title
   doc.setFontSize(18);
+  // doc.setFont('NotoSansTC', 'normal'); // Ensure normal style for title, though it should be default
   doc.text('PIRLS 閱讀素養題組', pageWidth / 2, yPos, { align: 'center' });
   yPos += 12;
 
   // Images Section Title
   checkPageBreak(10);
   doc.setFontSize(14);
-  doc.setFont('NotoSansTC', 'bold');
+  doc.setFont('NotoSansTC', 'normal'); // Changed from bold to normal
   doc.text('一、閱讀文本 (圖片內容)', margin, yPos);
-  doc.setFont('NotoSansTC', 'normal');
+  doc.setFont('NotoSansTC', 'normal'); // Ensure subsequent text is normal
   yPos += 8;
 
   if (imageFiles.length === 0) {
@@ -109,54 +110,52 @@ export async function exportPIRLStoPDF(
         let imgWidthOnPage = contentWidth;
         let imgHeightOnPage = imgWidthOnPage / aspectRatio;
 
-        // If image is too tall for half a page, scale it down
-        const maxImgHeight = (pageHeight - 2 * margin) / 2; // Max half page for an image
+        const maxImgHeight = (pageHeight - 2 * margin) / 2; 
         if (imgHeightOnPage > maxImgHeight) {
           imgHeightOnPage = maxImgHeight;
           imgWidthOnPage = imgHeightOnPage * aspectRatio;
         }
-        // Ensure width does not exceed contentWidth after height adjustment
         if (imgWidthOnPage > contentWidth) {
             imgWidthOnPage = contentWidth;
             imgHeightOnPage = imgWidthOnPage / aspectRatio;
         }
 
-        checkPageBreak(imgHeightOnPage + 5); // 5mm spacing after image
+        checkPageBreak(imgHeightOnPage + 5); 
         doc.addImage(dataUri, imgProps.fileType.toUpperCase(), margin, yPos, imgWidthOnPage, imgHeightOnPage);
         yPos += imgHeightOnPage + 5;
       } catch (e: any) {
         console.error(`Error adding image ${file.name} to PDF:`, e);
         checkPageBreak(10);
-        doc.setTextColor(255, 0, 0); // Red for error
+        doc.setTextColor(255, 0, 0); 
         doc.setFontSize(10);
         doc.text(`無法載入圖片: ${file.name} (錯誤: ${e.message || '未知問題'})`, margin, yPos);
-        doc.setTextColor(0, 0, 0); // Reset text color
+        doc.setTextColor(0, 0, 0); 
         yPos += 7;
       }
     }
   }
-  yPos += 5; // Extra space before questions
+  yPos += 5; 
 
   // Questions Section Title
   checkPageBreak(12);
   doc.setFontSize(16);
-  doc.setFont('NotoSansTC', 'bold');
+  doc.setFont('NotoSansTC', 'normal'); // Changed from bold to normal
   doc.text('二、PIRLS 題組題目', margin, yPos);
-  doc.setFont('NotoSansTC', 'normal');
+  doc.setFont('NotoSansTC', 'normal'); // Ensure subsequent text is normal
   yPos += 10;
 
   const optionLabels = ['(A)', '(B)', '(C)', '(D)'];
 
   questionsOutput.questions.forEach((q, index) => {
     const questionNumber = index + 1;
-    let questionBlockNeededHeight = 20; // Initial estimate for question + level
+    let questionBlockNeededHeight = 20; 
     const questionTextLines = doc.splitTextToSize(`${questionNumber}. ${q.question}`, contentWidth);
-    questionBlockNeededHeight += questionTextLines.length * 5; // Approx line height 5mm for 12pt
+    questionBlockNeededHeight += questionTextLines.length * 5; 
     
     q.options.forEach(opt => {
-        questionBlockNeededHeight += doc.splitTextToSize(opt, contentWidth - 10).length * 4.5; // Approx line height 4.5mm for 10pt
+        questionBlockNeededHeight += doc.splitTextToSize(opt, contentWidth - 10).length * 4.5; 
     });
-    questionBlockNeededHeight += 15; // For answer and explanation header
+    questionBlockNeededHeight += 15; 
 
     const explanationLinesCount = doc.splitTextToSize(q.explanation, contentWidth).length;
     questionBlockNeededHeight += explanationLinesCount * 4.5;
@@ -165,32 +164,33 @@ export async function exportPIRLStoPDF(
 
     // Question Text
     doc.setFontSize(12);
-    doc.setFont('NotoSansTC', 'bold');
+    doc.setFont('NotoSansTC', 'normal'); // Changed from bold to normal
     doc.text(questionTextLines, margin, yPos);
     yPos += questionTextLines.length * 5 + 2;
 
     // PIRLS Level
     doc.setFontSize(9);
     doc.setFont('NotoSansTC', 'normal');
-    doc.setTextColor(100, 100, 100); // Grey for level
+    doc.setTextColor(100, 100, 100); 
     doc.text(`PIRLS 層次：${pirlsLevelLabels[q.pirlsLevel]}`, margin, yPos);
-    doc.setTextColor(0, 0, 0); // Reset color
+    doc.setTextColor(0, 0, 0); 
     yPos += 6;
 
     // Options
     doc.setFontSize(10);
+    doc.setFont('NotoSansTC', 'normal'); // Ensure options are normal
     q.options.forEach((option, optIndex) => {
       const optionFullText = `${optionLabels[optIndex]} ${option}`;
-      const optionTextLines = doc.splitTextToSize(optionFullText, contentWidth - 5); // Indent options slightly
+      const optionTextLines = doc.splitTextToSize(optionFullText, contentWidth - 5); 
       checkPageBreak(optionTextLines.length * 4.5 + 1);
       doc.text(optionTextLines, margin + 5, yPos);
       yPos += optionTextLines.length * 4.5 + 1;
     });
-    yPos += 3; // Space after options
+    yPos += 3; 
 
     // Correct Answer
     doc.setFontSize(10);
-    doc.setFont('NotoSansTC', 'bold');
+    doc.setFont('NotoSansTC', 'normal'); // Changed from bold to normal
     const correctAnswerText = `正確答案：${optionLabels[q.correctAnswerIndex]}`;
     checkPageBreak(6);
     doc.text(correctAnswerText, margin, yPos);
@@ -203,10 +203,10 @@ export async function exportPIRLStoPDF(
     doc.text(explanationHeaderText, margin, yPos);
     yPos += 4.5;
     
-    const explanationTextLines = doc.splitTextToSize(q.explanation, contentWidth - 5); // Indent explanation
+    const explanationTextLines = doc.splitTextToSize(q.explanation, contentWidth - 5); 
     checkPageBreak(explanationTextLines.length * 4.5 + 5);
     doc.text(explanationTextLines, margin + 5, yPos);
-    yPos += explanationTextLines.length * 4.5 + 8; // Space after each question block
+    yPos += explanationTextLines.length * 4.5 + 8; 
   });
 
   try {
@@ -226,3 +226,4 @@ export async function exportPIRLStoPDF(
     });
   }
 }
+
