@@ -255,7 +255,6 @@ export default function PIRLSQuestionCraftPage() {
       
       <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} PIRLS QuestionCraft. All rights reserved.</p>
-        <p className="text-xs mt-1">請確認您已將 NotoSansTC-(Regular/Bold/Medium/Thin/ExtraBold/Black).ttf 等字型檔放置於 public/fonts/ 資料夾中，以確保PDF中文內容正確顯示。</p>
       </footer>
     </div>
   );
