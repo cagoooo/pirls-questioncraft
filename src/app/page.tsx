@@ -115,7 +115,7 @@ export default function PIRLSQuestionCraftPage() {
       
       completedSteps++;
       updateDisplayProgress(completedSteps, '整合文字內容...');
-      const combinedText = extractedTextsArray.join('\\n\\n---\\n\\n'); 
+      const combinedText = extractedTextsArray.join('\n\n---\n\n'); 
       
 
       completedSteps++;
@@ -354,3 +354,4 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
+

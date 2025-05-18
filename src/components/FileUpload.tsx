@@ -118,7 +118,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     return () => {
       newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [selectedFiles, onFilesSelected, imagePreviews]); // Added imagePreviews to dependency to avoid stale closure
+  }, [selectedFiles, onFilesSelected]);
 
 
   const removeImage = (index: number) => {
@@ -132,7 +132,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const canUploadMore = selectedFiles.length < 4;
 
   return (
-    <Card className="w-full bg-muted dark:bg-muted">
+    <Card className="w-full bg-sky-100 dark:bg-sky-800">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ImagePlus className="h-6 w-6 text-primary" />
