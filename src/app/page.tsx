@@ -13,20 +13,22 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
+import { exportPIRLStoExcel } from '@/lib/generateExcel'; // New import
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon } from 'lucide-react'; // Added SheetIcon
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingExcel, setIsGeneratingExcel] = useState(false); // New state
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
-  const loadingSectionRef = useRef<HTMLDivElement>(null); // Added ref for loading section
+  const loadingSectionRef = useRef<HTMLDivElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -64,7 +66,6 @@ export default function PIRLSQuestionCraftPage() {
     setError(null); 
     setGeneratedQuestionsOutput(null); 
     
-    // Scroll to loading section
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
@@ -151,7 +152,7 @@ export default function PIRLSQuestionCraftPage() {
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]);
+  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage, error]); // Added error to dependency array
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -177,6 +178,30 @@ export default function PIRLSQuestionCraftPage() {
     }
   };
 
+  const handleDownloadExcel = async () => {
+    if (!generatedQuestionsOutput) {
+      toast({
+        title: '無法下載 Excel',
+        description: '請先生成題目。',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsGeneratingExcel(true);
+    try {
+      await exportPIRLStoExcel(generatedQuestionsOutput, toast);
+    } catch (excelError: any) {
+      console.error("Excel 生成失敗:", excelError);
+      toast({
+        title: 'Excel 生成失敗',
+        description: excelError.message || '無法生成 Excel 檔案，請稍後再試。',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingExcel(false);
+    }
+  };
+
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
@@ -189,11 +214,11 @@ export default function PIRLSQuestionCraftPage() {
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
-        <FileUpload onFilesSelected={handleImageFilesChange} isLoading={isLoading || isGeneratingPdf} />
+        <FileUpload onFilesSelected={handleImageFilesChange} isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} />
 
         <Button
           onClick={handleGenerateQuestions}
-          disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
+          disabled={isLoading || isGeneratingPdf || isGeneratingExcel || imageFiles.length === 0}
           className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
           size="lg"
         >
@@ -211,7 +236,7 @@ export default function PIRLSQuestionCraftPage() {
         </Button>
 
         {isLoading && (
-           <Card ref={loadingSectionRef} className="w-full shadow-md"> {/* Attached ref here */}
+           <Card ref={loadingSectionRef} className="w-full shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-semibold">
                 <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
@@ -237,28 +262,47 @@ export default function PIRLSQuestionCraftPage() {
 
         {generatedQuestionsOutput && !isLoading && (
           <section ref={resultsSectionRef} className="mt-8">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
-                <h2 className="text-2xl font-semibold text-center flex items-center justify-center mb-2 sm:mb-0">
-                <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-                為您生成的PIRLS題目
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
+                <h2 className="text-2xl font-semibold text-center flex items-center justify-center">
+                  <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
+                  為您生成的PIRLS題目
                 </h2>
-                <Button
-                    onClick={handleDownloadPdf}
-                    disabled={isGeneratingPdf || !generatedQuestionsOutput}
-                    variant="outline"
-                >
-                    {isGeneratingPdf ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            PDF產生中...
-                        </>
-                    ) : (
-                        <>
-                            <Download className="mr-2 h-4 w-4" />
-                            下載 PDF
-                        </>
-                    )}
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                      onClick={handleDownloadPdf}
+                      disabled={isGeneratingPdf || isGeneratingExcel || !generatedQuestionsOutput || imageFiles.length === 0}
+                      variant="outline"
+                  >
+                      {isGeneratingPdf ? (
+                          <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              PDF產生中...
+                          </>
+                      ) : (
+                          <>
+                              <Download className="mr-2 h-4 w-4" />
+                              下載 PDF
+                          </>
+                      )}
+                  </Button>
+                  <Button
+                      onClick={handleDownloadExcel}
+                      disabled={isGeneratingPdf || isGeneratingExcel || !generatedQuestionsOutput}
+                      variant="outline"
+                  >
+                      {isGeneratingExcel ? (
+                          <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Excel產生中...
+                          </>
+                      ) : (
+                          <>
+                              <SheetIcon className="mr-2 h-4 w-4" />
+                              下載 Excel
+                          </>
+                      )}
+                  </Button>
+                </div>
             </div>
             <Accordion type="single" collapsible className="w-full">
               {generatedQuestionsOutput.questions.map((q, index) => (
@@ -285,4 +329,3 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
-
