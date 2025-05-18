@@ -141,7 +141,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     const oldPreviews = imagePreviews;
     
     setImagePreviews(newPreviews);
-    onFilesSelected(selectedFiles); // Make sure this is correctly handled in parent for scrolling
+    onFilesSelected(selectedFiles); 
 
     return () => {
       oldPreviews.forEach(url => {
@@ -149,9 +149,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           URL.revokeObjectURL(url);
         }
       });
-      if (newPreviews.length === 0) {
+      if (newPreviews.length === 0 && oldPreviews.length > 0) {
           oldPreviews.forEach(URL.revokeObjectURL);
-      } else if (selectedFiles.length === 0) { 
+      } else if (selectedFiles.length === 0 && newPreviews.length > 0 ) { 
           newPreviews.forEach(URL.revokeObjectURL);
       }
     };
@@ -216,7 +216,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
   
   const handleDialogImageWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    // For debugging: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
@@ -226,7 +225,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-      // For debugging: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
         setImageOffset({ x: 0, y: 0 });
       }
@@ -450,7 +448,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           <div 
             ref={imageDisplayAreaRef}
             className="relative w-full h-full flex justify-center items-center overflow-hidden"
-            onWheel={handleDialogImageWheel} // Direct onWheel prop
+            onWheel={handleDialogImageWheel} 
           >
             <Image
               src={selectedImageForDialog}
@@ -477,18 +475,19 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             />
           </div>
         )}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-background/80 rounded-lg shadow-md">
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1 sm:bottom-4 sm:gap-2 sm:p-2 bg-background/80 rounded-lg shadow-md">
             <Button variant="outline" size="icon" onClick={zoomOut} aria-label="縮小">
-                <ZoomOut className="h-5 w-5" />
+                <ZoomOut className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Button variant="outline" size="icon" onClick={resetZoom} aria-label="重設縮放">
-                <RotateCcw className="h-5 w-5" />
+                <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Button variant="outline" size="icon" onClick={zoomIn} aria-label="放大">
-                <ZoomIn className="h-5 w-5" />
+                <ZoomIn className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
