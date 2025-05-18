@@ -26,6 +26,7 @@ export default function PIRLSQuestionCraftPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
+  const loadingSectionRef = useRef<HTMLDivElement>(null); // Added ref for loading section
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -63,6 +64,11 @@ export default function PIRLSQuestionCraftPage() {
     setError(null); 
     setGeneratedQuestionsOutput(null); 
     
+    // Scroll to loading section
+    setTimeout(() => {
+      loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+
     const currentImageFilesCount = imageFiles.length;
     const totalSteps = currentImageFilesCount + 2; 
     let completedSteps = 0;
@@ -122,7 +128,8 @@ export default function PIRLSQuestionCraftPage() {
         throw new Error('APP未能成功生成題目。');
       }
 
-    } catch (err: any) {
+    } catch (err: any)
+      {
       console.error("生成題目時發生錯誤:", err);
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
       setError(errorMessage);
@@ -144,7 +151,7 @@ export default function PIRLSQuestionCraftPage() {
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]); // Removed setLoadingProgress from dependency array as it's not directly used in useCallback's logic
+  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]);
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -204,7 +211,7 @@ export default function PIRLSQuestionCraftPage() {
         </Button>
 
         {isLoading && (
-           <Card className="w-full shadow-md">
+           <Card ref={loadingSectionRef} className="w-full shadow-md"> {/* Attached ref here */}
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-semibold">
                 <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
