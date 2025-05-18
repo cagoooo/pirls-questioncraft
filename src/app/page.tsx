@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Accordion } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
@@ -26,6 +26,12 @@ export default function PIRLSQuestionCraftPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
 
   const convertFileToDataUri = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -57,22 +63,26 @@ export default function PIRLSQuestionCraftPage() {
     setError(null); 
     setGeneratedQuestionsOutput(null); 
     
-    const totalSteps = imageFiles.length + 2; 
+    // Recalculate totalSteps based on current imageFiles.length
+    const currentImageFilesCount = imageFiles.length;
+    const totalSteps = currentImageFilesCount + 2; // +1 for combining, +1 for generating questions
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
-      setLoadingProgress(Math.min(100, (stepsDone / totalSteps) * 100)); 
+      // Ensure progress doesn't exceed 100 or go below 0
+      const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
+      setLoadingProgress(progress); 
     };
 
     updateDisplayProgress(completedSteps, '準備開始處理...'); 
 
     try {
       const extractedTextsArray: string[] = [];
-      if (imageFiles.length > 0) {
-        for (let i = 0; i < imageFiles.length; i++) {
-          const file = imageFiles[i];
-          updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${imageFiles.length})`);
+      if (currentImageFilesCount > 0) {
+        for (let i = 0; i < currentImageFilesCount; i++) {
+          const file = imageFiles[i]; // Use the imageFiles from the closure, which is the state at the time of calling
+          updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${currentImageFilesCount})`);
           
           const photoDataUri = await convertFileToDataUri(file);
           const extractionResult: ExtractTextFromImageOutput = await extractTextFromImage({ photoDataUri });
@@ -86,7 +96,7 @@ export default function PIRLSQuestionCraftPage() {
         }
       }
 
-      if (imageFiles.length > 0 && extractedTextsArray.length === 0) {
+      if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
       
@@ -123,17 +133,23 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      updateDisplayProgress(completedSteps, `處理時發生錯誤`);
+      // Update progress on error, but don't mark as 100% complete
+      const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
+      updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
+
     } finally {
       setIsLoading(false);
-      if (!error && completedSteps === totalSteps) {
-         setLoadingMessage('所有處理步驟已完成！');
-         setLoadingProgress(100); 
+      // Only set to 100% if successful and all steps completed
+      if (!error && generatedQuestionsOutput && completedSteps === totalSteps) {
+         updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
       } else if (error) {
-        setLoadingMessage(`處理失敗於: ${loadingMessage.split('...')[0]}`);
+        // Message already set in catch, progress already updated
+      } else if (!generatedQuestionsOutput && !error) {
+        // Handle cases where generation might finish without error but no output (should be rare)
+        updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast]);
+  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage]);
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -176,7 +192,7 @@ export default function PIRLSQuestionCraftPage() {
         <Button
           onClick={handleGenerateQuestions}
           disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
-          className="w-full py-3 text-base sm:py-4 sm:text-lg"
+          className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg"
           size="lg"
         >
           {isLoading ? (
@@ -251,12 +267,19 @@ export default function PIRLSQuestionCraftPage() {
         )}
       </main>
       
-      <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
-        <p>
-          &copy; {new Date().getFullYear()} <a href="https://www.smes.tyc.edu.tw/" target="_blank" rel="noopener noreferrer" className="hover:text-primary underline">桃園市石門國小資訊組 阿凱老師 設計</a>
+      <footer className="mt-16 mb-8 p-6 bg-card/80 dark:bg-card/60 rounded-xl shadow-lg text-center text-sm text-muted-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-card">
+        <p className="leading-relaxed">
+          &copy; {currentYear ? currentYear : new Date().getFullYear()}{' '}
+          <a 
+            href="https://www.smes.tyc.edu.tw/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="font-medium text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+          >
+            桃園市石門國小資訊組 阿凱老師 設計
+          </a>
         </p>
       </footer>
     </div>
   );
 }
-
