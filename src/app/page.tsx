@@ -93,7 +93,7 @@ export default function PIRLSQuestionCraftPage() {
           className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
         });
       } else {
-        throw new Error('AI未能成功生成題目。');
+        throw new Error('APP未能成功生成題目。');
       }
 
     } catch (err: any) {
@@ -143,7 +143,7 @@ export default function PIRLSQuestionCraftPage() {
         <PirlsLogo className="mx-auto mb-2 h-16 w-auto sm:h-20" />
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">PIRLS 閱讀素養題組生成器</h1>
         <p className="mt-2 text-md sm:text-lg text-muted-foreground">
-          上傳圖片，AI 為您分析內容並設計PIRLS四層次選擇題。
+          上傳圖片，APP 為您分析內容並設計PIRLS四層次選擇題。
         </p>
       </header>
 
@@ -174,7 +174,7 @@ export default function PIRLSQuestionCraftPage() {
             <CardHeader>
               <CardTitle className="flex items-center text-xl font-semibold">
                 <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                AI 努力思考中...
+                APP 努力思考中...
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-2">
@@ -235,3 +235,4 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
+
