@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, FileWarning } from 'lucide-react';
+import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -69,7 +69,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             });
         }
     }
-  }, [selectedFiles, toast, isLoading]);
+  }, [selectedFiles.length, toast, isLoading]);
 
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -128,33 +128,35 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   // Update image previews and call onFilesSelected when selectedFiles changes
   useEffect(() => {
     // Revoke old object URLs to prevent memory leaks
-    const oldPreviews = imagePreviews;
+    const oldPreviews = [...imagePreviews]; // Create a copy
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
     setImagePreviews(newPreviews);
     
     onFilesSelected(selectedFiles); // Inform parent component
 
+    // Cleanup function
     return () => {
-      oldPreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke old ones on next update or unmount
-      if (selectedFiles.length === 0) { // If all files are cleared, revoke current ones too
-          newPreviews.forEach(url => URL.revokeObjectURL(url));
-      }
+      oldPreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke old ones
+      // Also revoke the new ones if the component unmounts or selectedFiles changes again before these newPreviews become "old"
+      newPreviews.forEach(url => URL.revokeObjectURL(url)); 
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles, onFilesSelected]); // onFilesSelected is included as per linting, even if stable
+  }, [selectedFiles, onFilesSelected]); 
 
 
   const removeImage = (index: number) => {
-    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
-    // Also revoke the specific URL when an image is removed
     const urlToRevoke = imagePreviews[index];
     if (urlToRevoke) {
         URL.revokeObjectURL(urlToRevoke);
     }
+    // Update previews first to ensure the correct one is removed from state before revoking its URL
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
   const clearAllImages = () => {
     imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke all current previews
+    setImagePreviews([]);
     setSelectedFiles([]);
   };
   
@@ -322,5 +324,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Card>
   );
 }
-
-    
