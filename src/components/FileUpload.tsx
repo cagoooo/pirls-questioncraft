@@ -144,7 +144,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           <ImagePlus className="h-6 w-6 text-primary" />
           上傳圖片
         </CardTitle>
-        <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG），或直接貼上圖片。</CardDescription>
+        <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG），或截圖貼上圖片。</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -169,7 +169,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 <>
                   <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
                   <p className="text-sm font-medium text-foreground text-center">
-                    點擊此處或拖曳圖片至此上傳（或直接貼上）
+                    點擊此處或拖曳圖片至此上傳（或截圖貼上）
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     已選 {selectedFiles.length}/4 張圖片
@@ -237,3 +237,5 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Card>
   );
 }
+
+    
