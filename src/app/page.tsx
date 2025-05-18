@@ -1,18 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Accordion } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2 } from 'lucide-react';
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -49,7 +49,7 @@ export default function PIRLSQuestionCraftPage() {
     setLoadingMessage('準備開始處理...');
 
     try {
-      const totalSteps = imageFiles.length + 2; // Each image extraction + 1 for combining text + 1 for question generation
+      const totalSteps = imageFiles.length + 2; 
       let currentStep = 0;
 
       const updateProgress = (message: string) => {
@@ -69,7 +69,6 @@ export default function PIRLSQuestionCraftPage() {
         } else if (!extractionResult.success) {
           throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
         }
-        // If successful but no text, it's fine, just don't add to array.
       }
 
       if (extractedTextsArray.length === 0) {
@@ -77,7 +76,7 @@ export default function PIRLSQuestionCraftPage() {
       }
       
       updateProgress('整合文字內容...');
-      const combinedText = extractedTextsArray.join('\n\n---\n\n'); // Add separator for clarity
+      const combinedText = extractedTextsArray.join('\\n\\n---\\n\\n'); 
 
       updateProgress('開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
@@ -88,7 +87,7 @@ export default function PIRLSQuestionCraftPage() {
           title: '成功！',
           description: 'PIRLS 題目已生成。',
           variant: 'default',
-          className: 'bg-green-500 border-green-500 text-white',
+          className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
         });
       } else {
         throw new Error('AI未能成功生成題目。');
@@ -106,15 +105,15 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsLoading(false);
       setLoadingProgress(100);
-      setLoadingMessage(error ? '處理失敗' : '處理完成！');
+      // setLoadingMessage(error ? '處理失敗' : '處理完成！'); // Message is set by error state or success toast
     }
-  }, [imageFiles, toast, error]);
+  }, [imageFiles, toast]);
 
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
       <header className="my-8 text-center">
-        <PirlsLogo className="mx-auto mb-2 h-16 w-auto" />
+        <PirlsLogo className="mx-auto mb-2 h-16 w-auto sm:h-20" />
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">PIRLS 閱讀素養題組生成器</h1>
         <p className="mt-2 text-md sm:text-lg text-muted-foreground">
           上傳圖片，AI 為您分析內容並設計PIRLS四層次選擇題。
@@ -130,7 +129,12 @@ export default function PIRLSQuestionCraftPage() {
           className="w-full text-lg py-6"
           size="lg"
         >
-          {isLoading ? '處理中...' : (
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              處理中，請稍候...
+            </>
+          ) : (
             <>
               <Brain className="mr-2 h-5 w-5" />
               生成PIRLS題目
@@ -139,10 +143,20 @@ export default function PIRLSQuestionCraftPage() {
         </Button>
 
         {isLoading && (
-          <div className="space-y-2">
-            <Progress value={loadingProgress} className="w-full" />
-            <p className="text-sm text-muted-foreground text-center">{loadingMessage} ({Math.round(loadingProgress)}%)</p>
-          </div>
+           <Card className="w-full shadow-md">
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl font-semibold">
+                <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
+                AI 努力思考中...
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
+              <Progress value={loadingProgress} className="w-full h-3" />
+              <p className="text-sm text-muted-foreground text-center">
+                {loadingMessage} ({Math.round(loadingProgress)}%)
+              </p>
+            </CardContent>
+          </Card>
         )}
 
         {error && !isLoading && (
@@ -157,7 +171,7 @@ export default function PIRLSQuestionCraftPage() {
           <section className="mt-8">
             <h2 className="text-2xl font-semibold mb-4 text-center flex items-center justify-center">
               <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-              生成的PIRLS題目
+              為您生成的PIRLS題目
             </h2>
             <Accordion type="single" collapsible className="w-full">
               {generatedQuestionsOutput.questions.map((q, index) => (
@@ -168,7 +182,7 @@ export default function PIRLSQuestionCraftPage() {
         )}
       </main>
       
-      <footer className="mt-12 text-center text-sm text-muted-foreground">
+      <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} PIRLS QuestionCraft. All rights reserved.</p>
       </footer>
     </div>

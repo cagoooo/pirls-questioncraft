@@ -15,6 +15,10 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        pirlsLocate: "border-blue-300 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700",
+        pirlsInfer: "border-green-300 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 dark:border-green-700",
+        pirlsInterpret: "border-yellow-300 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700",
+        pirlsEvaluate: "border-purple-300 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700",
       },
     },
     defaultVariants: {
@@ -24,7 +28,7 @@ const badgeVariants = cva(
 )
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>, // Changed from HTMLDivElement to HTMLSpanElement
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {

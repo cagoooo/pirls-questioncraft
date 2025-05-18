@@ -2,9 +2,10 @@
 
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
+import type { VariantProps } from 'class-variance-authority';
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileSearch, Lightbulb, Blocks, GraduationCap, CheckCircle2, XCircle } from 'lucide-react';
+import { FileSearch, Lightbulb, Blocks, GraduationCap, CheckCircle2 } from 'lucide-react';
 import React from 'react';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
@@ -14,11 +15,11 @@ interface QuestionCardProps {
   questionNumber: number;
 }
 
-const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon: React.ElementType }> = {
-  'locate & retrieve': { label: '訊息提取與檢索', icon: FileSearch },
-  'make straightforward inferences': { label: '直接推論', icon: Lightbulb },
-  'interpret & integrate': { label: '詮釋與整合', icon: Blocks },
-  'evaluate & critique': { label: '評估與批判', icon: GraduationCap },
+const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon: React.ElementType; badgeVariant: VariantProps<typeof badgeVariants>['variant'] }> = {
+  'locate & retrieve': { label: '訊息提取與檢索', icon: FileSearch, badgeVariant: 'pirlsLocate' },
+  'make straightforward inferences': { label: '直接推論', icon: Lightbulb, badgeVariant: 'pirlsInfer' },
+  'interpret & integrate': { label: '詮釋與整合', icon: Blocks, badgeVariant: 'pirlsInterpret' },
+  'evaluate & critique': { label: '評估與批判', icon: GraduationCap, badgeVariant: 'pirlsEvaluate' },
 };
 
 const optionLabels = ['A', 'B', 'C', 'D'];
@@ -30,16 +31,16 @@ export function QuestionCard({ questionItem, questionNumber }: QuestionCardProps
   return (
     <AccordionItem value={`item-${questionNumber}`} className="border-b-0">
       <Card className="mb-4 shadow-md hover:shadow-lg transition-shadow duration-200">
-        <AccordionTrigger className="hover:no-underline">
-          <CardHeader className="flex flex-row justify-between items-start w-full p-4">
+        <AccordionTrigger className="hover:no-underline p-4">
+          <div className="flex flex-row justify-between items-start w-full">
             <div>
-              <CardTitle className="text-lg mb-1">題目 {questionNumber}: {questionItem.question}</CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                <IconComponent className="h-3 w-3 mr-1" />
+              <CardTitle className="text-lg mb-1 text-left">題目 {questionNumber}: {questionItem.question}</CardTitle>
+              <Badge variant={levelDetail.badgeVariant} className="text-xs font-semibold">
+                <IconComponent className="h-3 w-3 mr-1.5" />
                 {levelDetail.label}
               </Badge>
             </div>
-          </CardHeader>
+          </div>
         </AccordionTrigger>
         <AccordionContent>
           <CardContent className="p-4 pt-0">
