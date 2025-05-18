@@ -13,15 +13,15 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
-import { exportPIRLStoExcel } from '@/lib/generateExcel'; // New import
+import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon } from 'lucide-react'; // Added SheetIcon
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon } from 'lucide-react';
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isGeneratingExcel, setIsGeneratingExcel] = useState(false); // New state
+  const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
@@ -32,6 +32,7 @@ export default function PIRLSQuestionCraftPage() {
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
+    // Ensure this only runs on the client after hydration
     setCurrentYear(new Date().getFullYear());
   }, []);
 
@@ -152,7 +153,7 @@ export default function PIRLSQuestionCraftPage() {
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage, error]); // Added error to dependency array
+  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage, error]);
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -315,7 +316,7 @@ export default function PIRLSQuestionCraftPage() {
       
       <footer className="w-full max-w-3xl mt-16 mb-8 p-6 bg-card/80 dark:bg-card/60 rounded-xl shadow-lg text-center text-sm text-muted-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-card">
         <p className="leading-relaxed">
-          &copy; {currentYear ? currentYear : new Date().getFullYear()}{' '}
+          &copy; {currentYear ? currentYear : ''}{' '}
           <a 
             href="https://www.smes.tyc.edu.tw/" 
             target="_blank" 

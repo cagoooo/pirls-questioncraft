@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ChangeEvent, ClipboardEvent } from 'react'; // Added ClipboardEvent
+import type { ChangeEvent, ClipboardEvent } from 'react';
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -96,15 +96,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         description: `成功貼上 ${newPastedFiles.length} 張圖片。`,
         variant: 'default',
       });
-    } else {
-      // Optionally notify if no image was found in paste.
-      // toast({
-      //   title: '貼上內容非圖片',
-      //   description: '請複製圖片後再嘗試貼上。',
-      //   variant: 'default',
-      // });
     }
-  }, [selectedFiles, toast, isLoading]);
+  }, [selectedFiles.length, toast, isLoading]);
 
   useEffect(() => {
     const pasteHandler = (event: Event) => handlePaste(event as ClipboardEvent<Document>);
@@ -116,7 +109,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   useEffect(() => {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke old previews
+    // It's important to revoke previous object URLs to prevent memory leaks
+    imagePreviews.forEach(url => URL.revokeObjectURL(url));
     setImagePreviews(newPreviews);
     onFilesSelected(selectedFiles);
 
@@ -124,8 +118,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     return () => {
       newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]); // Removed onFilesSelected from dependencies, as it might cause re-renders if its identity changes.
+  }, [selectedFiles, onFilesSelected]); // Added onFilesSelected to dependency array
+
 
   const removeImage = (index: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
@@ -237,5 +231,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Card>
   );
 }
-
-    
