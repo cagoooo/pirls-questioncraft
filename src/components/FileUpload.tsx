@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent } from 'react'; // Added ClipboardEvent
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -55,19 +55,75 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     }
   }, [toast, selectedFiles.length]);
 
+  const handlePaste = useCallback(async (event: ClipboardEvent) => {
+    if (isLoading) return;
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const newPastedFiles: File[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const blob = item.getAsFile();
+        if (blob) {
+          const extension = blob.type.split('/')[1] || 'png';
+          const fileName = `pasted-image-${Date.now()}.${extension}`;
+          const file = new File([blob], fileName, { type: blob.type });
+          newPastedFiles.push(file);
+        }
+      }
+    }
+
+    if (newPastedFiles.length > 0) {
+      if (selectedFiles.length + newPastedFiles.length > 4) {
+        toast({
+          title: '貼上圖片失敗',
+          description: `最多只能選擇 4 張圖片。您已選擇 ${selectedFiles.length} 張，嘗試再貼上 ${newPastedFiles.length} 張。`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setSelectedFiles(prevFiles => {
+        const updatedFiles = [...prevFiles, ...newPastedFiles].slice(0, 4);
+        return updatedFiles;
+      });
+
+      toast({
+        title: '圖片已貼上',
+        description: `成功貼上 ${newPastedFiles.length} 張圖片。`,
+        variant: 'default',
+      });
+    } else {
+      // Optionally notify if no image was found in paste.
+      // toast({
+      //   title: '貼上內容非圖片',
+      //   description: '請複製圖片後再嘗試貼上。',
+      //   variant: 'default',
+      // });
+    }
+  }, [selectedFiles, toast, isLoading]);
+
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [handlePaste]);
+
   useEffect(() => {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    // Clean up old previews to prevent memory leaks
     imagePreviews.forEach(url => URL.revokeObjectURL(url));
     setImagePreviews(newPreviews);
     onFilesSelected(selectedFiles);
 
-    // Cleanup function to revoke URLs when component unmounts or selectedFiles changes
     return () => {
       newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]); // onFilesSelected removed from deps to avoid re-renders from parent if its reference changes
+  }, [selectedFiles]);
 
   const removeImage = (index: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
@@ -75,7 +131,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   const clearAllImages = () => {
     setSelectedFiles([]);
-    // imagePreviews will be cleared by the useEffect hook
   };
 
   const canUploadMore = selectedFiles.length < 4;
@@ -87,7 +142,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           <ImagePlus className="h-6 w-6 text-primary" />
           上傳圖片
         </CardTitle>
-        <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG）。</CardDescription>
+        <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG），或直接貼上圖片。</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -97,7 +152,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
               className={cn(
                 "flex flex-col items-center justify-center w-full h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
                 isLoading || !canUploadMore ? "cursor-not-allowed bg-muted/50 border-muted-foreground/30" : "cursor-pointer hover:border-primary/80 border-primary/50 bg-primary/10 hover:bg-primary/20",
-                !canUploadMore && !isLoading && "border-accent bg-accent/10" // Specific style when limit reached but not loading
+                !canUploadMore && !isLoading && "border-accent bg-accent/10"
               )}
             >
               {isLoading ? (
@@ -112,7 +167,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 <>
                   <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
                   <p className="text-sm font-medium text-foreground text-center">
-                    點擊此處或拖曳圖片至此上傳
+                    點擊此處或拖曳圖片至此上傳（或直接貼上）
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     已選 {selectedFiles.length}/4 張圖片
@@ -146,9 +201,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                     <Image
                       src={previewUrl}
                       alt={`預覽 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
-                      layout="fill"
-                      objectFit="cover"
-                      className="rounded-md border"
+                      fill={true}
+                      sizes="(max-width: 640px) 50vw, 25vw" // Example sizes, adjust as needed
+                      className="rounded-md border object-cover"
                       data-ai-hint="document scan"
                     />
                     <Button
