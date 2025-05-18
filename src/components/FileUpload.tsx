@@ -2,7 +2,7 @@
 "use client";
 
 import type { ChangeEvent, ClipboardEvent } from 'react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const { toast } = useToast();
+  const previewsSectionRef = useRef<HTMLDivElement>(null);
+  const previousImagePreviewsRef = useRef<string[]>([]);
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -108,15 +110,28 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [handlePaste]);
 
   useEffect(() => {
-    const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    // It's important to revoke previous object URLs to prevent memory leaks
-    imagePreviews.forEach(url => URL.revokeObjectURL(url));
-    setImagePreviews(newPreviews);
-    onFilesSelected(selectedFiles);
+    // Revoke old object URLs from the previous render
+    previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
 
-    // Cleanup function to revoke object URLs when component unmounts or selectedFiles change
+    const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+    setImagePreviews(newPreviews);
+    previousImagePreviewsRef.current = newPreviews; // Store current previews for next cleanup
+
+    onFilesSelected(selectedFiles); // Inform parent component
+
+    if (selectedFiles.length > 0) {
+      // Ensure the DOM has updated and the ref is attached
+      // Scroll after a short delay to allow DOM updates
+      const timer = setTimeout(() => {
+        previewsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100); // 100ms delay, adjust if needed
+      return () => clearTimeout(timer); // Cleanup timer on re-run or unmount
+    }
+
+    // Cleanup function for when the component unmounts
+    // This will also be called before the effect runs again if dependencies change
     return () => {
-      newPreviews.forEach(url => URL.revokeObjectURL(url));
+      previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
     };
   }, [selectedFiles, onFilesSelected]);
 
@@ -132,7 +147,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const canUploadMore = selectedFiles.length < 4;
 
   return (
-    <Card className="w-full bg-sky-100 dark:bg-sky-800">
+    <Card className="w-full bg-muted dark:bg-muted/80">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ImagePlus className="h-6 w-6 text-primary" />
@@ -189,7 +204,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           </div>
 
           {selectedFiles.length > 0 && (
-            <div className="space-y-4">
+            <div ref={previewsSectionRef} className="space-y-4">
               <h3 className="text-md font-semibold text-foreground">已選圖片預覽：</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {imagePreviews.map((previewUrl, index) => (
@@ -231,4 +246,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Card>
   );
 }
-
