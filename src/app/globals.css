@@ -17,8 +17,8 @@ body {
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 100% 73%; /* Gentle blue (#75A9FF) */
-    --primary-foreground: 220 30% 10%; /* Darker blue for text on primary */
+    --primary: 217 90% 60%; /* Darker, stronger blue (previously 217 100% 73%) */
+    --primary-foreground: 0 0% 100%; /* White text for contrast on new primary (previously 220 30% 10%) */
 
     --secondary: 220 60% 90%;
     --secondary-foreground: 222 47% 11%;
@@ -64,8 +64,8 @@ body {
     --popover: 222 47% 13%;
     --popover-foreground: 220 100% 97%;
 
-    --primary: 217 100% 73%;
-    --primary-foreground: 220 30% 10%;
+    --primary: 217 90% 65%; /* Adjusted for dark mode, slightly lighter than light mode's primary */
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 222 47% 20%;
     --secondary-foreground: 220 100% 97%;

@@ -72,15 +72,18 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
-    const totalSteps = currentImageFilesCount + 2; 
+    // Total steps: 1 (start) + N images for extraction + 1 (combine) + 1 (generate questions) + 1 (final success)
+    const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
+      // Ensure progress is always between 0 and 100.
       const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
       setLoadingProgress(progress); 
     };
-
+    
+    completedSteps++;
     updateDisplayProgress(completedSteps, '準備開始處理...'); 
 
     try {
@@ -88,6 +91,7 @@ export default function PIRLSQuestionCraftPage() {
       if (currentImageFilesCount > 0) {
         for (let i = 0; i < currentImageFilesCount; i++) {
           const file = imageFiles[i]; 
+          completedSteps++;
           updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${currentImageFilesCount})`);
           
           const photoDataUri = await convertFileToDataUri(file);
@@ -98,23 +102,29 @@ export default function PIRLSQuestionCraftPage() {
           } else if (!extractionResult.success) {
             throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
           }
-          completedSteps++; 
         }
+      } else {
+        // If no images, skip extraction steps for progress calculation
+        completedSteps += currentImageFilesCount; 
       }
+
 
       if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
       
+      completedSteps++;
       updateDisplayProgress(completedSteps, '整合文字內容...');
       const combinedText = extractedTextsArray.join('\\n\\n---\\n\\n'); 
-      completedSteps++; 
+      
 
+      completedSteps++;
       updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
-      completedSteps++; 
+      
       
       if (questionsResult && questionsResult.questions) {
+        completedSteps++;
         updateDisplayProgress(completedSteps, '題目已成功生成！'); 
         setGeneratedQuestionsOutput(questionsResult);
         toast({
@@ -145,15 +155,16 @@ export default function PIRLSQuestionCraftPage() {
 
     } finally {
       setIsLoading(false);
-      if (!error && generatedQuestionsOutput && completedSteps === totalSteps) {
+      // Ensure progress hits 100% on success, or stays at current if error
+      if (!error && generatedQuestionsOutput) {
          updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
       } else if (error) {
-        // Message already set in catch, progress already updated
+        // Message already set in catch, progress already updated to show where it failed
       } else if (!generatedQuestionsOutput && !error) {
         updateDisplayProgress(completedSteps, '處理完成但未生成題目');
       }
     }
-  }, [imageFiles, toast, generatedQuestionsOutput, loadingMessage, error]);
+  }, [imageFiles, toast, loadingMessage, error, generatedQuestionsOutput]);
 
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput || imageFiles.length === 0) {
@@ -207,9 +218,22 @@ export default function PIRLSQuestionCraftPage() {
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
       <header className="my-8 text-center">
-        <PirlsLogo className="mx-auto mb-2 h-16 w-auto sm:h-20" />
-        <h1 className="text-3xl sm:text-4xl font-bold text-primary">PIRLS 閱讀素養題組生成器</h1>
-        <p className="mt-2 text-md sm:text-lg text-muted-foreground">
+        <PirlsLogo className="mx-auto mb-4 h-20 w-auto sm:h-24" />
+        <h1 className="
+          inline-block
+          text-3xl sm:text-4xl font-bold text-primary
+          py-3 px-6 sm:py-4 sm:px-8
+          bg-primary/5 dark:bg-primary/10
+          border-2 border-primary/30
+          rounded-xl
+          shadow-lg
+          transition-all duration-300 ease-in-out
+          hover:shadow-xl hover:border-primary/50 hover:bg-primary/10 dark:hover:bg-primary/20
+          cursor-default
+        ">
+          PIRLS 閱讀素養題組生成器
+        </h1>
+        <p className="mt-4 text-md sm:text-lg text-muted-foreground">
           上傳圖片，APP 為您分析內容並設計PIRLS四層次選擇題。
         </p>
       </header>
