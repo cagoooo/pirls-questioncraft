@@ -33,6 +33,7 @@ export default function PIRLSQuestionCraftPage() {
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
+  const generateButtonRef = useRef<HTMLButtonElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -53,6 +54,12 @@ export default function PIRLSQuestionCraftPage() {
     setImageFiles(files);
     setGeneratedQuestionsOutput(null);
     setError(null);
+    if (files.length > 0 && generateButtonRef.current) {
+      const timer = setTimeout(() => {
+        generateButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+      // No cleanup needed for one-shot timeout in callback
+    }
   }, []);
 
 
@@ -191,12 +198,9 @@ export default function PIRLSQuestionCraftPage() {
         variant: 'destructive',
       });
       setFileGenerationMessage(`PDF 生成失敗: ${pdfError.message || '未知錯誤'}`);
-      setFileGenerationProgress(0); // Or some error indication
+      setFileGenerationProgress(0); 
     } finally {
       setIsGeneratingPdf(false);
-      // Optionally reset progress after a delay or keep it at 100 if successful before hiding
-      // setFileGenerationProgress(0); 
-      // setFileGenerationMessage('');
     }
   };
 
@@ -259,6 +263,7 @@ export default function PIRLSQuestionCraftPage() {
         />
 
         <Button
+          ref={generateButtonRef}
           onClick={handleGenerateQuestions}
           disabled={isLoading || isGeneratingPdf || isGeneratingExcel || imageFiles.length === 0}
           className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
@@ -346,29 +351,30 @@ export default function PIRLSQuestionCraftPage() {
                   </Button>
                 </div>
             </div>
+
+            {(isGeneratingPdf || isGeneratingExcel) && (
+              <Card className="w-full shadow-md mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-xl font-semibold">
+                    <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
+                    檔案處理中...
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-2">
+                  <Progress value={fileGenerationProgress} className="w-full h-3" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <Accordion type="single" collapsible className="w-full">
               {generatedQuestionsOutput.questions.map((q, index) => (
                 <QuestionCard key={index} questionItem={q} questionNumber={index + 1} />
               ))}
             </Accordion>
           </section>
-        )}
-
-        {(isGeneratingPdf || isGeneratingExcel) && (
-          <Card className="w-full shadow-md mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center text-xl font-semibold">
-                <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                檔案處理中...
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-2">
-              <Progress value={fileGenerationProgress} className="w-full h-3" />
-              <p className="text-sm text-muted-foreground text-center">
-                {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
-              </p>
-            </CardContent>
-          </Card>
         )}
       </main>
       

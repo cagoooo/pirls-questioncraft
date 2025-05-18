@@ -110,26 +110,14 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [handlePaste]);
 
   useEffect(() => {
-    // Revoke old object URLs from the previous render
     previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
 
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
     setImagePreviews(newPreviews);
-    previousImagePreviewsRef.current = newPreviews; // Store current previews for next cleanup
+    previousImagePreviewsRef.current = newPreviews; 
 
-    onFilesSelected(selectedFiles); // Inform parent component
+    onFilesSelected(selectedFiles);
 
-    if (selectedFiles.length > 0) {
-      // Ensure the DOM has updated and the ref is attached
-      // Scroll after a short delay to allow DOM updates
-      const timer = setTimeout(() => {
-        previewsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 100); // 100ms delay, adjust if needed
-      return () => clearTimeout(timer); // Cleanup timer on re-run or unmount
-    }
-
-    // Cleanup function for when the component unmounts
-    // This will also be called before the effect runs again if dependencies change
     return () => {
       previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
     };
