@@ -1,18 +1,10 @@
+
 // src/lib/generateExcel.ts
 'use client';
 
 import * as XLSX from 'xlsx';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import type { Toast } from '@/hooks/use-toast';
-
-type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
-
-const pirlsLevelLabels: Record<PirlsQuestion['pirlsLevel'], string> = {
-  'locate & retrieve': '訊息提取與檢索',
-  'make straightforward inferences': '直接推論',
-  'interpret & integrate': '詮釋與整合',
-  'evaluate & critique': '評估與批判',
-};
 
 export async function exportPIRLStoExcel(
   questionsOutput: GeneratePirlsQuestionsOutput,
@@ -28,8 +20,7 @@ export async function exportPIRLStoExcel(
       "選項1",
       "選項2",
       "選項3",
-      "選項4",
-      "PIRLS 層次"
+      "選項4"
     ];
 
     const data = questionsOutput.questions.map(q => [
@@ -41,8 +32,7 @@ export async function exportPIRLStoExcel(
       q.options[0] || "",
       q.options[1] || "",
       q.options[2] || "",
-      q.options[3] || "",
-      pirlsLevelLabels[q.pirlsLevel] || q.pirlsLevel
+      q.options[3] || ""
     ]);
 
     const worksheetData = [headers, ...data];
@@ -59,8 +49,7 @@ export async function exportPIRLStoExcel(
         {wch: 30}, // 選項1
         {wch: 30}, // 選項2
         {wch: 30}, // 選項3
-        {wch: 30}, // 選項4
-        {wch: 20}  // PIRLS 層次
+        {wch: 30}  // 選項4
     ];
     worksheet['!cols'] = columnWidths;
 
@@ -85,3 +74,4 @@ export async function exportPIRLStoExcel(
     });
   }
 }
+
