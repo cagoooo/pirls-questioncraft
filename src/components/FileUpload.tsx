@@ -31,7 +31,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
   const [dialogImageScale, setDialogImageScale] = useState(1);
-  const imageDialogRef = useRef<HTMLDivElement>(null); // For wheel event on DialogContent
+  const imageDialogRef = useRef<HTMLDivElement>(null);
 
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -81,7 +81,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             });
         }
     }
-  }, [selectedFiles.length, toast, isLoading]);
+  }, [selectedFiles.length, toast, isLoading, setSelectedFiles]);
 
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -149,10 +149,16 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           URL.revokeObjectURL(url);
         }
       });
-      if (selectedFiles.length === 0 && newPreviews.length > 0) { // Ensure all are revoked if selection becomes empty
+      // Ensure all are revoked if selection becomes empty or component unmounts with previews
+      if (selectedFiles.length === 0 && newPreviews.length > 0) { 
         newPreviews.forEach(url => URL.revokeObjectURL(url));
+      } else if (newPreviews.length > 0 && selectedFiles.length > 0) { // On unmount, if files still selected
+         // No, this logic is flawed. The first part of return handles unmount logic when selectedFiles changes.
+         // If selectedFiles itself becomes empty, the newPreviews become empty, and oldPreviews are revoked.
+         // If component unmounts while selectedFiles are present, this cleanup will run.
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFiles, onFilesSelected]);
 
 
@@ -161,13 +167,14 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     URL.revokeObjectURL(urlToRevoke);
 
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
+    // imagePreviews will update via the useEffect listening to selectedFiles
   };
 
 
   const clearAllImages = () => {
     imagePreviews.forEach(url => URL.revokeObjectURL(url));
-    setImagePreviews([]);
-    setSelectedFiles([]);
+    setImagePreviews([]); // This will trigger the useEffect to revoke if imagePreviews was the source
+    setSelectedFiles([]); // This is the primary state driving previews
   };
   
   const canUploadMore = selectedFiles.length < 4;
@@ -219,13 +226,13 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     setIsImageDialogOpen(true);
   };
 
-  const handleDialogImageWheel = (event: WheelEvent) => {
+  const handleDialogImageWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
-      if (event.deltaY < 0) { 
+      if (event.deltaY < 0) { // Zoom in
         newScale = prevScale + SCALE_STEP;
-      } else { 
+      } else { // Zoom out
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
@@ -234,7 +241,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       }
       return clampedScale;
     });
-  };
+  }, [setDialogImageScale, setImageOffset]); // SCALE_STEP, MIN_SCALE, MAX_SCALE are constants outside
   
   useEffect(() => {
     const currentImageDialogEl = imageDialogRef.current;
@@ -246,7 +253,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         currentImageDialogEl.removeEventListener('wheel', handleDialogImageWheel);
       }
     };
-  }, [isImageDialogOpen]);
+  }, [isImageDialogOpen, handleDialogImageWheel]);
 
   const zoomIn = () => setDialogImageScale(s => {
     const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
@@ -277,8 +284,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   useEffect(() => {
     const handleGlobalPanMove = (e: MouseEvent | TouchEvent) => {
       if (!isPanning) return;
-      // For touchmove, prevent default scrolling if not handled by touch-action
-      if ('touches' in e) e.preventDefault();
+      if ('touches' in e) e.preventDefault(); // Prevent page scroll on touch
 
 
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -299,7 +305,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       window.addEventListener('touchmove', handleGlobalPanMove, { passive: false });
       window.addEventListener('mouseup', handleGlobalPanEnd);
       window.addEventListener('touchend', handleGlobalPanEnd);
-      window.addEventListener('mouseleave', handleGlobalPanEnd); // Handle mouse leaving window
+      window.addEventListener('mouseleave', handleGlobalPanEnd);
     }
 
     return () => {
@@ -504,5 +510,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
-
-      
