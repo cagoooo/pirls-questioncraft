@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
@@ -7,6 +8,7 @@ import type { VariantProps } from 'class-variance-authority';
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { FileSearch, Lightbulb, Blocks, GraduationCap, CheckCircle2 } from 'lucide-react';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
@@ -15,11 +17,11 @@ interface QuestionCardProps {
   questionNumber: number;
 }
 
-const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon: React.ElementType; badgeVariant: VariantProps<typeof badgeVariants>['variant'] }> = {
-  'locate & retrieve': { label: '訊息提取與檢索', icon: FileSearch, badgeVariant: 'pirlsLocate' },
-  'make straightforward inferences': { label: '直接推論', icon: Lightbulb, badgeVariant: 'pirlsInfer' },
-  'interpret & integrate': { label: '詮釋與整合', icon: Blocks, badgeVariant: 'pirlsInterpret' },
-  'evaluate & critique': { label: '評估與批判', icon: GraduationCap, badgeVariant: 'pirlsEvaluate' },
+const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon: React.ElementType; badgeVariant: VariantProps<typeof badgeVariants>['variant'], borderColorClass: string }> = {
+  'locate & retrieve': { label: '訊息提取與檢索', icon: FileSearch, badgeVariant: 'pirlsLocate', borderColorClass: 'border-blue-500' },
+  'make straightforward inferences': { label: '直接推論', icon: Lightbulb, badgeVariant: 'pirlsInfer', borderColorClass: 'border-green-500' },
+  'interpret & integrate': { label: '詮釋與整合', icon: Blocks, badgeVariant: 'pirlsInterpret', borderColorClass: 'border-yellow-500' },
+  'evaluate & critique': { label: '評估與批判', icon: GraduationCap, badgeVariant: 'pirlsEvaluate', borderColorClass: 'border-purple-500' },
 };
 
 const optionLabels = ['A', 'B', 'C', 'D'];
@@ -30,7 +32,10 @@ export function QuestionCard({ questionItem, questionNumber }: QuestionCardProps
 
   return (
     <AccordionItem value={`item-${questionNumber}`} className="border-b-0">
-      <Card className="mb-4 shadow-md hover:shadow-lg transition-shadow duration-200">
+      <Card className={cn(
+        "mb-4 shadow-md hover:shadow-lg transition-shadow duration-200 border-l-4",
+        levelDetail.borderColorClass
+      )}>
         <AccordionTrigger className="hover:no-underline p-4">
           <div className="flex flex-row justify-between items-start w-full">
             <div>
