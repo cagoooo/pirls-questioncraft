@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
+import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,10 @@ interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
   isLoading: boolean;
 }
+
+const MIN_SCALE = 0.3;
+const MAX_SCALE = 4;
+const SCALE_STEP = 0.2;
 
 export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -26,6 +30,9 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
+  const [dialogImageScale, setDialogImageScale] = useState(1);
+  const imageDialogRef = useRef<HTMLDivElement>(null);
+
 
   const processNewFiles = useCallback((newFilesArray: File[]) => {
     if (isLoading) return;
@@ -130,23 +137,18 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
     setImagePreviews(newPreviews);
     
-    // Call onFilesSelected after selectedFiles and imagePreviews are updated
     onFilesSelected(selectedFiles);
 
     return () => {
-      // Clean up old previews that are no longer in selectedFiles
       oldPreviews.forEach(url => {
         if (!newPreviews.includes(url)) {
           URL.revokeObjectURL(url);
         }
       });
-      // Also ensure current newPreviews are cleaned up if component unmounts
-      // or if selectedFiles is cleared
       if (selectedFiles.length === 0) {
         newPreviews.forEach(url => URL.revokeObjectURL(url));
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFiles, onFilesSelected]);
 
 
@@ -155,7 +157,6 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     URL.revokeObjectURL(urlToRevoke);
 
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
-    // Previews will update via the useEffect watching selectedFiles
   };
 
 
@@ -208,16 +209,50 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   const handleImagePreviewClick = (previewUrl: string) => {
     setSelectedImageForDialog(previewUrl);
-    // DialogTrigger now handles opening via onOpenChange on Dialog
+    setDialogImageScale(1); // Reset scale when new image is opened
+    setIsImageDialogOpen(true);
   };
 
-  return (
-    <Dialog open={isImageDialogOpen} onOpenChange={(isOpen) => {
-      setIsImageDialogOpen(isOpen);
-      if (!isOpen) {
-        setSelectedImageForDialog(null);
+  const handleDialogImageWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    setDialogImageScale(prevScale => {
+      let newScale;
+      if (event.deltaY < 0) { // Zoom in
+        newScale = prevScale + SCALE_STEP;
+      } else { // Zoom out
+        newScale = prevScale - SCALE_STEP;
       }
-    }}>
+      return Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+    });
+  };
+  
+  useEffect(() => {
+    const currentImageDialogRef = imageDialogRef.current;
+    if (isImageDialogOpen && currentImageDialogRef) {
+      currentImageDialogRef.addEventListener('wheel', handleDialogImageWheel, { passive: false });
+    }
+    return () => {
+      if (currentImageDialogRef) {
+        currentImageDialogRef.removeEventListener('wheel', handleDialogImageWheel);
+      }
+    };
+  }, [isImageDialogOpen]);
+
+  const zoomIn = () => setDialogImageScale(s => Math.min(s + SCALE_STEP, MAX_SCALE));
+  const zoomOut = () => setDialogImageScale(s => Math.max(s - SCALE_STEP, MIN_SCALE));
+  const resetZoom = () => setDialogImageScale(1);
+
+  return (
+    <Dialog 
+        open={isImageDialogOpen} 
+        onOpenChange={(isOpen) => {
+            setIsImageDialogOpen(isOpen);
+            if (!isOpen) {
+                setSelectedImageForDialog(null);
+                setDialogImageScale(1); // Reset scale on close
+            }
+        }}
+    >
       <Card className="w-full bg-muted dark:bg-muted/80">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -323,7 +358,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                           size="icon"
                           className="absolute top-1.5 right-1.5 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10"
                           onClick={(e) => {
-                            e.stopPropagation();
+                            e.stopPropagation(); // Prevent dialog from opening
                             removeImage(index);
                           }}
                           disabled={isLoading}
@@ -350,27 +385,44 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         </CardContent>
       </Card>
 
-      <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm">
+      <DialogContent 
+        className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
+        ref={imageDialogRef} // Ref for wheel event
+      >
         <DialogTitle className="sr-only">放大的圖片預覽</DialogTitle>
         {selectedImageForDialog && (
-          <div className="relative max-h-[85vh] w-full flex justify-center items-center p-2">
+          <div className="relative w-full h-full flex justify-center items-center overflow-hidden"> {/* Added overflow-hidden */}
             <Image
               src={selectedImageForDialog}
               alt="放大的圖片預覽"
-              width={1200}
+              width={1200} 
               height={800}
               style={{
                   width: 'auto',
                   height: 'auto',
                   maxWidth: '100%',
-                  maxHeight: 'calc(85vh - 2rem)',
+                  maxHeight: 'calc(85vh - 2rem - 40px)', // Account for buttons
                   objectFit: 'contain',
+                  transform: `scale(${dialogImageScale})`,
+                  transition: 'transform 0.1s ease-out',
+                  cursor: dialogImageScale > 1 ? 'grab' : 'default',
               }}
               className="rounded-md shadow-xl"
               data-ai-hint="document scan enlarged"
             />
           </div>
         )}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-background/80 rounded-lg shadow-md">
+            <Button variant="outline" size="icon" onClick={zoomOut} aria-label="縮小">
+                <ZoomOut className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={resetZoom} aria-label="重設縮放">
+                <RotateCcw className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={zoomIn} aria-label="放大">
+                <ZoomIn className="h-5 w-5" />
+            </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
