@@ -29,7 +29,7 @@ const PirlsQuestionSchema = z.object({
     .describe('正確答案在選項陣列中的索引（0-3）。'),
   explanation: z
     .string()
-    .describe('解釋為何該答案是正確的，需參考文本內容，並使用台灣常用語彙的繁體中文。'),
+    .describe('提示在文本中哪個段落或句子可以找到解題線索的說明，需使用台灣常用語彙的繁體中文，不應直接揭露答案。'),
   pirlsLevel: z
     .enum(['locate & retrieve', 'make straightforward inferences', 'interpret & integrate', 'evaluate & critique'])
     .describe('問題對應的PIRLS閱讀素養層次。'),
@@ -63,7 +63,7 @@ const prompt = ai.definePrompt({
 您必須為每個PIRLS層次生成兩個問題，總共八個問題。
 
 每個問題必須有四個答案選項，其中只有一個是正確答案。請提供正確答案的索引（0-3）。
-此外，請針對正確答案，以**完全繁體中文**提供說明，解釋為何該選項正確，並指出在文本中能夠找到答案的段落或句子。**說明文字需符合台灣讀者習慣的語氣與詞彙**。
+此外，請針對正確答案，以**完全繁體中文**提供說明。**此說明不應直接告知哪個選項是正確答案，而是應該提示使用者在文本中的哪個段落或哪些句子可以找到解題的線索或相關資訊，引導使用者自行思考。**說明文字需符合台灣讀者習慣的語氣與詞彙。
 每個問題還必須標明其PIRLS層次（pirlsLevel）。
 
 提供的文本內容如下：
