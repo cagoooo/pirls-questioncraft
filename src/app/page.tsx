@@ -48,43 +48,52 @@ export default function PIRLSQuestionCraftPage() {
     setIsLoading(true);
     setError(null);
     setGeneratedQuestionsOutput(null);
-    setLoadingProgress(0);
-    setLoadingMessage('準備開始處理...');
+    
+    // Correctly define total steps and completed steps
+    const totalSteps = imageFiles.length + 2; // N extractions + 1 combine text + 1 generate questions
+    let completedSteps = 0;
+
+    const updateDisplayProgress = (stepsDone: number, message: string) => {
+      setLoadingMessage(message);
+      // Ensure progress doesn't exceed 100, though it shouldn't with correct logic
+      setLoadingProgress(Math.min(100, (stepsDone / totalSteps) * 100)); 
+    };
+
+    updateDisplayProgress(completedSteps, '準備開始處理...'); // Initial state: 0 steps done
 
     try {
-      const totalSteps = imageFiles.length + 2;
-      let currentStep = 0;
-
-      const updateProgress = (message: string) => {
-        currentStep++;
-        setLoadingMessage(message);
-        setLoadingProgress((currentStep / totalSteps) * 100);
-      };
-      
-      updateProgress('開始提取圖片文字...');
       const extractedTextsArray: string[] = [];
-      for (const file of imageFiles) {
-        updateProgress(`提取 "${file.name}" 中的文字...`);
-        const photoDataUri = await convertFileToDataUri(file);
-        const extractionResult: ExtractTextFromImageOutput = await extractTextFromImage({ photoDataUri });
-        if (extractionResult.success && extractionResult.extractedText) {
-          extractedTextsArray.push(extractionResult.extractedText);
-        } else if (!extractionResult.success) {
-          throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
+      if (imageFiles.length > 0) {
+        for (let i = 0; i < imageFiles.length; i++) {
+          const file = imageFiles[i];
+          updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${imageFiles.length})`);
+          
+          const photoDataUri = await convertFileToDataUri(file);
+          const extractionResult: ExtractTextFromImageOutput = await extractTextFromImage({ photoDataUri });
+          
+          if (extractionResult.success && extractionResult.extractedText) {
+            extractedTextsArray.push(extractionResult.extractedText);
+          } else if (!extractionResult.success) {
+            throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
+          }
+          completedSteps++; // Increment after successful extraction for this file
         }
       }
 
-      if (extractedTextsArray.length === 0) {
+      if (imageFiles.length > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
       
-      updateProgress('整合文字內容...');
+      updateDisplayProgress(completedSteps, '整合文字內容...');
       const combinedText = extractedTextsArray.join('\\n\\n---\\n\\n'); 
+      completedSteps++; // Increment after combining text
 
-      updateProgress('開始生成PIRLS題目...');
+      updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
+      completedSteps++; // Increment after generating questions
       
       if (questionsResult && questionsResult.questions) {
+        updateDisplayProgress(completedSteps, '題目已成功生成！'); // All steps done
         setGeneratedQuestionsOutput(questionsResult);
         toast({
           title: '成功！',
@@ -105,9 +114,19 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
+      // Optionally update progress message on error
+      // updateDisplayProgress(completedSteps, `處理時發生錯誤：${errorMessage.substring(0, 50)}...`);
     } finally {
       setIsLoading(false);
-      setLoadingProgress(100);
+      // No longer need setLoadingProgress(100) here, as updateDisplayProgress handles it.
+      // If an error occurred, the progress will reflect where it stopped.
+      // If successful, it will be at 100% with the success message.
+      if (!error && completedSteps === totalSteps) {
+         setLoadingMessage('所有處理步驟已完成！');
+      } else if (error) {
+        // Potentially set a final error message for progress if desired
+        // For example: setLoadingMessage(`處理失敗於: ${loadingMessage}`);
+      }
     }
   }, [imageFiles, toast]);
 
