@@ -176,7 +176,7 @@ export default function PIRLSQuestionCraftPage() {
         <Button
           onClick={handleGenerateQuestions}
           disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
-          className="w-full py-4 text-base sm:py-6 sm:text-lg"
+          className="w-full py-3 text-base sm:py-4 sm:text-lg"
           size="lg"
         >
           {isLoading ? (
@@ -252,7 +252,9 @@ export default function PIRLSQuestionCraftPage() {
       </main>
       
       <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} PIRLS QuestionCraft. All rights reserved.</p>
+        <p>
+          &copy; {new Date().getFullYear()} <a href="https://www.smes.tyc.edu.tw/" target="_blank" rel="noopener noreferrer" className="hover:text-primary underline">桃園市石門國小資訊組 阿凱老師 設計</a>
+        </p>
       </footer>
     </div>
   );
