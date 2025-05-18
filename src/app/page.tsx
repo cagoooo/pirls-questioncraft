@@ -34,6 +34,7 @@ export default function PIRLSQuestionCraftPage() {
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
+  const fileProgressSectionRef = useRef<HTMLDivElement>(null); // Ref for file progress section
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -188,6 +189,9 @@ export default function PIRLSQuestionCraftPage() {
     setIsGeneratingPdf(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化 PDF 產生程序...');
+    setTimeout(() => {
+      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
     try {
       await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (pdfError: any) {
@@ -216,6 +220,9 @@ export default function PIRLSQuestionCraftPage() {
     setIsGeneratingExcel(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化 Excel 產生程序...');
+    setTimeout(() => {
+      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
     try {
       await exportPIRLStoExcel(generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (excelError: any) {
@@ -353,7 +360,7 @@ export default function PIRLSQuestionCraftPage() {
             </div>
 
             {(isGeneratingPdf || isGeneratingExcel) && (
-              <Card className="w-full shadow-md mb-6">
+              <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center text-xl font-semibold">
                     <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
@@ -394,3 +401,5 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
+
+    
