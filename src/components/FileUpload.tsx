@@ -1,13 +1,13 @@
 
 "use client";
 
-import type { ChangeEvent, ClipboardEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent, DragEvent } from 'react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2 } from 'lucide-react';
+import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, FileWarning } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -19,43 +19,69 @@ interface FileUploadProps {
 export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const { toast } = useToast();
   const previewsSectionRef = useRef<HTMLDivElement>(null);
-  const previousImagePreviewsRef = useRef<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for the file input
+
+  // Common function to process new files (from click, paste, or drop)
+  const processNewFiles = useCallback((newFilesArray: File[]) => {
+    if (isLoading) return; // Should ideally be checked by callers
+
+    const currentFileCount = selectedFiles.length;
+    const filesToAdd = newFilesArray.slice(0, 4 - currentFileCount); // Only take files up to the limit
+
+    if (newFilesArray.length > filesToAdd.length) {
+        toast({
+            title: '上傳限制',
+            description: `最多只能選擇 4 張圖片。您嘗試加入 ${newFilesArray.length} 張，但只能再加入 ${filesToAdd.length} 張。`,
+            variant: 'destructive',
+        });
+    }
+    
+    const imageFiles = filesToAdd.filter(file => file.type.startsWith('image/'));
+    if (imageFiles.length !== filesToAdd.length && filesToAdd.length > 0) {
+      toast({
+        title: '檔案類型錯誤',
+        description: '偵測到非圖片檔案，已自動過濾。請僅選擇圖片檔案。',
+        variant: 'destructive',
+      });
+    }
+
+    if (imageFiles.length > 0) {
+      setSelectedFiles(prevFiles => {
+        const updatedFiles = [...prevFiles, ...imageFiles].slice(0, 4); // Ensure not to exceed 4
+        return updatedFiles;
+      });
+      toast({
+          title: '圖片已加入',
+          description: `成功加入 ${imageFiles.length} 張圖片。`,
+          variant: 'default',
+          className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
+      });
+    } else if (filesToAdd.length > 0) {
+        // This means files were attempted but none were valid images or fit
+        if (!newFilesArray.some(file => file.type.startsWith('image/'))) {
+             toast({
+                title: '無效檔案',
+                description: '您嘗試加入的檔案都不是有效的圖片格式。',
+                variant: 'destructive',
+            });
+        }
+    }
+  }, [selectedFiles, toast, isLoading]);
+
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const filesArray = Array.from(event.target.files);
-      const totalAfterAdding = selectedFiles.length + filesArray.length;
-
-      if (totalAfterAdding > 4) {
-        toast({
-          title: '上傳錯誤',
-          description: `最多只能選擇 4 張圖片。您已選擇 ${selectedFiles.length} 張，嘗試再加入 ${filesArray.length} 張。`,
-          variant: 'destructive',
-        });
-        event.target.value = ''; 
-        return;
+      processNewFiles(filesArray);
+      // Reset file input value to allow selecting the same file again
+      if (event.target) {
+        event.target.value = '';
       }
-      
-      const imageFiles = filesArray.filter(file => file.type.startsWith('image/'));
-      if (imageFiles.length !== filesArray.length) {
-        toast({
-          title: '檔案類型錯誤',
-          description: '偵測到非圖片檔案，已自動過濾。請僅選擇圖片檔案。',
-          variant: 'destructive',
-        });
-      }
-
-      if (imageFiles.length > 0) {
-        setSelectedFiles(prevFiles => {
-          const newFiles = [...prevFiles, ...imageFiles].slice(0, 4);
-          return newFiles;
-        });
-      }
-      event.target.value = ''; 
     }
-  }, [toast, selectedFiles.length]);
+  }, [processNewFiles]);
 
   const handlePaste = useCallback(async (event: ClipboardEvent<Document>) => {
     if (isLoading) return;
@@ -79,27 +105,17 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     }
 
     if (newPastedFiles.length > 0) {
-      if (selectedFiles.length + newPastedFiles.length > 4) {
-        toast({
-          title: '貼上圖片失敗',
-          description: `最多只能選擇 4 張圖片。您已選擇 ${selectedFiles.length} 張，嘗試再貼上 ${newPastedFiles.length} 張。`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setSelectedFiles(prevFiles => {
-        const updatedFiles = [...prevFiles, ...newPastedFiles].slice(0, 4);
-        return updatedFiles;
-      });
-
-      toast({
-        title: '圖片已貼上',
-        description: `成功貼上 ${newPastedFiles.length} 張圖片。`,
-        variant: 'default',
-      });
+        if (selectedFiles.length >= 4) {
+            toast({
+              title: '上傳已滿',
+              description: '已達 4 張圖片上限，無法再貼上。',
+              variant: 'destructive',
+            });
+            return;
+        }
+      processNewFiles(newPastedFiles);
     }
-  }, [selectedFiles.length, toast, isLoading]);
+  }, [isLoading, selectedFiles.length, processNewFiles, toast]);
 
   useEffect(() => {
     const pasteHandler = (event: Event) => handlePaste(event as ClipboardEvent<Document>);
@@ -109,30 +125,81 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     };
   }, [handlePaste]);
 
+  // Update image previews and call onFilesSelected when selectedFiles changes
   useEffect(() => {
-    previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
-
+    // Revoke old object URLs to prevent memory leaks
+    const oldPreviews = imagePreviews;
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
     setImagePreviews(newPreviews);
-    previousImagePreviewsRef.current = newPreviews; 
-
-    onFilesSelected(selectedFiles);
+    
+    onFilesSelected(selectedFiles); // Inform parent component
 
     return () => {
-      previousImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
+      oldPreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke old ones on next update or unmount
+      if (selectedFiles.length === 0) { // If all files are cleared, revoke current ones too
+          newPreviews.forEach(url => URL.revokeObjectURL(url));
+      }
     };
-  }, [selectedFiles, onFilesSelected]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFiles, onFilesSelected]); // onFilesSelected is included as per linting, even if stable
 
 
   const removeImage = (index: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+    // Also revoke the specific URL when an image is removed
+    const urlToRevoke = imagePreviews[index];
+    if (urlToRevoke) {
+        URL.revokeObjectURL(urlToRevoke);
+    }
   };
 
   const clearAllImages = () => {
+    imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke all current previews
     setSelectedFiles([]);
   };
-
+  
   const canUploadMore = selectedFiles.length < 4;
+
+  const handleDragEnter = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isLoading && canUploadMore) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Check if the leave target is outside the dropzone
+    if (event.currentTarget.contains(event.relatedTarget as Node)) {
+        return;
+    }
+    setIsDraggingOver(false);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault(); // Necessary to allow drop
+    event.stopPropagation();
+    if (!isLoading && canUploadMore && !isDraggingOver) {
+        setIsDraggingOver(true); // Ensure isDraggingOver is set if it wasn't by DragEnter
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(false);
+
+    if (isLoading || !canUploadMore) return;
+
+    const files = event.dataTransfer?.files;
+    if (files) {
+      const filesArray = Array.from(files);
+      processNewFiles(filesArray);
+    }
+  };
+
 
   return (
     <Card className="w-full bg-muted dark:bg-muted/80">
@@ -150,38 +217,59 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
               htmlFor="imageUpload"
               className={cn(
                 "flex flex-col items-center justify-center w-full h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
-                isLoading || !canUploadMore ? "cursor-not-allowed bg-muted/50 border-muted-foreground/30" : "cursor-pointer hover:border-primary/80 border-primary/50 bg-primary/10 hover:bg-primary/20",
-                !canUploadMore && !isLoading && "border-accent bg-accent/10"
+                // Disabled states (loading or no more uploads allowed)
+                (isLoading || (!canUploadMore && !isDraggingOver)) && 
+                  (!canUploadMore && !isLoading && !isDraggingOver 
+                    ? "border-accent bg-accent/10 text-accent-foreground" // Max files reached, not loading, not dragging
+                    : "bg-muted/50 border-muted-foreground/30 text-muted-foreground"),
+                (isLoading || !canUploadMore) && "cursor-not-allowed",
+                
+                // Enabled states
+                !isLoading && canUploadMore && (
+                  isDraggingOver 
+                    ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2" // Dragging over
+                    : "cursor-pointer hover:border-primary/80 border-primary/50 bg-primary/10 hover:bg-primary/20 text-foreground" // Default enabled
+                )
               )}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin h-10 w-10 text-primary mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <p className="text-sm font-medium text-foreground">處理中...</p>
+                  <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" />
+                  <p className="text-sm font-medium">處理中...</p>
                 </>
-              ) : canUploadMore ? (
+              ) : !canUploadMore ? (
+                 <>
+                  <CheckCircle2 className="w-10 h-10 text-accent mb-2" />
+                  <p className="text-sm font-medium">已達圖片上傳上限 (4張)</p>
+                  <p className="text-xs text-muted-foreground mt-1">您可以清除部分圖片後再試</p>
+                </>
+              ) : isDraggingOver ? (
                 <>
                   <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
-                  <p className="text-sm font-medium text-foreground text-center">
+                  <p className="text-sm font-medium text-primary">放開以加入圖片</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    還可選 {4 - selectedFiles.length} 張圖片
+                  </p>
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
+                  <p className="text-sm font-medium text-center">
                     點擊此處或拖曳圖片至此上傳（或截圖貼上）
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     已選 {selectedFiles.length}/4 張圖片
                   </p>
                 </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-10 h-10 text-accent mb-2" />
-                  <p className="text-sm font-medium text-foreground">已達圖片上傳上限 (4張)</p>
-                  <p className="text-xs text-muted-foreground mt-1">您可以清除部分圖片後再試</p>
-                </>
               )}
             </label>
             <Input
               id="imageUpload"
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               multiple
@@ -234,3 +322,5 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Card>
   );
 }
+
+    

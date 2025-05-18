@@ -20,7 +20,7 @@ const siteDescription = '上傳圖片或直接貼上截圖，APP 為您分析內
 const socialPreviewImageUrl = '/images/social-preview.png'; 
 
 // !!! 重要：請將下面的 'https://your-production-domain.com' 替換成您網站的實際生產環境域名 !!!
-const productionDomain = 'https://your-production-domain.com'; // 例如：https://www.example.com
+const productionDomain = 'https://pirlss.smes.tyc.edu.tw'; // 例如：https://www.example.com
 
 export const metadata: Metadata = {
   // metadataBase 會為所有相對路徑 (如 socialPreviewImageUrl 和 icons.icon) 提供基礎 URL
