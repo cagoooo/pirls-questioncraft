@@ -35,6 +35,17 @@ export default function PIRLSQuestionCraftPage() {
     });
   };
 
+  const handleImageFilesChange = useCallback((files: File[]) => {
+    setImageFiles(files);
+    // Clear previous results and errors when image selection changes
+    setGeneratedQuestionsOutput(null);
+    setError(null);
+    // Optionally reset progress if generation was ongoing, but typically not needed here
+    // setLoadingProgress(0);
+    // setLoadingMessage('');
+  }, []);
+
+
   const handleGenerateQuestions = useCallback(async () => {
     if (imageFiles.length === 0) {
       toast({
@@ -46,20 +57,18 @@ export default function PIRLSQuestionCraftPage() {
     }
 
     setIsLoading(true);
-    setError(null);
-    setGeneratedQuestionsOutput(null);
+    setError(null); // Reset error state
+    setGeneratedQuestionsOutput(null); // Reset previous questions
     
-    // Correctly define total steps and completed steps
-    const totalSteps = imageFiles.length + 2; // N extractions + 1 combine text + 1 generate questions
+    const totalSteps = imageFiles.length + 2; 
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
-      // Ensure progress doesn't exceed 100, though it shouldn't with correct logic
       setLoadingProgress(Math.min(100, (stepsDone / totalSteps) * 100)); 
     };
 
-    updateDisplayProgress(completedSteps, '準備開始處理...'); // Initial state: 0 steps done
+    updateDisplayProgress(completedSteps, '準備開始處理...'); // Initial state: 0 steps done, 0%
 
     try {
       const extractedTextsArray: string[] = [];
@@ -76,7 +85,7 @@ export default function PIRLSQuestionCraftPage() {
           } else if (!extractionResult.success) {
             throw new Error(`無法從圖片 "${file.name}" 提取文字: ${extractionResult.error || '未知錯誤'}`);
           }
-          completedSteps++; // Increment after successful extraction for this file
+          completedSteps++; 
         }
       }
 
@@ -86,14 +95,14 @@ export default function PIRLSQuestionCraftPage() {
       
       updateDisplayProgress(completedSteps, '整合文字內容...');
       const combinedText = extractedTextsArray.join('\\n\\n---\\n\\n'); 
-      completedSteps++; // Increment after combining text
+      completedSteps++; 
 
       updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
-      completedSteps++; // Increment after generating questions
+      completedSteps++; 
       
       if (questionsResult && questionsResult.questions) {
-        updateDisplayProgress(completedSteps, '題目已成功生成！'); // All steps done
+        updateDisplayProgress(completedSteps, '題目已成功生成！'); 
         setGeneratedQuestionsOutput(questionsResult);
         toast({
           title: '成功！',
@@ -114,18 +123,16 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Optionally update progress message on error
-      // updateDisplayProgress(completedSteps, `處理時發生錯誤：${errorMessage.substring(0, 50)}...`);
+      // Update progress message on error, current 'completedSteps' will reflect where it stopped
+      updateDisplayProgress(completedSteps, `處理時發生錯誤`);
     } finally {
       setIsLoading(false);
-      // No longer need setLoadingProgress(100) here, as updateDisplayProgress handles it.
-      // If an error occurred, the progress will reflect where it stopped.
-      // If successful, it will be at 100% with the success message.
       if (!error && completedSteps === totalSteps) {
          setLoadingMessage('所有處理步驟已完成！');
+         setLoadingProgress(100); // Ensure it hits 100% on success
       } else if (error) {
-        // Potentially set a final error message for progress if desired
-        // For example: setLoadingMessage(`處理失敗於: ${loadingMessage}`);
+        // Keep the error message in loadingMessage if one occurred
+        setLoadingMessage(`處理失敗於: ${loadingMessage.split('...')[0]}`);
       }
     }
   }, [imageFiles, toast]);
@@ -142,7 +149,6 @@ export default function PIRLSQuestionCraftPage() {
     setIsGeneratingPdf(true);
     try {
       await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast);
-      // Success toast is handled within exportPIRLStoPDF
     } catch (pdfError: any) {
       console.error("PDF 生成失敗:", pdfError);
       toast({
@@ -167,7 +173,7 @@ export default function PIRLSQuestionCraftPage() {
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
-        <FileUpload onFilesSelected={setImageFiles} isLoading={isLoading || isGeneratingPdf} />
+        <FileUpload onFilesSelected={handleImageFilesChange} isLoading={isLoading || isGeneratingPdf} />
 
         <Button
           onClick={handleGenerateQuestions}
@@ -249,9 +255,8 @@ export default function PIRLSQuestionCraftPage() {
       
       <footer className="mt-12 mb-6 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} PIRLS QuestionCraft. All rights reserved.</p>
-        <p className="text-xs mt-1">請確認您已將 NotoSansTC-Regular.ttf 字型檔放置於 public/fonts/ 資料夾中，以確保PDF中文內容正確顯示。</p>
+        <p className="text-xs mt-1">請確認您已將 NotoSansTC-(Regular/Bold/Medium/Thin/ExtraBold/Black).ttf 等字型檔放置於 public/fonts/ 資料夾中，以確保PDF中文內容正確顯示。</p>
       </footer>
     </div>
   );
 }
-
