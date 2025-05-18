@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -89,7 +89,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       const filesArray = Array.from(event.target.files);
       processNewFiles(filesArray);
       if (event.target) {
-        event.target.value = '';
+        event.target.value = ''; // Reset file input to allow re-selection of the same file
       }
     }
   }, [processNewFiles]);
@@ -160,7 +160,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     return () => {
       newPreviews.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [selectedFiles, onFilesSelected]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFiles, onFilesSelected]); // onFilesSelected is included per exhaustive-deps, though its identity should be stable from parent page
 
 
   const removeImage = (indexToRemove: number) => {
@@ -226,7 +227,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   };
 
   const handleDialogImageWheel = useCallback((event: WheelEvent) => {
-    // For debugging: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
+    // For debugging: // console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     event.preventDefault();
     setDialogImageScale(prevScale => {
       let newScale;
@@ -236,7 +237,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-      // For debugging: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
+      // For debugging: // console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
         setImageOffset({ x: 0, y: 0 });
       }
@@ -246,18 +247,18 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   
   useEffect(() => {
     const currentImageDialogEl = imageDialogRef.current;
-    // For debugging: console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDialogEl);
+    // For debugging: // console.log('useEffect for wheel listener. isImageDialogOpen:', isImageDialogOpen, 'Element:', currentImageDialogEl);
     if (isImageDialogOpen && currentImageDialogEl) {
       currentImageDialogEl.addEventListener('wheel', handleDialogImageWheel, { passive: false });
-      // For debugging: console.log('Wheel listener ATTACHED to:', currentImageDialogEl);
+      // For debugging: // console.log('Wheel listener ATTACHED to:', currentImageDialogEl);
     }
     return () => {
       if (currentImageDialogEl) {
         currentImageDialogEl.removeEventListener('wheel', handleDialogImageWheel);
-        // For debugging: console.log('Wheel listener REMOVED from:', currentImageDialogEl);
+        // For debugging: // console.log('Wheel listener REMOVED from:', currentImageDialogEl);
       }
     };
-  }, [isImageDialogOpen, handleDialogImageWheel]);
+  }, [isImageDialogOpen, handleDialogImageWheel, imageDialogRef]);
 
   const zoomIn = () => setDialogImageScale(s => {
     const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
@@ -473,6 +474,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         ref={imageDialogRef} 
       >
         <DialogTitle className="sr-only">放大的圖片預覽</DialogTitle>
+        <DialogDescription className="sr-only">詳細檢視上傳的圖片內容，可使用按鈕或滑鼠滾輪進行縮放，以及拖曳平移圖片。</DialogDescription>
         {selectedImageForDialog && (
           <div className="relative w-full h-full flex justify-center items-center overflow-hidden">
             <Image
@@ -515,4 +517,3 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     </Dialog>
   );
 }
-
