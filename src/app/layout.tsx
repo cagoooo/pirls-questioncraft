@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PIRLS QuestionCraft',
+  title: 'PIRLS 閱讀素養題組生成站',
   description: '上傳圖片，生成PIRLS閱讀素養題組',
 };
 
