@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Accordion } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
@@ -25,6 +25,7 @@ export default function PIRLSQuestionCraftPage() {
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const resultsSectionRef = useRef<HTMLDivElement>(null);
 
   const convertFileToDataUri = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -37,12 +38,8 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleImageFilesChange = useCallback((files: File[]) => {
     setImageFiles(files);
-    // Clear previous results and errors when image selection changes
     setGeneratedQuestionsOutput(null);
     setError(null);
-    // Optionally reset progress if generation was ongoing, but typically not needed here
-    // setLoadingProgress(0);
-    // setLoadingMessage('');
   }, []);
 
 
@@ -57,8 +54,8 @@ export default function PIRLSQuestionCraftPage() {
     }
 
     setIsLoading(true);
-    setError(null); // Reset error state
-    setGeneratedQuestionsOutput(null); // Reset previous questions
+    setError(null); 
+    setGeneratedQuestionsOutput(null); 
     
     const totalSteps = imageFiles.length + 2; 
     let completedSteps = 0;
@@ -68,7 +65,7 @@ export default function PIRLSQuestionCraftPage() {
       setLoadingProgress(Math.min(100, (stepsDone / totalSteps) * 100)); 
     };
 
-    updateDisplayProgress(completedSteps, '準備開始處理...'); // Initial state: 0 steps done, 0%
+    updateDisplayProgress(completedSteps, '準備開始處理...'); 
 
     try {
       const extractedTextsArray: string[] = [];
@@ -110,6 +107,9 @@ export default function PIRLSQuestionCraftPage() {
           variant: 'default',
           className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
         });
+        setTimeout(() => {
+          resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
       } else {
         throw new Error('APP未能成功生成題目。');
       }
@@ -123,15 +123,13 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Update progress message on error, current 'completedSteps' will reflect where it stopped
       updateDisplayProgress(completedSteps, `處理時發生錯誤`);
     } finally {
       setIsLoading(false);
       if (!error && completedSteps === totalSteps) {
          setLoadingMessage('所有處理步驟已完成！');
-         setLoadingProgress(100); // Ensure it hits 100% on success
+         setLoadingProgress(100); 
       } else if (error) {
-        // Keep the error message in loadingMessage if one occurred
         setLoadingMessage(`處理失敗於: ${loadingMessage.split('...')[0]}`);
       }
     }
@@ -178,7 +176,7 @@ export default function PIRLSQuestionCraftPage() {
         <Button
           onClick={handleGenerateQuestions}
           disabled={isLoading || isGeneratingPdf || imageFiles.length === 0}
-          className="w-full text-lg py-6"
+          className="w-full py-4 text-base sm:py-6 sm:text-lg"
           size="lg"
         >
           {isLoading ? (
@@ -220,7 +218,7 @@ export default function PIRLSQuestionCraftPage() {
         )}
 
         {generatedQuestionsOutput && !isLoading && (
-          <section className="mt-8">
+          <section ref={resultsSectionRef} className="mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold text-center flex items-center justify-center mb-2 sm:mb-0">
                 <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
@@ -259,3 +257,4 @@ export default function PIRLSQuestionCraftPage() {
     </div>
   );
 }
+
