@@ -115,7 +115,7 @@ export default function PIRLSQuestionCraftPage() {
       
       completedSteps++;
       updateDisplayProgress(completedSteps, '整合文字內容...');
-      const combinedText = extractedTextsArray.join('\n\n---\n\n'); 
+      const combinedText = extractedTextsArray.join('\n\n---\n\n');
       
 
       completedSteps++;
@@ -345,7 +345,7 @@ export default function PIRLSQuestionCraftPage() {
             href="https://www.smes.tyc.edu.tw/" 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="font-medium text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+            className="font-medium text-primary hover:text-primary/80 transition-colors"
           >
             桃園市石門國小資訊組 阿凱老師 設計
           </a>
