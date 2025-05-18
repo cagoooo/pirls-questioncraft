@@ -338,7 +338,7 @@ export default function PIRLSQuestionCraftPage() {
         )}
       </main>
       
-      <footer className="w-full max-w-3xl mt-16 mb-8 p-6 bg-card/80 dark:bg-card/60 rounded-xl shadow-lg text-center text-sm text-muted-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-card">
+      <footer className="w-full max-w-3xl mt-16 mb-8 p-6 bg-muted dark:bg-card rounded-xl shadow-lg text-center text-sm text-muted-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-secondary dark:hover:bg-muted">
         <p className="leading-relaxed">
           &copy; {currentYear ? currentYear : ''}{' '}
           <a 
