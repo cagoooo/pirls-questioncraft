@@ -7,6 +7,8 @@ import { Accordion } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -16,7 +18,7 @@ import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy } from 'lucide-react';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
@@ -34,6 +36,7 @@ export default function PIRLSQuestionCraftPage() {
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
   const [isQuizActive, setIsQuizActive] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
@@ -42,18 +45,21 @@ export default function PIRLSQuestionCraftPage() {
   const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
+  const placeholderShareLink = typeof window !== 'undefined' ? `${window.location.origin}/quiz/placeholder-id` : 'https://pirlss.smes.tyc.edu.tw/quiz/placeholder-id';
+
+
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
 
   useEffect(() => {
-    if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
+    if ((isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf) && fileProgressSectionRef.current) {
       const timer = setTimeout(() => {
         fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100); 
       return () => clearTimeout(timer);
     }
-  }, [isGeneratingQuizResultsPdf]);
+  }, [isGeneratingPdf, isGeneratingExcel, isGeneratingQuizResultsPdf]);
 
 
   const convertFileToDataUri = (file: File): Promise<string> => {
@@ -99,7 +105,6 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
-    // Total steps: 1 (initial) + N images + 1 (combine) + 1 (generate) + 1 (success)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
@@ -134,9 +139,6 @@ export default function PIRLSQuestionCraftPage() {
             });
           }
         }
-      } else {
-         // Should not happen if button is enabled only with files, but as a safeguard
-        completedSteps += currentImageFilesCount; 
       }
 
       if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
@@ -280,6 +282,24 @@ export default function PIRLSQuestionCraftPage() {
     setFileGenerationMessage(message);
   };
 
+  const handleCopyShareLink = () => {
+    navigator.clipboard.writeText(placeholderShareLink).then(() => {
+      toast({
+        title: "連結已複製",
+        description: "示意分享連結已複製到剪貼簿。",
+        variant: "default",
+        className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
+      });
+    }).catch(err => {
+      console.error("複製連結失敗:", err);
+      toast({
+        title: "複製失敗",
+        description: "無法複製連結，請手動複製。",
+        variant: "destructive",
+      });
+    });
+  };
+
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
@@ -393,6 +413,59 @@ export default function PIRLSQuestionCraftPage() {
                         <ClipboardCheck className="mr-2 h-4 w-4" />
                         開始測驗
                     </Button>
+                     <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            onClick={() => setIsShareDialogOpen(true)}
+                            disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
+                            variant="outline"
+                            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
+                          >
+                            <Share2 className="mr-2 h-4 w-4" />
+                            分享測驗
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>分享您的測驗</DialogTitle>
+                            <DialogDescription>
+                              讓其他人可以透過連結或QR Code參與此測驗。
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                              <label htmlFor="share-link" className="text-sm font-medium">
+                                分享連結 (示意)
+                              </label>
+                              <div className="flex items-center space-x-2">
+                                <Input id="share-link" value={placeholderShareLink} readOnly className="flex-1" />
+                                <Button type="button" size="sm" onClick={handleCopyShareLink}>
+                                  <Copy className="h-4 w-4 mr-1 sm:mr-2" />
+                                  <span className="hidden sm:inline">複製</span>
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                               <label className="text-sm font-medium">QR Code (示意)</label>
+                               <div className="flex items-center justify-center p-4 border rounded-md bg-muted h-32">
+                                 <p className="text-muted-foreground text-sm">QR Code 預留位置</p>
+                               </div>
+                            </div>
+                             <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+                              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                              <AlertTitle className="text-yellow-700 dark:text-yellow-300">請注意</AlertTitle>
+                              <AlertDescription className="text-yellow-600 dark:text-yellow-500 text-xs">
+                                完整的測驗分享功能（包含圖片和學生作答追蹤）需要將題組儲存到伺服器。目前的連結和QR碼僅為示意，尚無法讓他人直接進行測驗。
+                              </AlertDescription>
+                            </Alert>
+                          </div>
+                          <DialogFooter className="sm:justify-end">
+                            <Button type="button" variant="outline" onClick={() => setIsShareDialogOpen(false)}>
+                              關閉
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     <Button
                         onClick={handleDownloadPdf}
                         disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
@@ -471,4 +544,5 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
