@@ -138,25 +138,25 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   useEffect(() => {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    const oldPreviews = imagePreviews;
+    const oldPreviews = [...imagePreviews]; // Create a copy for cleanup
     
     setImagePreviews(newPreviews);
     onFilesSelected(selectedFiles); 
 
     return () => {
       oldPreviews.forEach(url => {
-        if (!newPreviews.includes(url)) {
+        if (!newPreviews.includes(url)) { // Only revoke if not in new previews
           URL.revokeObjectURL(url);
         }
       });
-      if (newPreviews.length === 0 && oldPreviews.length > 0) {
-          oldPreviews.forEach(URL.revokeObjectURL);
-      } else if (selectedFiles.length === 0 && newPreviews.length > 0 ) { 
-          newPreviews.forEach(URL.revokeObjectURL);
+       // If all files are cleared, newPreviews will be empty.
+      // Make sure to revoke any remaining URLs in oldPreviews that were not in newPreviews (which would be all of them).
+      if (selectedFiles.length === 0) {
+        oldPreviews.forEach(URL.revokeObjectURL);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles, onFilesSelected]); 
+  }, [selectedFiles]); // onFilesSelected removed as per previous lint fix to avoid re-renders if it changes identity
 
   const removeImage = (indexToRemove: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
@@ -217,6 +217,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   
   const handleDialogImageWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
+    // For debugging: console.log('handleDialogImageWheel triggered. DeltaY:', event.deltaY);
     setDialogImageScale(prevScale => {
       let newScale;
       if (event.deltaY < 0) { 
@@ -225,6 +226,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      // For debugging: console.log('Prev scale:', prevScale, 'New scale:', newScale, 'Clamped scale:', clampedScale);
       if (clampedScale === 1) {
         setImageOffset({ x: 0, y: 0 });
       }
@@ -308,20 +310,20 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
         }}
     >
       <Card className="w-full bg-muted dark:bg-muted/80">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <ImagePlus className="h-6 w-6 text-primary" />
             上傳圖片
           </CardTitle>
           <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG），或截圖貼上圖片。</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="space-y-6">
             <div>
               <label
                 htmlFor="imageUpload"
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
+                  "flex flex-col items-center justify-center w-full h-32 sm:h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
                   (isLoading || (!canUploadMore && !isDraggingOver)) && 
                     (!canUploadMore && !isLoading && !isDraggingOver 
                       ? "border-accent bg-accent/10 text-accent-foreground" 
@@ -383,7 +385,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
             {selectedFiles.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-md font-semibold text-foreground">已選圖片預覽：</h3>
+                <h3 className="text-base sm:text-md font-semibold text-foreground">已選圖片預覽：</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {imagePreviews.map((previewUrl, index) => (
                     <DialogTrigger asChild key={previewUrl}>
