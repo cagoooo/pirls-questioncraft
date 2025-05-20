@@ -503,7 +503,7 @@ export default function PIRLSQuestionCraftPage() {
                                   <div className="flex items-center space-x-2">
                                     <Input id="share-link" value={currentShareLink} readOnly className="flex-1" />
                                     <Button type="button" size="sm" onClick={handleCopyShareLink}>
-                                      <Copy className="h-4 w-4 mr-1 sm:mr-2" />
+                                      <Copy className="h-4 w-4 sm:mr-2" />
                                       <span className="hidden sm:inline">複製</span>
                                     </Button>
                                   </div>
@@ -522,7 +522,7 @@ export default function PIRLSQuestionCraftPage() {
                              <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
                               <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                               <AlertTitle className="text-yellow-700 dark:text-yellow-300">重要提示：臨時分享</AlertTitle>
-                              <AlertDescription className="text-yellow-600 dark:text-yellow-500 text-xs">
+                              <AlertDescription className="text-yellow-600 dark:text-yellow-500 text-sm">
                                 此分享連結是**臨時性的**，內容儲存在伺服器記憶體中。連結約在 **1 小時後或伺服器重啟/更新時失效**。
                                 不適用於永久保存或非同步測驗。學生需在連結有效期內完成測驗。
                                 在正式生產環境 (例如 Vercel)，此臨時分享的穩定性可能受限。
@@ -621,3 +621,6 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+
+    
