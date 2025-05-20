@@ -24,7 +24,11 @@ import {
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
 import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf'; 
-import type { StudentInfo } from '@/app/quiz/[quizId]/page';
+export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
+  class: string;
+  seatNumber: string;
+  name: string;
+}
 
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
@@ -116,6 +120,7 @@ export function QuizView({
       };
       generatePreviews();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageFiles, imageFilesDataURIs]); 
 
   useEffect(() => {
@@ -324,7 +329,7 @@ export function QuizView({
                       <span className={`mr-3 font-semibold ${result.isCorrect ? 'text-green-600 dark:text-green-400' : 'text-destructive dark:text-red-400'}`}>
                         題目 {index + 1}: {result.isCorrect ? <CheckCircle className="inline h-5 w-5 ml-1" /> : <XCircle className="inline h-5 w-5 ml-1" />}
                       </span>
-                      <span className="flex-1 truncate text-sm group-hover:text-primary">{result.questionText}</span>
+                      <span className="flex-1 text-sm group-hover:text-primary">{result.questionText}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4 pt-2 space-y-3 text-sm">
