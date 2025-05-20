@@ -10,11 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge, badgeVariants } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut } from 'lucide-react';
 import type { VariantProps } from 'class-variance-authority';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Progress } from '@/components/ui/progress';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
@@ -33,15 +40,30 @@ const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; ic
 
 const optionLabels = ['A', 'B', 'C', 'D'];
 
+interface QuizResultItem {
+  questionText: string;
+  options: string[];
+  userAnswerIndex: number | null;
+  correctAnswerIndex: number;
+  isCorrect: boolean;
+  explanation: string;
+  pirlsLevel: PirlsQuestion['pirlsLevel'];
+}
+
+type QuizState = 'answering' | 'results';
+
 export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(() => 
+  const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(() =>
     Array(questionsOutput.questions.length).fill(null)
   );
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [quizState, setQuizState] = useState<QuizState>('answering');
+  const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
 
-  const currentQuestion = questionsOutput.questions[currentQuestionIndex];
-  const levelDetail = pirlsLevelDetails[currentQuestion.pirlsLevel];
+  const currentQuestion = useMemo(() => questionsOutput.questions[currentQuestionIndex], [questionsOutput, currentQuestionIndex]);
+  const levelDetail = useMemo(() => quizState === 'answering' ? pirlsLevelDetails[currentQuestion.pirlsLevel] : null, [currentQuestion, quizState]);
+
 
   useEffect(() => {
     const generatePreviews = async () => {
@@ -62,14 +84,14 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
       generatePreviews();
     }
     
-    // Cleanup
     return () => {
       imagePreviews.forEach(url => URL.revokeObjectURL(url));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles]); // Only re-run if imageFiles change
+  }, [imageFiles]);
 
   const handleOptionChange = (value: string) => {
+    if (quizState !== 'answering') return;
     const answerIndex = parseInt(value, 10);
     setSelectedAnswers(prev => {
       const newAnswers = [...prev];
@@ -90,26 +112,169 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     }
   };
 
-  const handleFinishQuiz = () => {
-    // For now, just log the answers. Scoring will be a future step.
-    console.log("Quiz Finished. User Answers:", selectedAnswers);
-    // Example of checking answers:
-    const results = questionsOutput.questions.map((q, idx) => ({
-      question: q.question,
-      userAnswer: selectedAnswers[idx] !== null ? optionLabels[selectedAnswers[idx]!] : '未作答',
-      correctAnswer: optionLabels[q.correctAnswerIndex],
-      isCorrect: selectedAnswers[idx] === q.correctAnswerIndex
-    }));
-    console.log("Detailed Results:", results);
-    // alert("測驗已完成！詳細結果請查看瀏覽器控制台。\n計分與回饋功能將在後續版本加入。");
-    // For now, just exit quiz after "finishing"
-    onExitQuiz(); 
+  const processAndSetResults = () => {
+    const results: QuizResultItem[] = questionsOutput.questions.map((q, idx) => {
+      const userAnswerIndex = selectedAnswers[idx];
+      return {
+        questionText: q.question,
+        options: q.options,
+        userAnswerIndex,
+        correctAnswerIndex: q.correctAnswerIndex,
+        isCorrect: userAnswerIndex === q.correctAnswerIndex,
+        explanation: q.explanation,
+        pirlsLevel: q.pirlsLevel,
+      };
+    });
+    setQuizResults(results);
+    setQuizState('results');
   };
-  
-  const currentSelectedValue = selectedAnswers[currentQuestionIndex] !== null 
-    ? selectedAnswers[currentQuestionIndex]?.toString() 
+
+  const handleFinishQuiz = () => {
+    processAndSetResults();
+  };
+
+  const handleRestartQuiz = () => {
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers(Array(questionsOutput.questions.length).fill(null));
+    setQuizResults(null);
+    setQuizState('answering');
+  };
+
+  const currentSelectedValue = selectedAnswers[currentQuestionIndex] !== null
+    ? selectedAnswers[currentQuestionIndex]?.toString()
     : undefined;
 
+
+  if (quizState === 'results' && quizResults) {
+    const totalQuestions = quizResults.length;
+    const totalCorrect = quizResults.filter(r => r.isCorrect).length;
+    const overallScore = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
+
+    const pirlsScores: Record<string, { correct: number, total: number, label: string }> = {};
+    // Initialize pirlsScores based on all possible levels to ensure correct order and labels
+    (Object.keys(pirlsLevelDetails) as Array<PirlsQuestion['pirlsLevel']>).forEach(levelKey => {
+        pirlsScores[levelKey] = {
+            correct: 0,
+            total: 0,
+            label: pirlsLevelDetails[levelKey].label
+        };
+    });
+    
+    quizResults.forEach(result => {
+      if (pirlsScores[result.pirlsLevel]) { // Check if level exists to prevent errors
+        pirlsScores[result.pirlsLevel].total++;
+        if (result.isCorrect) {
+          pirlsScores[result.pirlsLevel].correct++;
+        }
+      }
+    });
+
+    return (
+      <Card className="w-full shadow-xl">
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div className="flex items-center">
+            <CheckSquare className="h-7 w-7 mr-3 text-primary" />
+            <CardTitle>測驗結果</CardTitle>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleRestartQuiz}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              重新測驗
+            </Button>
+            <Button variant="ghost" onClick={onExitQuiz}>
+              <LogOut className="mr-2 h-4 w-4" />
+              退出測驗
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">總體表現</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p>您答對了 {totalCorrect} / {totalQuestions} 題。</p>
+              <Progress value={overallScore} className="w-full h-3" />
+              <p className="text-sm text-muted-foreground text-center">{Math.round(overallScore)}%</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">各PIRLS層次得分</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Object.entries(pirlsScores).map(([level, score]) => {
+                if (score.total === 0 && !questionsOutput.questions.some(q => q.pirlsLevel === level)) return null; 
+                const percentage = score.total > 0 ? (score.correct / score.total) * 100 : 0;
+                const levelBadgeVariant = pirlsLevelDetails[level as PirlsQuestion['pirlsLevel']].badgeVariant;
+                return (
+                  <div key={level}>
+                    <div className="flex justify-between items-center mb-1">
+                      <Badge variant={levelBadgeVariant} className="text-xs">{score.label}</Badge>
+                      <span className="font-medium">{score.correct} / {score.total} 題</span>
+                    </div>
+                    <Progress value={percentage} className="h-2" />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-3 mt-6">題目詳解：</h3>
+            <Accordion type="multiple" className="w-full space-y-2">
+              {quizResults.map((result, index) => (
+                <AccordionItem value={`result-${index}`} key={`result-${index}`} className={cn(
+                  "border rounded-md shadow-sm",
+                  result.isCorrect ? "border-green-300 bg-green-500/5 hover:bg-green-500/10" : "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
+                )}>
+                  <AccordionTrigger className="px-4 py-3 text-left hover:no-underline group">
+                    <div className="flex items-center w-full">
+                      <span className={`mr-3 font-semibold ${result.isCorrect ? 'text-green-600' : 'text-destructive'}`}>
+                        題目 {index + 1}: {result.isCorrect ? <CheckCircle className="inline h-5 w-5 ml-1" /> : <XCircle className="inline h-5 w-5 ml-1" />}
+                      </span>
+                      <span className="flex-1 truncate text-sm group-hover:text-primary">{result.questionText}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4 pt-2 space-y-3 text-sm">
+                    <p><strong>您的答案：</strong>
+                      <span className={cn(result.isCorrect ? "" : "text-destructive line-through")}>
+                        {result.userAnswerIndex !== null
+                          ? `${optionLabels[result.userAnswerIndex]}. ${result.options[result.userAnswerIndex]}`
+                          : <span className="text-muted-foreground italic">未作答</span>}
+                      </span>
+                    </p>
+                    {!result.isCorrect && (
+                      <p className="text-green-700 dark:text-green-500">
+                        <strong>正確答案：</strong>
+                        {`${optionLabels[result.correctAnswerIndex]}. ${result.options[result.correctAnswerIndex]}`}
+                      </p>
+                    )}
+                     {result.isCorrect && (
+                       <p className="text-green-600 font-medium flex items-center">
+                         <CheckCircle className="h-4 w-4 mr-2" /> 恭喜答對！
+                       </p>
+                     )}
+                    {!result.isCorrect && result.explanation && (
+                      <div className="mt-2">
+                        <p className="font-semibold text-xs text-muted-foreground mb-1">解題引導：</p>
+                        <CardDescription className="text-xs whitespace-pre-wrap p-3 bg-muted/60 dark:bg-muted/30 rounded-md border border-dashed">
+                          {result.explanation}
+                        </CardDescription>
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 'answering' state UI
   return (
     <Card className="w-full shadow-xl">
       <CardHeader className="flex flex-row justify-between items-center pb-4">
@@ -117,8 +282,8 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
           <BookOpen className="h-6 w-6 mr-2 text-primary" />
           <CardTitle>PIRLS 線上測驗</CardTitle>
         </div>
-        <Button variant="outline" size="sm" onClick={onExitQuiz} className="ml-auto">
-          <XCircle className="mr-2 h-4 w-4" />
+        <Button variant="ghost" size="sm" onClick={onExitQuiz} className="ml-auto">
+          <LogOut className="mr-2 h-4 w-4" />
           退出測驗
         </Button>
       </CardHeader>
@@ -131,7 +296,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index}
+                    key={src} // Use src as key if stable, or manage IDs if files can be reordered
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -153,10 +318,12 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
             <h4 className="text-lg font-semibold">
               題目 {currentQuestionIndex + 1} / {questionsOutput.questions.length}
             </h4>
-            <Badge variant={levelDetail.badgeVariant} className={cn("text-xs", levelDetail.borderColorClass)}>
-              {levelDetail.icon && <levelDetail.icon className="h-3 w-3 mr-1.5" />}
-              {levelDetail.label}
-            </Badge>
+            {levelDetail && (
+              <Badge variant={levelDetail.badgeVariant} className={cn("text-xs", levelDetail.borderColorClass)}>
+                {levelDetail.icon && <levelDetail.icon className="h-3 w-3 mr-1.5" />}
+                {levelDetail.label}
+              </Badge>
+            )}
           </div>
           <p className="text-md mb-4 min-h-[60px]">{currentQuestion.question}</p>
 
@@ -191,12 +358,12 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
             onClick={handleFinishQuiz}
             className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
           >
-            <CheckCircle className="mr-2 h-4 w-4" />
+            <CheckSquare className="mr-2 h-4 w-4" />
             完成測驗
           </Button>
         ) : (
           <Button 
-            variant="outline" 
+            variant="default" // Changed to default for next button
             onClick={goToNextQuestion}
             disabled={currentQuestionIndex === questionsOutput.questions.length - 1}
           >
@@ -208,3 +375,4 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     </Card>
   );
 }
+
