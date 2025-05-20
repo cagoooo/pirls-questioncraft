@@ -1,17 +1,18 @@
+
 // src/app/quiz/[quizId]/page.tsx
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation'; // Import from next/navigation for App Router
+import { useParams } from 'next/navigation';
 import { QuizView } from '@/components/QuizView';
-import { type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PirlsLogo } from '@/components/PirlsLogo';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useToast } from '@/hooks/use-toast';
 
 interface QuizData {
   questionsOutput: GeneratePirlsQuestionsOutput;
@@ -20,66 +21,71 @@ interface QuizData {
 
 type ProgressCallback = (progress: number, message: string) => void;
 
-
 export default function SharedQuizPage() {
+  console.log('SharedQuizPage: Component rendering started');
   const params = useParams();
   const quizId = params?.quizId as string | undefined;
+  console.log('SharedQuizPage: quizId from params:', quizId);
 
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
-  const [fileGenerationProgress, setFileGenerationProgress] useState(0);
-  const [fileGenerationMessage, setFileGenerationMessage] useState('');
+  const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
+  const [fileGenerationMessage, setFileGenerationMessage] = useState('');
   
-  const { toast } = useToast(); // Initialize useToast
-
+  const { toast } = useToast();
 
   useEffect(() => {
+    console.log('SharedQuizPage: useEffect triggered. quizId:', quizId);
     if (quizId) {
       const fetchQuizData = async () => {
+        console.log('SharedQuizPage: fetchQuizData called for quizId:', quizId);
         setIsLoading(true);
         setError(null);
+        setQuizData(null); // Reset quizData before fetching
         try {
           const response = await fetch(`/api/share?quizId=${quizId}`);
+          console.log('SharedQuizPage: API response status:', response.status);
           const data = await response.json();
+          console.log('SharedQuizPage: API response data:', data);
 
           if (response.ok && data.success && data.quizData) {
+            console.log('SharedQuizPage: Quiz data fetched successfully');
             setQuizData(data.quizData);
           } else {
+            console.error('SharedQuizPage: Failed to fetch quiz data or data invalid. Response OK:', response.ok, 'Data Success:', data.success, 'QuizData present:', !!data.quizData);
             throw new Error(data.error || '無法載入測驗，連結可能已失效或不存在。');
           }
         } catch (err: any) {
-          console.error("載入分享測驗失敗:", err);
+          console.error("SharedQuizPage: 載入分享測驗失敗:", err);
           setError(err.message || '發生未知錯誤，無法載入測驗。');
         } finally {
+          console.log('SharedQuizPage: fetchQuizData finally block. Setting isLoading to false.');
           setIsLoading(false);
         }
       };
       fetchQuizData();
     } else {
+      console.log('SharedQuizPage: quizId is missing. Setting error.');
       setError('無效的測驗連結。');
       setIsLoading(false);
     }
   }, [quizId]);
 
-  // Dummy progress callbacks for QuizView as results PDF generation is complex here
   const handleShowQuizResultsPdfProgress = (show: boolean) => {
     setIsGeneratingQuizResultsPdf(show);
-    if (show) {
-        // Placeholder: In a real scenario, you might want to show some UI feedback
-        // For now, it just sets the state.
-    }
   };
 
   const handleUpdateQuizResultsPdfProgress: ProgressCallback = (progress, message) => {
      setFileGenerationProgress(progress);
      setFileGenerationMessage(message);
-    // Placeholder for progress update
   };
 
+  console.log('SharedQuizPage: Rendering. isLoading:', isLoading, 'error:', error, 'quizData is null:', quizData === null);
 
   if (isLoading) {
+    console.log('SharedQuizPage: Rendering loading state');
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -96,6 +102,7 @@ export default function SharedQuizPage() {
   }
 
   if (error) {
+    console.log('SharedQuizPage: Rendering error state:', error);
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -118,6 +125,7 @@ export default function SharedQuizPage() {
   }
 
   if (quizData) {
+    console.log('SharedQuizPage: Rendering QuizView with quizData');
     return (
       <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
          <header className="my-8 text-center">
@@ -127,24 +135,22 @@ export default function SharedQuizPage() {
         <main className="w-full max-w-3xl">
           <QuizView
             questionsOutput={quizData.questionsOutput}
-            imageFiles={[]} // Pass empty array as we are using data URIs
+            imageFiles={[]}
             imageFilesDataURIs={quizData.imageFilesDataURIs}
             onExitQuiz={() => {
-                // For a shared quiz, "exit" might mean going back to a generic page or just disabling further interaction.
-                // For simplicity, we can just show a message or redirect to home.
                 toast({ title: "測驗已結束", description: "感謝您的參與！您可以關閉此頁面。" });
-                // Or: window.location.href = '/';
             }}
             toast={toast}
-            showFileGenerationProgress={handleShowQuizResultsPdfProgress} // Pass down
-            updateFileGenerationProgress={handleUpdateQuizResultsPdfProgress} // Pass down
-            isGeneratingQuizResultsPdf={isGeneratingQuizResultsPdf} // Pass down
+            showFileGenerationProgress={handleShowQuizResultsPdfProgress}
+            updateFileGenerationProgress={handleUpdateQuizResultsPdfProgress}
+            isGeneratingQuizResultsPdf={isGeneratingQuizResultsPdf}
           />
         </main>
       </div>
     );
   }
-
+  
+  console.log('SharedQuizPage: Rendering fallback state (unknown state)');
   return (
     <div className="flex items-center justify-center min-h-screen">
         <p>未知狀態，請嘗試重新整理或返回首頁。</p>
