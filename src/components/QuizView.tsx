@@ -23,8 +23,9 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf';
-export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
+import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf'; // Removed PdfStudentInfo as it's defined here
+
+export interface StudentInfo {
   class: string;
   seatNumber: string;
   name: string;
@@ -121,7 +122,7 @@ export function QuizView({
       generatePreviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]);
+  }, [imageFiles, imageFilesDataURIs]); // imagePreviews removed from deps as it's being set here
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -150,7 +151,7 @@ export function QuizView({
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => prev - 1); 
     }
   };
 
@@ -394,7 +395,7 @@ export function QuizView({
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index}
+                    key={index} // Using index as key for data URIs, assuming order stability
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -424,7 +425,7 @@ export function QuizView({
             )}
           </div>
 
-          <div className="p-4 border rounded-lg bg-card shadow-md mb-6 dark:bg-muted/30">
+          <div className="p-4 border rounded-lg bg-muted dark:bg-secondary shadow-md mb-6">
              <p className="text-md font-medium text-foreground">{currentQuestion.question}</p>
           </div>
 
