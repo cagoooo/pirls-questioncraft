@@ -18,6 +18,7 @@ import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
+import { QRCodeSVG } from 'qrcode.react';
 import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle } from 'lucide-react';
 
 type ProgressCallback = (progress: number, message: string) => void;
@@ -483,7 +484,7 @@ export default function PIRLSQuestionCraftPage() {
                           <DialogHeader>
                             <DialogTitle>分享您的測驗</DialogTitle>
                             <DialogDescription>
-                              透過以下臨時連結分享此測驗給學生。
+                              透過以下臨時連結或QR Code分享此測驗給學生。
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-2">
@@ -494,30 +495,30 @@ export default function PIRLSQuestionCraftPage() {
                                </div>
                             )}
                             {!isSharingQuiz && currentShareLink && (
-                              <div className="space-y-1">
-                                <label htmlFor="share-link" className="text-sm font-medium">
-                                  臨時分享連結
-                                </label>
-                                <div className="flex items-center space-x-2">
-                                  <Input id="share-link" value={currentShareLink} readOnly className="flex-1" />
-                                  <Button type="button" size="sm" onClick={handleCopyShareLink}>
-                                    <Copy className="h-4 w-4 mr-1 sm:mr-2" />
-                                    <span className="hidden sm:inline">複製</span>
-                                  </Button>
+                              <>
+                                <div className="space-y-1">
+                                  <label htmlFor="share-link" className="text-sm font-medium">
+                                    臨時分享連結
+                                  </label>
+                                  <div className="flex items-center space-x-2">
+                                    <Input id="share-link" value={currentShareLink} readOnly className="flex-1" />
+                                    <Button type="button" size="sm" onClick={handleCopyShareLink}>
+                                      <Copy className="h-4 w-4 mr-1 sm:mr-2" />
+                                      <span className="hidden sm:inline">複製</span>
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
+                                <div className="space-y-1">
+                                  <label className="text-sm font-medium">QR Code</label>
+                                  <div className="flex items-center justify-center p-4 border rounded-md bg-muted">
+                                    <QRCodeSVG value={currentShareLink} size={128} bgColor={"#ffffff"} fgColor={"#000000"} level={"L"} includeMargin={false} />
+                                  </div>
+                                </div>
+                              </>
                             )}
                             {!isSharingQuiz && !currentShareLink && (
-                                 <p className="text-sm text-muted-foreground text-center py-2">點擊「分享測驗」按鈕以生成連結。</p>
+                                 <p className="text-sm text-muted-foreground text-center py-2">點擊「分享測驗」按鈕以生成連結和QR Code。</p>
                             )}
-                            <div className="space-y-1">
-                               <label className="text-sm font-medium">QR Code (示意)</label>
-                               <div className="flex items-center justify-center p-4 border rounded-md bg-muted h-32">
-                                 <p className="text-muted-foreground text-sm">
-                                   {currentShareLink ? "此處將顯示指向臨時連結的QR Code" : "QR Code 預留位置"}
-                                 </p>
-                               </div>
-                            </div>
                              <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
                               <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                               <AlertTitle className="text-yellow-700 dark:text-yellow-300">重要提示：臨時分享</AlertTitle>
@@ -613,6 +614,7 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
 
 
