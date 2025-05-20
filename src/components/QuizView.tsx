@@ -23,13 +23,8 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf'; // Removed PdfStudentInfo as it's defined here
-
-export interface StudentInfo {
-  class: string;
-  seatNumber: string;
-  name: string;
-}
+import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf'; 
+import type { StudentInfo } from '@/app/quiz/[quizId]/page';
 
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
@@ -474,7 +469,7 @@ export function QuizView({
         </div>
       </CardContent>
 
-      <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 space-y-2 sm:space-y-0">
+      <CardFooter className="flex flex-col-reverse sm:flex-row justify-between items-center pt-6 space-y-2 sm:space-y-0">
         <Button
           variant="outline"
           onClick={goToPreviousQuestion}
@@ -487,7 +482,7 @@ export function QuizView({
           <Button
             onClick={handleFinishQuiz}
             disabled={quizState !== 'answering'}
-            className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
+            className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 animate-bounce-subtle"
           >
             <CheckSquare className="mr-2 h-4 w-4" />
             完成測驗
@@ -496,7 +491,8 @@ export function QuizView({
           <Button
             variant="default"
             onClick={goToNextQuestion}
-            disabled={currentQuestionIndex === questionsOutput.questions.length - 1 || quizState !== 'answering'}
+            disabled={quizState !== 'answering'}
+            className="animate-bounce-subtle"
           >
             下一題
             <ArrowRight className="ml-2 h-4 w-4" />
