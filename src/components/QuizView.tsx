@@ -23,15 +23,16 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
+import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf'; // Make sure StudentInfo is exported
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 type ProgressCallback = (progress: number, message: string) => void;
 
 interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
-  imageFiles: File[]; // Used when creating quiz, can be empty if imageFilesDataURIs is provided
-  imageFilesDataURIs?: string[]; // Used when viewing a shared quiz
+  imageFiles: File[]; 
+  imageFilesDataURIs?: string[]; 
+  studentInfo?: PdfStudentInfo; // Use the exported type
   onExitQuiz: () => void;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
@@ -64,6 +65,7 @@ export function QuizView({
   questionsOutput, 
   imageFiles, 
   imageFilesDataURIs,
+  studentInfo,
   onExitQuiz,
   toast,
   showFileGenerationProgress,
@@ -112,7 +114,6 @@ export function QuizView({
       };
       generatePreviews();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageFiles, imageFilesDataURIs]); 
 
   useEffect(() => {
@@ -180,9 +181,9 @@ export function QuizView({
       return;
     }
     setIsSharingPdfInternal(true);
-    showFileGenerationProgress(true); // Call parent's progress handler
+    showFileGenerationProgress(true); 
     try {
-      await exportQuizResultsToPDF(quizResults, toast, updateFileGenerationProgress); // Pass parent's progress updater
+      await exportQuizResultsToPDF(quizResults, studentInfo, toast, updateFileGenerationProgress); 
     } catch (error: any) {
       toast({
         title: "分享結果失敗",
@@ -260,6 +261,18 @@ export function QuizView({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+           {studentInfo && (
+            <Card className="mb-4 bg-muted/50 dark:bg-muted/20">
+              <CardHeader>
+                <CardTitle className="text-lg">學生資訊</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-1">
+                <p><strong>班級：</strong> {studentInfo.class}</p>
+                <p><strong>座號：</strong> {studentInfo.seatNumber}</p>
+                <p><strong>姓名：</strong> {studentInfo.name}</p>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">總體表現</CardTitle>
@@ -374,7 +387,7 @@ export function QuizView({
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={src} // Use src as key if unique, otherwise index for data URIs
+                    key={index} 
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -485,5 +498,3 @@ export function QuizView({
     </Card>
   );
 }
-
-
