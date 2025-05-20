@@ -511,7 +511,7 @@ export default function PIRLSQuestionCraftPage() {
                                 <div className="space-y-1">
                                   <label className="text-sm font-medium">QR Code</label>
                                   <div className="flex items-center justify-center p-4 border rounded-md bg-muted">
-                                    <QRCodeSVG value={currentShareLink} size={128} bgColor={"#ffffff"} fgColor={"#000000"} level={"L"} includeMargin={false} />
+                                    <QRCodeSVG value={currentShareLink} size={192} bgColor={"#ffffff"} fgColor={"#000000"} level={"L"} includeMargin={false} />
                                   </div>
                                 </div>
                               </>
@@ -614,6 +614,7 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
 
 
