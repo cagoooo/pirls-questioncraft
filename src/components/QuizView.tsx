@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf'; 
+import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf';
 export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
   class: string;
   seatNumber: string;
@@ -36,9 +36,9 @@ type ProgressCallback = (progress: number, message: string) => void;
 
 interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
-  imageFiles: File[]; 
-  imageFilesDataURIs?: string[]; 
-  studentInfo?: StudentInfo; 
+  imageFiles: File[];
+  imageFilesDataURIs?: string[];
+  studentInfo?: StudentInfo;
   onExitQuiz: () => void;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
@@ -67,9 +67,9 @@ interface QuizResultItem {
 
 type QuizState = 'answering' | 'results';
 
-export function QuizView({ 
-  questionsOutput, 
-  imageFiles, 
+export function QuizView({
+  questionsOutput,
+  imageFiles,
   imageFilesDataURIs,
   studentInfo,
   onExitQuiz,
@@ -85,14 +85,14 @@ export function QuizView({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
-  const quizResultsTopRef = useRef<HTMLDivElement>(null); 
+  const quizResultsTopRef = useRef<HTMLDivElement>(null);
   const [isSharingPdfInternal, setIsSharingPdfInternal] = useState(false);
 
 
   const currentQuestion = useMemo(() => {
     return questionsOutput.questions[currentQuestionIndex];
   }, [questionsOutput, currentQuestionIndex]);
-  
+
   const levelDetail = useMemo(() => {
     if (quizState === 'answering' && currentQuestion) {
       return pirlsLevelDetails[currentQuestion.pirlsLevel];
@@ -121,13 +121,13 @@ export function QuizView({
       generatePreviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]); 
+  }, [imageFiles, imageFilesDataURIs]);
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
       const timer = setTimeout(() => {
         quizResultsTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100); 
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [quizState, quizResults]);
@@ -150,7 +150,7 @@ export function QuizView({
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1); 
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
@@ -188,9 +188,9 @@ export function QuizView({
       return;
     }
     setIsSharingPdfInternal(true);
-    showFileGenerationProgress(true); 
+    showFileGenerationProgress(true);
     try {
-      await exportQuizResultsToPDF(quizResults, studentInfo, toast, updateFileGenerationProgress); 
+      await exportQuizResultsToPDF(quizResults, imagePreviews, studentInfo, toast, updateFileGenerationProgress);
     } catch (error: any) {
       toast({
         title: "分享結果失敗",
@@ -200,7 +200,7 @@ export function QuizView({
       updateFileGenerationProgress(0, `結果 PDF 產生失敗: ${error.message || '未知錯誤'}`);
     } finally {
       setIsSharingPdfInternal(false);
-      showFileGenerationProgress(false); 
+      showFileGenerationProgress(false);
     }
   };
 
@@ -222,9 +222,9 @@ export function QuizView({
             label: pirlsLevelDetails[levelKey].label
         };
     });
-    
+
     quizResults.forEach(result => {
-      if (pirlsScores[result.pirlsLevel]) { 
+      if (pirlsScores[result.pirlsLevel]) {
         pirlsScores[result.pirlsLevel].total++;
         if (result.isCorrect) {
           pirlsScores[result.pirlsLevel].correct++;
@@ -240,8 +240,8 @@ export function QuizView({
             <CardTitle>測驗結果</CardTitle>
           </div>
           <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleShareResultsPdf}
               disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}
             >
@@ -297,7 +297,7 @@ export function QuizView({
             </CardHeader>
             <CardContent className="space-y-4">
               {Object.entries(pirlsScores).map(([level, score]) => {
-                if (score.total === 0 && !questionsOutput.questions.some(q => q.pirlsLevel === level)) return null; 
+                if (score.total === 0 && !questionsOutput.questions.some(q => q.pirlsLevel === level)) return null;
                 const percentage = score.total > 0 ? (score.correct / score.total) * 100 : 0;
                 const levelInfo = pirlsLevelDetails[level as PirlsQuestion['pirlsLevel']];
                 if (!levelInfo) return null;
@@ -321,7 +321,7 @@ export function QuizView({
               {quizResults.map((result, index) => (
                 <AccordionItem value={`result-${index}`} key={`result-${index}`} className={cn(
                   "border rounded-md shadow-sm",
-                  result.isCorrect ? "border-green-300 bg-green-500/5 hover:bg-green-500/10 dark:border-green-700 dark:bg-green-900/20 dark:hover:bg-green-800/20" 
+                  result.isCorrect ? "border-green-300 bg-green-500/5 hover:bg-green-500/10 dark:border-green-700 dark:bg-green-900/20 dark:hover:bg-green-800/20"
                                   : "border-destructive/30 bg-destructive/5 hover:bg-destructive/10 dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/30"
                 )}>
                   <AccordionTrigger className="px-4 py-3 text-left hover:no-underline group">
@@ -385,7 +385,7 @@ export function QuizView({
           退出測驗
         </Button>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {imagePreviews.length > 0 && (
           <div className="mb-6">
@@ -394,7 +394,7 @@ export function QuizView({
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index} 
+                    key={index}
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -423,7 +423,7 @@ export function QuizView({
               </Badge>
             )}
           </div>
-          
+
           <div className="p-4 border rounded-lg bg-card shadow-md mb-6 dark:bg-muted/30">
              <p className="text-md font-medium text-foreground">{currentQuestion.question}</p>
           </div>
@@ -474,16 +474,16 @@ export function QuizView({
       </CardContent>
 
       <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 space-y-2 sm:space-y-0">
-        <Button 
-          variant="outline" 
-          onClick={goToPreviousQuestion} 
+        <Button
+          variant="outline"
+          onClick={goToPreviousQuestion}
           disabled={currentQuestionIndex === 0 || quizState !== 'answering'}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           上一題
         </Button>
         {currentQuestionIndex === questionsOutput.questions.length - 1 ? (
-          <Button 
+          <Button
             onClick={handleFinishQuiz}
             disabled={quizState !== 'answering'}
             className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
@@ -492,8 +492,8 @@ export function QuizView({
             完成測驗
           </Button>
         ) : (
-          <Button 
-            variant="default" 
+          <Button
+            variant="default"
             onClick={goToNextQuestion}
             disabled={currentQuestionIndex === questionsOutput.questions.length - 1 || quizState !== 'answering'}
           >

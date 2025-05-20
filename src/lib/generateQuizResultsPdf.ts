@@ -3,7 +3,7 @@
 'use client';
 
 import jsPDF from 'jspdf';
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions'; 
+import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import type { Toast } from '@/hooks/use-toast';
 
 type PirlsQuestionOriginal = GeneratePirlsQuestionsOutput['questions'][0];
@@ -91,29 +91,30 @@ async function loadAllRequiredFonts(doc: jsPDF, showToast: typeof Toast, updateP
     { fileName: 'NotoSansTC-Black.ttf', style: 'black' },
   ];
   let allFontsLoaded = true;
-  const baseProgress = 0; // Starting progress for font loading
-  const progressPerFont = 10 / fontsToLoad.length;
+  const baseProgress = 0; 
+  const progressPerFont = 5 / fontsToLoad.length; // Allocate 5% for font loading
 
   for (let i = 0; i < fontsToLoad.length; i++) {
     const font = fontsToLoad[i];
-    updateProgress(baseProgress + Math.round(((i + 1) / fontsToLoad.length) * 10), `載入字型 ${font.fileName}...`);
+    updateProgress(baseProgress + Math.round(((i + 1) / fontsToLoad.length) * 5), `載入字型 ${font.fileName}...`);
     if (!(await loadAndRegisterFont(doc, font.fileName, fontBaseName, font.style, showToast))) {
       allFontsLoaded = false;
     }
   }
   doc.setFont(allFontsLoaded ? fontBaseName : 'helvetica', 'normal');
-  updateProgress(10, allFontsLoaded ? "所有字型已載入" : "部分字型載入失敗，使用預設字型");
+  updateProgress(5, allFontsLoaded ? "所有字型已載入" : "部分字型載入失敗，使用預設字型");
 }
 
 export async function exportQuizResultsToPDF(
   quizResults: QuizResultItem[],
-  studentInfo: StudentInfo | undefined, // Make studentInfo optional
+  imageURIs: string[], // Added imageURIs parameter
+  studentInfo: StudentInfo | undefined,
   showToast: typeof Toast,
   updateProgressCallback: ProgressCallback
 ) {
   updateProgressCallback(0, '開始準備測驗結果 PDF...');
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-  await loadAllRequiredFonts(doc, showToast, updateProgressCallback); // Progress from 0-10%
+  await loadAllRequiredFonts(doc, showToast, updateProgressCallback); // Progress from 0-5%
 
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -121,9 +122,10 @@ export async function exportQuizResultsToPDF(
   const margin = 15;
   const contentWidth = pageWidth - 2 * margin;
   const optionLabels = ['A', 'B', 'C', 'D'];
+  const defaultLineWidth = 0.2;
 
   function checkPageBreak(neededHeight: number, addFooterIfNeeded = true) {
-    if (yPos + neededHeight > pageHeight - (addFooterIfNeeded ? 15 : margin)) { 
+    if (yPos + neededHeight > pageHeight - (addFooterIfNeeded ? 15 : margin)) {
       if (addFooterIfNeeded) addFooter(doc, pageHeight);
       doc.addPage();
       yPos = margin;
@@ -139,8 +141,8 @@ export async function exportQuizResultsToPDF(
     pdfDoc.setTextColor(...themeColors.textMuted);
     pdfDoc.text(`第 ${pageNum} 頁`, pageWidth - margin, currentPageHeight - 7, { align: 'right' });
   }
-  
-  updateProgressCallback(10, '設定 PDF 標題與日期...');
+
+  updateProgressCallback(5, '設定 PDF 標題與日期...');
   doc.setFont('NotoSansTC', 'black');
   doc.setFontSize(20);
   doc.setTextColor(...themeColors.textDefault);
@@ -152,12 +154,12 @@ export async function exportQuizResultsToPDF(
   doc.setTextColor(...themeColors.textMuted);
   doc.text(`測驗日期：${new Date().toLocaleDateString('zh-TW')}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 7;
-  
+
   if (studentInfo) {
-    updateProgressCallback(12, '加入學生資訊...');
+    updateProgressCallback(7, '加入學生資訊...');
     doc.setFont('NotoSansTC', 'medium');
     doc.setFontSize(12);
-    checkPageBreak(25); // Estimate for student info + separator
+    checkPageBreak(25);
     let studentInfoY = yPos;
     doc.text(`班級：${studentInfo.class}`, margin, studentInfoY);
     studentInfoY += 7;
@@ -170,7 +172,77 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  updateProgressCallback(15, '計算總體表現...');
+  // --- Add Images Section ---
+  updateProgressCallback(10, '準備圖片區塊...');
+  checkPageBreak(12);
+  const imagesSectionTitle = '一、閱讀文本 (圖片內容)';
+  doc.setFont('NotoSansTC', 'bold');
+  doc.setFontSize(16);
+  doc.text(imagesSectionTitle, margin, yPos);
+  const imagesSectionTitleWidth = doc.getTextWidth(imagesSectionTitle);
+  doc.setDrawColor(...themeColors.primary);
+  doc.setLineWidth(0.5);
+  doc.line(margin, yPos + 1.5, margin + imagesSectionTitleWidth, yPos + 1.5);
+  doc.setDrawColor(...themeColors.borderDefault);
+  doc.setLineWidth(defaultLineWidth);
+  yPos += 10;
+
+  doc.setFont('NotoSansTC', 'normal');
+  doc.setFontSize(10);
+
+  if (imageURIs.length === 0) {
+    checkPageBreak(10);
+    doc.text('未提供相關圖片。', margin, yPos);
+    yPos += 7;
+    updateProgressCallback(30, '圖片區塊完成 (無圖片)'); // Allocate 20% for images
+  } else {
+    const imageProgressStart = 10;
+    const imageProgressTotal = 20; // Allocate 20% for image processing
+    for (let i = 0; i < imageURIs.length; i++) {
+      const dataUri = imageURIs[i];
+      updateProgressCallback(
+        imageProgressStart + Math.round(((i + 1) / imageURIs.length) * imageProgressTotal),
+        `正在處理圖片 ${i + 1} / ${imageURIs.length}...`
+      );
+      try {
+        const imgProps = doc.getImageProperties(dataUri);
+        const aspectRatio = imgProps.width / imgProps.height;
+
+        let imgWidthOnPage = contentWidth;
+        let imgHeightOnPage = imgWidthOnPage / aspectRatio;
+
+        const maxImgHeight = (pageHeight - 2 * margin) / 2; // Allow more space if needed
+        if (imgHeightOnPage > maxImgHeight) {
+          imgHeightOnPage = maxImgHeight;
+          imgWidthOnPage = imgHeightOnPage * aspectRatio;
+        }
+        if (imgWidthOnPage > contentWidth) {
+            imgWidthOnPage = contentWidth;
+            imgHeightOnPage = imgWidthOnPage / aspectRatio;
+        }
+
+        checkPageBreak(imgHeightOnPage + 7);
+        doc.addImage(dataUri, imgProps.fileType.toUpperCase(), margin, yPos, imgWidthOnPage, imgHeightOnPage);
+        yPos += imgHeightOnPage + 7;
+      } catch (e: any) {
+        console.error(`Error adding image ${i + 1} to results PDF:`, e);
+        checkPageBreak(10);
+        doc.setTextColor(255, 0, 0);
+        doc.setFontSize(10);
+        doc.text(`無法載入圖片 ${i + 1} (錯誤: ${e.message || '未知問題'})`, margin, yPos);
+        doc.setTextColor(...themeColors.textDefault);
+        yPos += 7;
+      }
+    }
+    updateProgressCallback(imageProgressStart + imageProgressTotal, '所有圖片已加入 PDF');
+  }
+  yPos += 8;
+  doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
+  yPos += 8;
+  // --- End Images Section ---
+
+
+  updateProgressCallback(30, '計算總體表現...');
   const totalQuestions = quizResults.length;
   const totalCorrect = quizResults.filter(r => r.isCorrect).length;
   const overallScore = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
@@ -179,7 +251,7 @@ export async function exportQuizResultsToPDF(
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(...themeColors.textDefault);
-  doc.text('總體表現', margin, yPos);
+  doc.text('二、總體表現', margin, yPos); // Changed section title
   yPos += 8;
 
   doc.setFont('NotoSansTC', 'medium');
@@ -191,11 +263,11 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  updateProgressCallback(20, '計算各PIRLS層次得分...');
-  checkPageBreak(10 + Object.keys(pirlsLevelLabels).length * 7); 
+  updateProgressCallback(35, '計算各PIRLS層次得分...'); // Adjusted progress
+  checkPageBreak(10 + Object.keys(pirlsLevelLabels).length * 7);
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text('各PIRLS層次得分', margin, yPos);
+  doc.text('三、各PIRLS層次得分', margin, yPos); // Changed section title
   yPos += 8;
 
   doc.setFont('NotoSansTC', 'medium');
@@ -226,30 +298,33 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  updateProgressCallback(30, '準備題目詳解...');
+  updateProgressCallback(40, '準備題目詳解...'); // Adjusted progress
   checkPageBreak(15);
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text('題目詳解', margin, yPos);
+  doc.text('四、題目詳解', margin, yPos); // Changed section title
   yPos += 10;
 
+  const questionProgressStart = 40;
+  const questionProgressTotal = 58; // Allocate 58% for questions
+
   quizResults.forEach((result, index) => {
-    const progressPercentage = 30 + Math.round(((index + 1) / totalQuestions) * 65);
+    const progressPercentage = questionProgressStart + Math.round(((index + 1) / totalQuestions) * questionProgressTotal);
     updateProgressCallback(progressPercentage, `處理題目 ${index + 1} / ${totalQuestions} 的詳解...`);
 
-    let neededHeightEst = 10; 
+    let neededHeightEst = 10;
     doc.setFont('NotoSansTC', 'medium');
     doc.setFontSize(12);
-    neededHeightEst += doc.splitTextToSize(result.questionText, contentWidth - 10).length * 5; 
-    neededHeightEst += 5; 
+    neededHeightEst += doc.splitTextToSize(result.questionText, contentWidth - 10).length * 5;
+    neededHeightEst += 5;
     doc.setFont('NotoSansTC', 'normal');
     doc.setFontSize(10);
     const userAnswerDisplay = result.userAnswerIndex !== null ? `${optionLabels[result.userAnswerIndex]}. ${result.options[result.userAnswerIndex]}` : '未作答';
     neededHeightEst += doc.splitTextToSize(`您的答案：${userAnswerDisplay} (${result.isCorrect ? '正確' : '錯誤'})`, contentWidth).length * 4;
     if (!result.isCorrect) {
-        neededHeightEst += doc.splitTextToSize(result.explanation, contentWidth - 5).length * 4; 
+        neededHeightEst += doc.splitTextToSize(result.explanation, contentWidth - 5).length * 4;
     }
-    neededHeightEst += 10; 
+    neededHeightEst += 10;
 
     checkPageBreak(neededHeightEst);
 
@@ -258,7 +333,7 @@ export async function exportQuizResultsToPDF(
     const questionNumberText = `題目 ${index + 1}: `;
     const qNumWidth = doc.getTextWidth(questionNumberText);
     doc.text(questionNumberText, margin, yPos);
-    
+
     doc.setFont('NotoSansTC', 'medium');
     const questionTextLines = doc.splitTextToSize(result.questionText, contentWidth - qNumWidth);
     doc.text(questionTextLines, margin + qNumWidth, yPos);
@@ -297,7 +372,7 @@ export async function exportQuizResultsToPDF(
       yPos += explanationLines.length * 4 + 1;
       doc.setTextColor(...themeColors.textDefault);
     }
-    yPos += 5; 
+    yPos += 5;
     if (index < totalQuestions - 1) {
       checkPageBreak(2);
       doc.setDrawColor(...themeColors.borderDefault);
@@ -306,7 +381,7 @@ export async function exportQuizResultsToPDF(
     }
   });
 
-  addFooter(doc, pageHeight); 
+  addFooter(doc, pageHeight);
 
   updateProgressCallback(98, '準備儲存測驗結果 PDF...');
   try {
