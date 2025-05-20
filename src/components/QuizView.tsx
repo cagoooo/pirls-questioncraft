@@ -109,6 +109,8 @@ export function QuizView({
     if (imageFiles.length > 0) {
       generatePreviews();
     }
+    // imagePreviews is set here, so it should not be a dependency to avoid infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageFiles]); 
 
   useEffect(() => {
@@ -399,7 +401,10 @@ export function QuizView({
               </Badge>
             )}
           </div>
-          <p className="text-md mb-4 min-h-[60px]">{currentQuestion.question}</p>
+          
+          <div className="p-4 border rounded-lg bg-card shadow-md mb-6 dark:bg-muted/30">
+             <p className="text-md font-medium text-foreground">{currentQuestion.question}</p>
+          </div>
 
           <RadioGroup
             value={currentSelectedValue}
@@ -422,7 +427,7 @@ export function QuizView({
                     quizState === 'answering' ? "cursor-pointer" : "cursor-default",
                     isSelected
                       ? "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
-                      : quizState === 'answering' ? "border-border hover:bg-muted/50 dark:hover:bg-muted/30" : "border-border"
+                      : quizState === 'answering' ? "border-border hover:bg-accent/20 dark:hover:bg-accent/30" : "border-border"
                   )}
                 >
                   <RadioGroupItem
