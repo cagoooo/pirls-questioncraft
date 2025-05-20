@@ -2,7 +2,7 @@
 // src/components/QuizView.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,8 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
+  const resultsOverallRef = useRef<HTMLDivElement>(null);
+
 
   const currentQuestion = useMemo(() => {
     return questionsOutput.questions[currentQuestionIndex];
@@ -96,6 +98,15 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
       // No explicit object URL cleanup needed here as FileReader's result is a data URI
     };
   }, [imageFiles]); 
+
+  useEffect(() => {
+    if (quizState === 'results' && quizResults && resultsOverallRef.current) {
+      const timer = setTimeout(() => {
+        resultsOverallRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100); // Short delay to ensure UI is rendered
+      return () => clearTimeout(timer);
+    }
+  }, [quizState, quizResults]);
 
   const handleOptionChange = (value: string) => {
     if (quizState !== 'answering') return;
@@ -194,7 +205,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Card>
+          <Card ref={resultsOverallRef}>
             <CardHeader>
               <CardTitle className="text-xl">總體表現</CardTitle>
             </CardHeader>
