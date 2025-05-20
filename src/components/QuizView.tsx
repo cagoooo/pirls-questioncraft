@@ -61,7 +61,9 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
 
-  const currentQuestion = useMemo(() => questionsOutput.questions[currentQuestionIndex], [questionsOutput, currentQuestionIndex]);
+  const currentQuestion = useMemo(() => {
+    return questionsOutput.questions[currentQuestionIndex];
+  }, [questionsOutput, currentQuestionIndex]);
   
   const levelDetail = useMemo(() => {
     if (quizState === 'answering' && currentQuestion) {
@@ -90,23 +92,10 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
       generatePreviews();
     }
     
-    // Cleanup function
     return () => {
-      imagePreviews.forEach(url => {
-        // Check if the URL is an object URL before revoking
-        if (url.startsWith('blob:') || url.startsWith('data:')) {
-          // It's a data URI or blob URI, no need to revoke for data URIs,
-          // and blob URIs are typically revoked when no longer needed elsewhere if created by URL.createObjectURL
-          // For this component's lifecycle, if they were created by URL.createObjectURL and stored,
-          // they would need explicit revocation. FileReader's result (data URI) doesn't need this.
-        } else {
-           // If it were an object URL from URL.createObjectURL, you'd revoke it:
-           // URL.revokeObjectURL(url);
-        }
-      });
+      // No explicit object URL cleanup needed here as FileReader's result is a data URI
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles]); // imagePreviews should not be in dependency array if we're cleaning it up
+  }, [imageFiles]); 
 
   const handleOptionChange = (value: string) => {
     if (quizState !== 'answering') return;
@@ -126,7 +115,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1); // Corrected: was prev + 1
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
@@ -169,7 +158,6 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     const overallScore = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
 
     const pirlsScores: Record<string, { correct: number, total: number, label: string }> = {};
-    // Initialize pirlsScores based on all possible levels to ensure correct order and labels
     (Object.keys(pirlsLevelDetails) as Array<PirlsQuestion['pirlsLevel']>).forEach(levelKey => {
         pirlsScores[levelKey] = {
             correct: 0,
@@ -226,7 +214,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
                 if (score.total === 0 && !questionsOutput.questions.some(q => q.pirlsLevel === level)) return null; 
                 const percentage = score.total > 0 ? (score.correct / score.total) * 100 : 0;
                 const levelInfo = pirlsLevelDetails[level as PirlsQuestion['pirlsLevel']];
-                if (!levelInfo) return null; // Should not happen if keys are aligned
+                if (!levelInfo) return null;
                 const levelBadgeVariant = levelInfo.badgeVariant;
                 return (
                   <div key={level}>
@@ -247,11 +235,12 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
               {quizResults.map((result, index) => (
                 <AccordionItem value={`result-${index}`} key={`result-${index}`} className={cn(
                   "border rounded-md shadow-sm",
-                  result.isCorrect ? "border-green-300 bg-green-500/5 hover:bg-green-500/10" : "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
+                  result.isCorrect ? "border-green-300 bg-green-500/5 hover:bg-green-500/10 dark:border-green-700 dark:bg-green-900/20 dark:hover:bg-green-800/20" 
+                                  : "border-destructive/30 bg-destructive/5 hover:bg-destructive/10 dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/30"
                 )}>
                   <AccordionTrigger className="px-4 py-3 text-left hover:no-underline group">
                     <div className="flex items-center w-full">
-                      <span className={`mr-3 font-semibold ${result.isCorrect ? 'text-green-600' : 'text-destructive'}`}>
+                      <span className={`mr-3 font-semibold ${result.isCorrect ? 'text-green-600 dark:text-green-400' : 'text-destructive dark:text-red-400'}`}>
                         題目 {index + 1}: {result.isCorrect ? <CheckCircle className="inline h-5 w-5 ml-1" /> : <XCircle className="inline h-5 w-5 ml-1" />}
                       </span>
                       <span className="flex-1 truncate text-sm group-hover:text-primary">{result.questionText}</span>
@@ -259,14 +248,14 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4 pt-2 space-y-3 text-sm">
                     <p><strong>您的答案：</strong>
-                      <span className={cn(result.isCorrect ? "" : "text-destructive line-through")}>
+                      <span className={cn(result.isCorrect ? "text-foreground" : "text-destructive line-through dark:text-red-400")}>
                         {result.userAnswerIndex !== null
                           ? `${optionLabels[result.userAnswerIndex]}. ${result.options[result.userAnswerIndex]}`
                           : <span className="text-muted-foreground italic">未作答</span>}
                       </span>
                     </p>
                      {result.isCorrect && (
-                       <p className="text-green-600 font-medium flex items-center">
+                       <p className="text-green-600 dark:text-green-400 font-medium flex items-center">
                          <CheckCircle className="h-4 w-4 mr-2" /> 恭喜答對！
                        </p>
                      )}
@@ -288,18 +277,16 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     );
   }
 
-  // Fallback for 'answering' state if currentQuestion is not yet ready (defensive)
   if (quizState === 'answering' && !currentQuestion) {
     return (
       <Card className="w-full shadow-xl flex items-center justify-center p-8">
         <CardContent>
-          <p>載入題目中...</p> {/* Or a spinner component */}
+          <p>載入題目中...</p>
         </CardContent>
       </Card>
     );
   }
 
-  // 'answering' state UI
   return (
     <Card className="w-full shadow-xl">
       <CardHeader className="flex flex-row justify-between items-center pb-4">
@@ -317,11 +304,11 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
         {imagePreviews.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
-            <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/30">
+            <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={src} 
+                    key={index} // Using index as key because src might not be unique if files are identical
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -356,15 +343,43 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
             value={currentSelectedValue}
             onValueChange={handleOptionChange}
             className="space-y-2"
+            disabled={quizState !== 'answering'}
           >
-            {currentQuestion.options.map((option, index) => (
-              <div key={index} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                <RadioGroupItem value={index.toString()} id={`q${currentQuestionIndex}-opt${index}`} />
-                <Label htmlFor={`q${currentQuestionIndex}-opt${index}`} className="flex-1 cursor-pointer text-sm">
-                  <span className="font-semibold mr-1">{optionLabels[index]}.</span> {option}
-                </Label>
-              </div>
-            ))}
+            {currentQuestion.options.map((option, index) => {
+              const isSelected = selectedAnswers[currentQuestionIndex] === index;
+              return (
+                <div
+                  key={index}
+                  onClick={() => {
+                    if (quizState === 'answering') {
+                      handleOptionChange(index.toString());
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center space-x-3 p-3 border rounded-md transition-colors",
+                    quizState === 'answering' ? "cursor-pointer" : "cursor-default",
+                    isSelected
+                      ? "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
+                      : quizState === 'answering' ? "border-border hover:bg-muted/50 dark:hover:bg-muted/30" : "border-border"
+                  )}
+                >
+                  <RadioGroupItem
+                    value={index.toString()}
+                    id={`q${currentQuestionIndex}-opt${index}`}
+                    disabled={quizState !== 'answering'}
+                  />
+                  <Label
+                    htmlFor={`q${currentQuestionIndex}-opt${index}`}
+                    className={cn(
+                      "flex-1 text-sm",
+                      quizState === 'answering' ? "cursor-pointer" : "cursor-default"
+                    )}
+                  >
+                    <span className="font-semibold mr-1.5">{optionLabels[index]}.</span> {option}
+                  </Label>
+                </div>
+              );
+            })}
           </RadioGroup>
         </div>
       </CardContent>
@@ -373,7 +388,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
         <Button 
           variant="outline" 
           onClick={goToPreviousQuestion} 
-          disabled={currentQuestionIndex === 0}
+          disabled={currentQuestionIndex === 0 || quizState !== 'answering'}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           上一題
@@ -381,6 +396,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
         {currentQuestionIndex === questionsOutput.questions.length - 1 ? (
           <Button 
             onClick={handleFinishQuiz}
+            disabled={quizState !== 'answering'}
             className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
           >
             <CheckSquare className="mr-2 h-4 w-4" />
@@ -390,7 +406,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
           <Button 
             variant="default" 
             onClick={goToNextQuestion}
-            disabled={currentQuestionIndex === questionsOutput.questions.length - 1}
+            disabled={currentQuestionIndex === questionsOutput.questions.length - 1 || quizState !== 'answering'}
           >
             下一題
             <ArrowRight className="ml-2 h-4 w-4" />
