@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge, badgeVariants } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut } from 'lucide-react';
+import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut, FileText, Loader2 } from 'lucide-react';
 import type { VariantProps } from 'class-variance-authority';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -22,13 +22,20 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
+import type { Toast } from '@/hooks/use-toast';
+import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
+type ProgressCallback = (progress: number, message: string) => void;
 
 interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFiles: File[];
   onExitQuiz: () => void;
+  toast: typeof Toast;
+  showFileGenerationProgress: (show: boolean) => void;
+  updateFileGenerationProgress: ProgressCallback;
+  isGeneratingQuizResultsPdf: boolean;
 }
 
 const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon?: React.ElementType; badgeVariant: VariantProps<typeof badgeVariants>['variant'], borderColorClass: string }> = {
@@ -52,7 +59,15 @@ interface QuizResultItem {
 
 type QuizState = 'answering' | 'results';
 
-export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewProps) {
+export function QuizView({ 
+  questionsOutput, 
+  imageFiles, 
+  onExitQuiz,
+  toast,
+  showFileGenerationProgress,
+  updateFileGenerationProgress,
+  isGeneratingQuizResultsPdf
+}: QuizViewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(() =>
     Array(questionsOutput.questions.length).fill(null)
@@ -61,6 +76,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
   const resultsOverallRef = useRef<HTMLDivElement>(null);
+  const [isSharingPdf, setIsSharingPdf] = useState(false);
 
 
   const currentQuestion = useMemo(() => {
@@ -93,17 +109,13 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     if (imageFiles.length > 0) {
       generatePreviews();
     }
-    
-    return () => {
-      // No explicit object URL cleanup needed here as FileReader's result is a data URI
-    };
   }, [imageFiles]); 
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && resultsOverallRef.current) {
       const timer = setTimeout(() => {
         resultsOverallRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100); // Short delay to ensure UI is rendered
+      }, 100); 
       return () => clearTimeout(timer);
     }
   }, [quizState, quizResults]);
@@ -158,6 +170,28 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     setQuizState('answering');
   };
 
+  const handleShareResultsPdf = async () => {
+    if (!quizResults) {
+      toast({ title: "錯誤", description: "沒有測驗結果可供分享。", variant: "destructive" });
+      return;
+    }
+    setIsSharingPdf(true);
+    showFileGenerationProgress(true);
+    try {
+      await exportQuizResultsToPDF(quizResults, toast, updateFileGenerationProgress);
+    } catch (error: any) {
+      toast({
+        title: "分享結果失敗",
+        description: `無法產生結果 PDF: ${error.message || '未知錯誤'}`,
+        variant: "destructive",
+      });
+      updateFileGenerationProgress(0, `結果 PDF 產生失敗: ${error.message || '未知錯誤'}`);
+    } finally {
+      setIsSharingPdf(false);
+      showFileGenerationProgress(false);
+    }
+  };
+
   const currentSelectedValue = selectedAnswers[currentQuestionIndex] !== null
     ? selectedAnswers[currentQuestionIndex]?.toString()
     : undefined;
@@ -188,17 +222,34 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
 
     return (
       <Card className="w-full shadow-xl">
-        <CardHeader className="flex flex-row justify-between items-center">
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center">
             <CheckSquare className="h-7 w-7 mr-3 text-primary" />
             <CardTitle>測驗結果</CardTitle>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handleRestartQuiz}>
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
+            <Button 
+              variant="outline" 
+              onClick={handleShareResultsPdf}
+              disabled={isSharingPdf || isGeneratingQuizResultsPdf}
+            >
+              {isSharingPdf || isGeneratingQuizResultsPdf ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  結果PDF準備中...
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-4 w-4" />
+                  分享結果 (PDF)
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleRestartQuiz} disabled={isSharingPdf || isGeneratingQuizResultsPdf}>
               <RotateCcw className="mr-2 h-4 w-4" />
               重新測驗
             </Button>
-            <Button variant="ghost" onClick={onExitQuiz}>
+            <Button variant="ghost" onClick={onExitQuiz} disabled={isSharingPdf || isGeneratingQuizResultsPdf}>
               <LogOut className="mr-2 h-4 w-4" />
               退出測驗
             </Button>
@@ -319,7 +370,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index} // Using index as key because src might not be unique if files are identical
+                    key={index} 
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}

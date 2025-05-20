@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
-import { QuizView } from '@/components/QuizView'; // New component for quiz
+import { QuizView } from '@/components/QuizView';
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
@@ -18,11 +18,14 @@ import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck } from 'lucide-react';
 
+type ProgressCallback = (progress: number, message: string) => void;
+
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
+  const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
@@ -30,7 +33,7 @@ export default function PIRLSQuestionCraftPage() {
   
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
-  const [isQuizActive, setIsQuizActive] = useState(false); // State for quiz mode
+  const [isQuizActive, setIsQuizActive] = useState(false);
 
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
@@ -57,12 +60,12 @@ export default function PIRLSQuestionCraftPage() {
     setImageFiles(files);
     setGeneratedQuestionsOutput(null);
     setError(null);
-    setIsQuizActive(false); // Exit quiz mode if images change
+    setIsQuizActive(false);
     if (files.length > 0 && generateButtonRef.current) {
       const timer = setTimeout(() => {
         generateButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 100);
-      // No cleanup needed for one-shot timeout in callback
+      return () => clearTimeout(timer);
     }
   }, []);
 
@@ -80,13 +83,14 @@ export default function PIRLSQuestionCraftPage() {
     setIsLoading(true);
     setError(null); 
     setGeneratedQuestionsOutput(null); 
-    setIsQuizActive(false); // Reset quiz mode
+    setIsQuizActive(false);
     
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
+    // Total steps: 1 (initial) + N images + 1 (combine) + 1 (generate) + 1 (success)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
@@ -122,6 +126,7 @@ export default function PIRLSQuestionCraftPage() {
           }
         }
       } else {
+         // Should not happen if button is enabled only with files, but as a safeguard
         completedSteps += currentImageFilesCount; 
       }
 
@@ -171,7 +176,7 @@ export default function PIRLSQuestionCraftPage() {
     }
   }, [imageFiles, toast, loadingMessage]);
 
-  const fileProgressCallback = (progress: number, message: string) => {
+  const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
     setFileGenerationMessage(message);
   };
@@ -241,7 +246,6 @@ export default function PIRLSQuestionCraftPage() {
   const handleStartQuiz = () => {
     if (generatedQuestionsOutput && imageFiles.length > 0) {
       setIsQuizActive(true);
-      // Optionally scroll to quiz view
       setTimeout(() => {
         resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -256,6 +260,15 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleExitQuiz = () => {
     setIsQuizActive(false);
+  };
+
+  const handleShowQuizResultsPdfProgress = (show: boolean) => {
+    setIsGeneratingQuizResultsPdf(show);
+  };
+
+  const handleUpdateQuizResultsPdfProgress: ProgressCallback = (progress, message) => {
+    setFileGenerationProgress(progress);
+    setFileGenerationMessage(message);
   };
 
 
@@ -286,7 +299,7 @@ export default function PIRLSQuestionCraftPage() {
         {!isQuizActive && (
           <FileUpload 
             onFilesSelected={handleImageFilesChange} 
-            isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} 
+            isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf} 
           />
         )}
 
@@ -294,7 +307,7 @@ export default function PIRLSQuestionCraftPage() {
           <Button
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
-            disabled={isLoading || isGeneratingPdf || isGeneratingExcel || imageFiles.length === 0}
+            disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || imageFiles.length === 0}
             className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
             size="lg"
           >
@@ -339,6 +352,22 @@ export default function PIRLSQuestionCraftPage() {
 
         {generatedQuestionsOutput && !isLoading && (
           <section ref={resultsSectionRef} className="mt-8">
+             {(isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf) && (
+              <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-xl font-semibold">
+                    <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
+                    檔案處理中...
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-2">
+                  <Progress value={fileGenerationProgress} className="w-full h-3" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
                 <h2 className="text-2xl font-semibold text-center flex items-center justify-center">
                   <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
@@ -348,7 +377,7 @@ export default function PIRLSQuestionCraftPage() {
                   <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
                     <Button
                         onClick={handleStartQuiz}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
                         variant="outline"
                         className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
                     >
@@ -357,7 +386,7 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
                         variant="outline"
                     >
                         {isGeneratingPdf ? (
@@ -374,7 +403,7 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadExcel}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput}
                         variant="outline"
                     >
                         {isGeneratingExcel ? (
@@ -392,29 +421,16 @@ export default function PIRLSQuestionCraftPage() {
                   </div>
                 )}
             </div>
-
-            {(isGeneratingPdf || isGeneratingExcel) && !isQuizActive && (
-              <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl font-semibold">
-                    <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                    檔案處理中...
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-2">
-                  <Progress value={fileGenerationProgress} className="w-full h-3" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
-                  </p>
-                </CardContent>
-              </Card>
-            )}
             
             {isQuizActive && generatedQuestionsOutput && imageFiles.length > 0 ? (
               <QuizView 
                 questionsOutput={generatedQuestionsOutput} 
                 imageFiles={imageFiles} 
-                onExitQuiz={handleExitQuiz} 
+                onExitQuiz={handleExitQuiz}
+                toast={toast}
+                showFileGenerationProgress={handleShowQuizResultsPdfProgress}
+                updateFileGenerationProgress={handleUpdateQuizResultsPdfProgress}
+                isGeneratingQuizResultsPdf={isGeneratingQuizResultsPdf}
               />
             ) : (
               <Accordion type="single" collapsible className="w-full">
