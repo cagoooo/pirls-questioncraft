@@ -122,7 +122,7 @@ export function QuizView({
       generatePreviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]); // imagePreviews removed from deps as it's being set here
+  }, [imageFiles, imageFilesDataURIs]);
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -395,7 +395,7 @@ export function QuizView({
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index} // Using index as key for data URIs, assuming order stability
+                    key={index} 
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -426,7 +426,7 @@ export function QuizView({
           </div>
 
           <div className="p-4 border rounded-lg bg-muted dark:bg-secondary shadow-md mb-6">
-             <p className="text-md font-medium text-foreground">{currentQuestion.question}</p>
+             <p className="text-lg sm:text-xl font-semibold text-foreground">{currentQuestion.question}</p>
           </div>
 
           <RadioGroup
