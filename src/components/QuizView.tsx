@@ -108,7 +108,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
@@ -245,12 +245,6 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
                           : <span className="text-muted-foreground italic">未作答</span>}
                       </span>
                     </p>
-                    {!result.isCorrect && (
-                      <p className="text-green-700 dark:text-green-500">
-                        <strong>正確答案：</strong>
-                        {`${optionLabels[result.correctAnswerIndex]}. ${result.options[result.correctAnswerIndex]}`}
-                      </p>
-                    )}
                      {result.isCorrect && (
                        <p className="text-green-600 font-medium flex items-center">
                          <CheckCircle className="h-4 w-4 mr-2" /> 恭喜答對！
