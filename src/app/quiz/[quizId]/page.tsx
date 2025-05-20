@@ -22,7 +22,7 @@ interface QuizData {
   imageFilesDataURIs: string[];
 }
 
-interface StudentInfo {
+export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
   class: string;
   seatNumber: string;
   name: string;
@@ -164,37 +164,40 @@ export default function SharedQuizPage() {
         <PirlsLogo className="mx-auto mb-6 h-20 w-auto sm:h-24" />
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
-            <CardTitle className="text-center text-2xl font-bold text-primary">開始測驗前請輸入資訊</CardTitle>
+            <CardTitle className="text-center text-xl sm:text-2xl font-bold text-primary">開始測驗前請輸入資訊</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleStudentInfoSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="studentClass" className="text-md">班級</Label>
+                <Label htmlFor="studentClass" className="text-sm sm:text-md">班級</Label>
                 <Input
                   id="studentClass"
                   value={studentClass}
                   onChange={(e) => setStudentClass(e.target.value)}
                   placeholder="例如：三年一班"
+                  className="text-sm sm:text-base"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="studentSeatNumber" className="text-md">座號</Label>
+                <Label htmlFor="studentSeatNumber" className="text-sm sm:text-md">座號</Label>
                 <Input
                   id="studentSeatNumber"
                   value={studentSeatNumber}
                   onChange={(e) => setStudentSeatNumber(e.target.value)}
                   placeholder="例如：01"
+                  className="text-sm sm:text-base"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="studentName" className="text-md">姓名</Label>
+                <Label htmlFor="studentName" className="text-sm sm:text-md">姓名</Label>
                 <Input
                   id="studentName"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   placeholder="例如：王小明"
+                  className="text-sm sm:text-base"
                   required
                 />
               </div>
@@ -205,7 +208,7 @@ export default function SharedQuizPage() {
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
-              <Button type="submit" className="w-full py-3 text-lg">
+              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg">
                 開始測驗
               </Button>
             </form>
@@ -224,23 +227,23 @@ export default function SharedQuizPage() {
     };
     return (
       <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
-         <header className="my-8 text-center">
-            <PirlsLogo className="mx-auto mb-4 h-16 w-auto sm:h-20" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
-            <p className="text-sm text-muted-foreground mt-1">學生：{studentInfo.class} {studentInfo.seatNumber}號 {studentInfo.name}</p>
+         <header className="my-4 sm:my-8 text-center">
+            <PirlsLogo className="mx-auto mb-4 h-12 w-auto sm:h-16" />
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">學生：{studentInfo.class} {studentInfo.seatNumber}號 {studentInfo.name}</p>
         </header>
         <main className="w-full max-w-3xl">
           {(isGeneratingQuizResultsPdf) && (
             <Card className="w-full shadow-md mb-6">
               <CardHeader>
-                <CardTitle className="flex items-center text-xl font-semibold">
+                <CardTitle className="flex items-center text-lg sm:text-xl font-semibold">
                   <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
                   結果PDF處理中...
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pt-2">
                 <Progress value={fileGenerationProgress} className="w-full h-3" />
-                <p className="text-sm text-muted-foreground text-center">
+                <p className="text-xs sm:text-sm text-muted-foreground text-center">
                   {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
                 </p>
               </CardContent>
@@ -276,4 +279,5 @@ export default function SharedQuizPage() {
     </div>
   );
 }
+
 

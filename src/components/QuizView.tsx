@@ -23,7 +23,9 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf'; // Make sure StudentInfo is exported
+import { exportQuizResultsToPDF, type StudentInfo as PdfStudentInfo } from '@/lib/generateQuizResultsPdf'; 
+import type { StudentInfo } from '@/app/quiz/[quizId]/page';
+
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 type ProgressCallback = (progress: number, message: string) => void;
@@ -32,7 +34,7 @@ interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFiles: File[]; 
   imageFilesDataURIs?: string[]; 
-  studentInfo?: PdfStudentInfo; // Use the exported type
+  studentInfo?: StudentInfo; 
   onExitQuiz: () => void;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
@@ -143,7 +145,7 @@ export function QuizView({
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => prev - 1); 
     }
   };
 
@@ -383,7 +385,7 @@ export function QuizView({
         {imagePreviews.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
-            <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
+            <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
@@ -498,3 +500,4 @@ export function QuizView({
     </Card>
   );
 }
+
