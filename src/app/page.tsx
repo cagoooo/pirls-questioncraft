@@ -46,6 +46,15 @@ export default function PIRLSQuestionCraftPage() {
     setCurrentYear(new Date().getFullYear());
   }, []);
 
+  useEffect(() => {
+    if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
+      const timer = setTimeout(() => {
+        fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100); 
+      return () => clearTimeout(timer);
+    }
+  }, [isGeneratingQuizResultsPdf]);
+
 
   const convertFileToDataUri = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -462,3 +471,4 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
