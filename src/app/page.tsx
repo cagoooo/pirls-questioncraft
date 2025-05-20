@@ -18,7 +18,7 @@ import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle } from 'lucide-react';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
@@ -544,5 +544,6 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
 
