@@ -62,7 +62,13 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
 
   const currentQuestion = useMemo(() => questionsOutput.questions[currentQuestionIndex], [questionsOutput, currentQuestionIndex]);
-  const levelDetail = useMemo(() => quizState === 'answering' ? pirlsLevelDetails[currentQuestion.pirlsLevel] : null, [currentQuestion, quizState]);
+  
+  const levelDetail = useMemo(() => {
+    if (quizState === 'answering' && currentQuestion) {
+      return pirlsLevelDetails[currentQuestion.pirlsLevel];
+    }
+    return null;
+  }, [currentQuestion, quizState]);
 
 
   useEffect(() => {
@@ -84,11 +90,23 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
       generatePreviews();
     }
     
+    // Cleanup function
     return () => {
-      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      imagePreviews.forEach(url => {
+        // Check if the URL is an object URL before revoking
+        if (url.startsWith('blob:') || url.startsWith('data:')) {
+          // It's a data URI or blob URI, no need to revoke for data URIs,
+          // and blob URIs are typically revoked when no longer needed elsewhere if created by URL.createObjectURL
+          // For this component's lifecycle, if they were created by URL.createObjectURL and stored,
+          // they would need explicit revocation. FileReader's result (data URI) doesn't need this.
+        } else {
+           // If it were an object URL from URL.createObjectURL, you'd revoke it:
+           // URL.revokeObjectURL(url);
+        }
+      });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles]);
+  }, [imageFiles]); // imagePreviews should not be in dependency array if we're cleaning it up
 
   const handleOptionChange = (value: string) => {
     if (quizState !== 'answering') return;
@@ -108,7 +126,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      setCurrentQuestionIndex(prev => prev - 1); // Corrected: was prev + 1
     }
   };
 
@@ -161,7 +179,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     });
     
     quizResults.forEach(result => {
-      if (pirlsScores[result.pirlsLevel]) { // Check if level exists to prevent errors
+      if (pirlsScores[result.pirlsLevel]) { 
         pirlsScores[result.pirlsLevel].total++;
         if (result.isCorrect) {
           pirlsScores[result.pirlsLevel].correct++;
@@ -207,7 +225,9 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
               {Object.entries(pirlsScores).map(([level, score]) => {
                 if (score.total === 0 && !questionsOutput.questions.some(q => q.pirlsLevel === level)) return null; 
                 const percentage = score.total > 0 ? (score.correct / score.total) * 100 : 0;
-                const levelBadgeVariant = pirlsLevelDetails[level as PirlsQuestion['pirlsLevel']].badgeVariant;
+                const levelInfo = pirlsLevelDetails[level as PirlsQuestion['pirlsLevel']];
+                if (!levelInfo) return null; // Should not happen if keys are aligned
+                const levelBadgeVariant = levelInfo.badgeVariant;
                 return (
                   <div key={level}>
                     <div className="flex justify-between items-center mb-1">
@@ -268,6 +288,17 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
     );
   }
 
+  // Fallback for 'answering' state if currentQuestion is not yet ready (defensive)
+  if (quizState === 'answering' && !currentQuestion) {
+    return (
+      <Card className="w-full shadow-xl flex items-center justify-center p-8">
+        <CardContent>
+          <p>載入題目中...</p> {/* Or a spinner component */}
+        </CardContent>
+      </Card>
+    );
+  }
+
   // 'answering' state UI
   return (
     <Card className="w-full shadow-xl">
@@ -290,7 +321,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={src} // Use src as key if stable, or manage IDs if files can be reordered
+                    key={src} 
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -357,7 +388,7 @@ export function QuizView({ questionsOutput, imageFiles, onExitQuiz }: QuizViewPr
           </Button>
         ) : (
           <Button 
-            variant="default" // Changed to default for next button
+            variant="default" 
             onClick={goToNextQuestion}
             disabled={currentQuestionIndex === questionsOutput.questions.length - 1}
           >
