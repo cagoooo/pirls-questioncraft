@@ -75,7 +75,7 @@ export function QuizView({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
-  const resultsOverallRef = useRef<HTMLDivElement>(null);
+  const quizResultsTopRef = useRef<HTMLDivElement>(null); // Renamed and will be used for the main results card
   const [isSharingPdf, setIsSharingPdf] = useState(false);
 
 
@@ -114,9 +114,9 @@ export function QuizView({
   }, [imageFiles]); 
 
   useEffect(() => {
-    if (quizState === 'results' && quizResults && resultsOverallRef.current) {
+    if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
       const timer = setTimeout(() => {
-        resultsOverallRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        quizResultsTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100); 
       return () => clearTimeout(timer);
     }
@@ -190,7 +190,10 @@ export function QuizView({
       updateFileGenerationProgress(0, `結果 PDF 產生失敗: ${error.message || '未知錯誤'}`);
     } finally {
       setIsSharingPdf(false);
-      showFileGenerationProgress(false);
+      // Only hide progress if page.tsx isn't showing it for PDF/Excel generation
+      if (!isGeneratingQuizResultsPdf) { // This condition might need re-evaluation depending on how page.tsx handles this
+        showFileGenerationProgress(false);
+      }
     }
   };
 
@@ -223,7 +226,7 @@ export function QuizView({
     });
 
     return (
-      <Card className="w-full shadow-xl">
+      <Card ref={quizResultsTopRef} className="w-full shadow-xl">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center">
             <CheckSquare className="h-7 w-7 mr-3 text-primary" />
@@ -258,7 +261,7 @@ export function QuizView({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Card ref={resultsOverallRef}>
+          <Card>
             <CardHeader>
               <CardTitle className="text-xl">總體表現</CardTitle>
             </CardHeader>
