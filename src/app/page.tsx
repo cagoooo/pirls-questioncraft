@@ -36,7 +36,11 @@ export default function PIRLSQuestionCraftPage() {
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
   const [isQuizActive, setIsQuizActive] = useState(false);
+  
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isSharingQuiz, setIsSharingQuiz] = useState(false);
+  const [currentShareLink, setCurrentShareLink] = useState('');
+
 
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
@@ -44,9 +48,6 @@ export default function PIRLSQuestionCraftPage() {
   const generateButtonRef = useRef<HTMLButtonElement>(null);
   const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
   const [currentYear, setCurrentYear] = useState<number | null>(null);
-
-  const placeholderShareLink = typeof window !== 'undefined' ? `${window.location.origin}/quiz/placeholder-id` : 'https://pirlss.smes.tyc.edu.tw/quiz/placeholder-id';
-
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -60,6 +61,15 @@ export default function PIRLSQuestionCraftPage() {
       return () => clearTimeout(timer);
     }
   }, [isGeneratingPdf, isGeneratingExcel, isGeneratingQuizResultsPdf]);
+
+  useEffect(() => {
+    if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
+        const timer = setTimeout(() => {
+            fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        return () => clearTimeout(timer);
+    }
+  }, [isGeneratingQuizResultsPdf]);
 
 
   const convertFileToDataUri = (file: File): Promise<string> => {
@@ -76,6 +86,7 @@ export default function PIRLSQuestionCraftPage() {
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
+    setCurrentShareLink(''); // Reset share link if images change
     if (files.length > 0 && generateButtonRef.current) {
       const timer = setTimeout(() => {
         generateButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -99,6 +110,7 @@ export default function PIRLSQuestionCraftPage() {
     setError(null); 
     setGeneratedQuestionsOutput(null); 
     setIsQuizActive(false);
+    setCurrentShareLink('');
     
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -282,11 +294,53 @@ export default function PIRLSQuestionCraftPage() {
     setFileGenerationMessage(message);
   };
 
+  const handleShareQuiz = async () => {
+    if (!generatedQuestionsOutput || imageFiles.length === 0) {
+      toast({ title: "無法分享", description: "請先生成題目並上傳圖片。", variant: "destructive" });
+      return;
+    }
+    setIsSharingQuiz(true);
+    setCurrentShareLink(''); // Clear previous link
+    setIsShareDialogOpen(true); // Open dialog to show loading/link
+
+    try {
+      const imageFilesDataURIs = await Promise.all(imageFiles.map(file => convertFileToDataUri(file)));
+      const response = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionsOutput: generatedQuestionsOutput, imageFilesDataURIs }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success && data.quizId) {
+        const newShareLink = `${window.location.origin}/quiz/${data.quizId}`;
+        setCurrentShareLink(newShareLink);
+        toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white' });
+      } else {
+        throw new Error(data.error || '無法生成分享連結');
+      }
+    } catch (shareError: any) {
+      console.error("分享測驗失敗:", shareError);
+      setCurrentShareLink('');
+      toast({
+        title: "分享失敗",
+        description: `無法生成臨時分享連結: ${shareError.message || '未知錯誤'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSharingQuiz(false);
+    }
+  };
+
   const handleCopyShareLink = () => {
-    navigator.clipboard.writeText(placeholderShareLink).then(() => {
+    if (!currentShareLink) {
+        toast({ title: "無連結可複製", description: "請先生成分享連結。", variant: "destructive" });
+        return;
+    }
+    navigator.clipboard.writeText(currentShareLink).then(() => {
       toast({
         title: "連結已複製",
-        description: "示意分享連結已複製到剪貼簿。",
+        description: "臨時分享連結已複製到剪貼簿。",
         variant: "default",
         className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
       });
@@ -416,51 +470,66 @@ export default function PIRLSQuestionCraftPage() {
                      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
-                            onClick={() => setIsShareDialogOpen(true)}
-                            disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
+                            onClick={handleShareQuiz}
+                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
                             variant="outline"
                             className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
                           >
-                            <Share2 className="mr-2 h-4 w-4" />
-                            分享測驗
+                            {isSharingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+                            {isSharingQuiz ? "處理中..." : "分享測驗"}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
                             <DialogTitle>分享您的測驗</DialogTitle>
                             <DialogDescription>
-                              讓其他人可以透過連結或QR Code參與此測驗。
+                              透過以下臨時連結分享此測驗給學生。
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-2">
-                            <div className="space-y-1">
-                              <label htmlFor="share-link" className="text-sm font-medium">
-                                分享連結 (示意)
-                              </label>
-                              <div className="flex items-center space-x-2">
-                                <Input id="share-link" value={placeholderShareLink} readOnly className="flex-1" />
-                                <Button type="button" size="sm" onClick={handleCopyShareLink}>
-                                  <Copy className="h-4 w-4 mr-1 sm:mr-2" />
-                                  <span className="hidden sm:inline">複製</span>
-                                </Button>
+                            {isSharingQuiz && (
+                               <div className="flex items-center justify-center p-4">
+                                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                                <p className="ml-2 text-muted-foreground">正在生成臨時分享連結...</p>
+                               </div>
+                            )}
+                            {!isSharingQuiz && currentShareLink && (
+                              <div className="space-y-1">
+                                <label htmlFor="share-link" className="text-sm font-medium">
+                                  臨時分享連結
+                                </label>
+                                <div className="flex items-center space-x-2">
+                                  <Input id="share-link" value={currentShareLink} readOnly className="flex-1" />
+                                  <Button type="button" size="sm" onClick={handleCopyShareLink}>
+                                    <Copy className="h-4 w-4 mr-1 sm:mr-2" />
+                                    <span className="hidden sm:inline">複製</span>
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
+                            )}
+                            {!isSharingQuiz && !currentShareLink && (
+                                 <p className="text-sm text-muted-foreground text-center py-2">點擊「分享測驗」按鈕以生成連結。</p>
+                            )}
                             <div className="space-y-1">
                                <label className="text-sm font-medium">QR Code (示意)</label>
                                <div className="flex items-center justify-center p-4 border rounded-md bg-muted h-32">
-                                 <p className="text-muted-foreground text-sm">QR Code 預留位置</p>
+                                 <p className="text-muted-foreground text-sm">
+                                   {currentShareLink ? "此處將顯示指向臨時連結的QR Code" : "QR Code 預留位置"}
+                                 </p>
                                </div>
                             </div>
                              <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
                               <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                              <AlertTitle className="text-yellow-700 dark:text-yellow-300">請注意</AlertTitle>
+                              <AlertTitle className="text-yellow-700 dark:text-yellow-300">重要提示：臨時分享</AlertTitle>
                               <AlertDescription className="text-yellow-600 dark:text-yellow-500 text-xs">
-                                完整的測驗分享功能（包含圖片和學生作答追蹤）需要將題組儲存到伺服器。目前的連結和QR碼僅為示意，尚無法讓他人直接進行測驗。
+                                此分享連結是**臨時性的**，內容儲存在伺服器記憶體中。連結約在 **1 小時後或伺服器重啟/更新時失效**。
+                                不適用於永久保存或非同步測驗。學生需在連結有效期內完成測驗。
+                                在正式生產環境 (例如 Vercel)，此臨時分享的穩定性可能受限。
                               </AlertDescription>
                             </Alert>
                           </div>
                           <DialogFooter className="sm:justify-end">
-                            <Button type="button" variant="outline" onClick={() => setIsShareDialogOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setIsShareDialogOpen(false)} disabled={isSharingQuiz}>
                               關閉
                             </Button>
                           </DialogFooter>
@@ -544,6 +613,7 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
 
 

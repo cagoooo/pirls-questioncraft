@@ -30,7 +30,8 @@ type ProgressCallback = (progress: number, message: string) => void;
 
 interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
-  imageFiles: File[];
+  imageFiles: File[]; // Used when creating quiz, can be empty if imageFilesDataURIs is provided
+  imageFilesDataURIs?: string[]; // Used when viewing a shared quiz
   onExitQuiz: () => void;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
@@ -62,6 +63,7 @@ type QuizState = 'answering' | 'results';
 export function QuizView({ 
   questionsOutput, 
   imageFiles, 
+  imageFilesDataURIs,
   onExitQuiz,
   toast,
   showFileGenerationProgress,
@@ -75,8 +77,8 @@ export function QuizView({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [quizState, setQuizState] = useState<QuizState>('answering');
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
-  const quizResultsTopRef = useRef<HTMLDivElement>(null); // Renamed and will be used for the main results card
-  const [isSharingPdf, setIsSharingPdf] = useState(false);
+  const quizResultsTopRef = useRef<HTMLDivElement>(null); 
+  const [isSharingPdfInternal, setIsSharingPdfInternal] = useState(false);
 
 
   const currentQuestion = useMemo(() => {
@@ -92,26 +94,26 @@ export function QuizView({
 
 
   useEffect(() => {
-    const generatePreviews = async () => {
-      const previews = await Promise.all(
-        imageFiles.map(file => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
-      setImagePreviews(previews);
-    };
-
-    if (imageFiles.length > 0) {
+    if (imageFilesDataURIs && imageFilesDataURIs.length > 0) {
+      setImagePreviews(imageFilesDataURIs);
+    } else if (imageFiles && imageFiles.length > 0) {
+      const generatePreviews = async () => {
+        const previews = await Promise.all(
+          imageFiles.map(file => {
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          })
+        );
+        setImagePreviews(previews);
+      };
       generatePreviews();
     }
-    // imagePreviews is set here, so it should not be a dependency to avoid infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles]); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageFiles, imageFilesDataURIs]); 
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -177,10 +179,10 @@ export function QuizView({
       toast({ title: "錯誤", description: "沒有測驗結果可供分享。", variant: "destructive" });
       return;
     }
-    setIsSharingPdf(true);
-    showFileGenerationProgress(true);
+    setIsSharingPdfInternal(true);
+    showFileGenerationProgress(true); // Call parent's progress handler
     try {
-      await exportQuizResultsToPDF(quizResults, toast, updateFileGenerationProgress);
+      await exportQuizResultsToPDF(quizResults, toast, updateFileGenerationProgress); // Pass parent's progress updater
     } catch (error: any) {
       toast({
         title: "分享結果失敗",
@@ -189,11 +191,8 @@ export function QuizView({
       });
       updateFileGenerationProgress(0, `結果 PDF 產生失敗: ${error.message || '未知錯誤'}`);
     } finally {
-      setIsSharingPdf(false);
-      // Only hide progress if page.tsx isn't showing it for PDF/Excel generation
-      if (!isGeneratingQuizResultsPdf) { // This condition might need re-evaluation depending on how page.tsx handles this
-        showFileGenerationProgress(false);
-      }
+      setIsSharingPdfInternal(false);
+      showFileGenerationProgress(false); 
     }
   };
 
@@ -236,9 +235,9 @@ export function QuizView({
             <Button 
               variant="outline" 
               onClick={handleShareResultsPdf}
-              disabled={isSharingPdf || isGeneratingQuizResultsPdf}
+              disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}
             >
-              {isSharingPdf || isGeneratingQuizResultsPdf ? (
+              {isSharingPdfInternal || isGeneratingQuizResultsPdf ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   結果PDF準備中...
@@ -250,11 +249,11 @@ export function QuizView({
                 </>
               )}
             </Button>
-            <Button variant="outline" onClick={handleRestartQuiz} disabled={isSharingPdf || isGeneratingQuizResultsPdf}>
+            <Button variant="outline" onClick={handleRestartQuiz} disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}>
               <RotateCcw className="mr-2 h-4 w-4" />
               重新測驗
             </Button>
-            <Button variant="ghost" onClick={onExitQuiz} disabled={isSharingPdf || isGeneratingQuizResultsPdf}>
+            <Button variant="ghost" onClick={onExitQuiz} disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}>
               <LogOut className="mr-2 h-4 w-4" />
               退出測驗
             </Button>
@@ -375,7 +374,7 @@ export function QuizView({
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
                   <Image
-                    key={index} 
+                    key={src} // Use src as key if unique, otherwise index for data URIs
                     src={src}
                     alt={`閱讀圖片 ${index + 1}`}
                     width={800}
@@ -486,4 +485,5 @@ export function QuizView({
     </Card>
   );
 }
+
 
