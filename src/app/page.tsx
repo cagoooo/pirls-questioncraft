@@ -10,12 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
+import { QuizView } from '@/components/QuizView'; // New component for quiz
 import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck } from 'lucide-react';
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -29,6 +30,7 @@ export default function PIRLSQuestionCraftPage() {
   
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
+  const [isQuizActive, setIsQuizActive] = useState(false); // State for quiz mode
 
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
@@ -55,6 +57,7 @@ export default function PIRLSQuestionCraftPage() {
     setImageFiles(files);
     setGeneratedQuestionsOutput(null);
     setError(null);
+    setIsQuizActive(false); // Exit quiz mode if images change
     if (files.length > 0 && generateButtonRef.current) {
       const timer = setTimeout(() => {
         generateButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -77,13 +80,13 @@ export default function PIRLSQuestionCraftPage() {
     setIsLoading(true);
     setError(null); 
     setGeneratedQuestionsOutput(null); 
+    setIsQuizActive(false); // Reset quiz mode
     
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
-    // Total steps: 1 (prep) + N (extract) + 1 (combine) + 1 (generate) + 1 (display)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
@@ -110,7 +113,6 @@ export default function PIRLSQuestionCraftPage() {
           if (extractionResult.success && extractionResult.extractedText) {
             extractedTextsArray.push(extractionResult.extractedText);
           } else {
-            // Don't throw. Log and show a non-critical toast for this specific file.
             console.warn(`Text extraction failed for ${file.name}: ${extractionResult.error || 'No text extracted or an error occurred'}`);
             toast({
               title: `圖片 "${file.name}" 處理提示`,
@@ -120,12 +122,9 @@ export default function PIRLSQuestionCraftPage() {
           }
         }
       } else {
-        // This case should be caught by the initial imageFiles.length === 0 check
-        // but ensure completedSteps for extraction part is consistent.
         completedSteps += currentImageFilesCount; 
       }
 
-      // After processing all images, check if any text was actually extracted
       if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
@@ -164,26 +163,13 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Ensure progress message reflects error at current stage if possible
       const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
       updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
 
     } finally {
       setIsLoading(false);
-      // Update progress to 100% only on clear success or known failure point
-      if (!error && generatedQuestionsOutput) {
-         // Final step to ensure progress bar shows 100% on success.
-         // The last step updateDisplayProgress in the try block should handle this.
-         // If not, uncomment: updateDisplayProgress(totalSteps, '所有處理步驟已完成！');
-      } else if (error) {
-        // Message already set in catch
-      } else if (!generatedQuestionsOutput && !error && imageFiles.length > 0) {
-        // This case might indicate an unexpected flow where no questions were generated
-        // without an explicit error.
-        updateDisplayProgress(completedSteps, '處理完成但未生成題目');
-      }
     }
-  }, [imageFiles, toast, loadingMessage, generatedQuestionsOutput, error]);
+  }, [imageFiles, toast, loadingMessage]);
 
   const fileProgressCallback = (progress: number, message: string) => {
     setFileGenerationProgress(progress);
@@ -252,6 +238,26 @@ export default function PIRLSQuestionCraftPage() {
     }
   };
 
+  const handleStartQuiz = () => {
+    if (generatedQuestionsOutput && imageFiles.length > 0) {
+      setIsQuizActive(true);
+      // Optionally scroll to quiz view
+      setTimeout(() => {
+        resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+       toast({
+        title: '無法開始測驗',
+        description: '請先上傳圖片並成功生成題目。',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleExitQuiz = () => {
+    setIsQuizActive(false);
+  };
+
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
@@ -277,30 +283,34 @@ export default function PIRLSQuestionCraftPage() {
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
-        <FileUpload 
-          onFilesSelected={handleImageFilesChange} 
-          isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} 
-        />
+        {!isQuizActive && (
+          <FileUpload 
+            onFilesSelected={handleImageFilesChange} 
+            isLoading={isLoading || isGeneratingPdf || isGeneratingExcel} 
+          />
+        )}
 
-        <Button
-          ref={generateButtonRef}
-          onClick={handleGenerateQuestions}
-          disabled={isLoading || isGeneratingPdf || isGeneratingExcel || imageFiles.length === 0}
-          className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
-          size="lg"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              處理中，請稍候...
-            </>
-          ) : (
-            <>
-              <Brain className="mr-2 h-5 w-5" />
-              生成PIRLS題目
-            </>
-          )}
-        </Button>
+        {!isQuizActive && (
+          <Button
+            ref={generateButtonRef}
+            onClick={handleGenerateQuestions}
+            disabled={isLoading || isGeneratingPdf || isGeneratingExcel || imageFiles.length === 0}
+            className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
+            size="lg"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                處理中，請稍候...
+              </>
+            ) : (
+              <>
+                <Brain className="mr-2 h-5 w-5" />
+                生成PIRLS題目
+              </>
+            )}
+          </Button>
+        )}
 
         {isLoading && (
            <Card ref={loadingSectionRef} className="w-full shadow-md">
@@ -332,47 +342,58 @@ export default function PIRLSQuestionCraftPage() {
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
                 <h2 className="text-2xl font-semibold text-center flex items-center justify-center">
                   <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-                  為您生成的PIRLS題目
+                  {isQuizActive ? "PIRLS 線上測驗" : "為您生成的PIRLS題目"}
                 </h2>
-                <div className="flex space-x-2">
-                  <Button
-                      onClick={handleDownloadPdf}
-                      disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
-                      variant="outline"
-                  >
-                      {isGeneratingPdf ? (
-                          <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              PDF準備中...
-                          </>
-                      ) : (
-                          <>
-                              <Download className="mr-2 h-4 w-4" />
-                              下載 PDF
-                          </>
-                      )}
-                  </Button>
-                  <Button
-                      onClick={handleDownloadExcel}
-                      disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput}
-                      variant="outline"
-                  >
-                      {isGeneratingExcel ? (
-                          <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Excel準備中...
-                          </>
-                      ) : (
-                          <>
-                              <SheetIcon className="mr-2 h-4 w-4" />
-                              下載 Excel
-                          </>
-                      )}
-                  </Button>
-                </div>
+                {!isQuizActive && (
+                  <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
+                    <Button
+                        onClick={handleStartQuiz}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
+                        variant="outline"
+                        className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
+                    >
+                        <ClipboardCheck className="mr-2 h-4 w-4" />
+                        開始測驗
+                    </Button>
+                    <Button
+                        onClick={handleDownloadPdf}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput || imageFiles.length === 0}
+                        variant="outline"
+                    >
+                        {isGeneratingPdf ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                PDF準備中...
+                            </>
+                        ) : (
+                            <>
+                                <Download className="mr-2 h-4 w-4" />
+                                下載 PDF
+                            </>
+                        )}
+                    </Button>
+                    <Button
+                        onClick={handleDownloadExcel}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || !generatedQuestionsOutput}
+                        variant="outline"
+                    >
+                        {isGeneratingExcel ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Excel準備中...
+                            </>
+                        ) : (
+                            <>
+                                <SheetIcon className="mr-2 h-4 w-4" />
+                                下載 Excel
+                            </>
+                        )}
+                    </Button>
+                  </div>
+                )}
             </div>
 
-            {(isGeneratingPdf || isGeneratingExcel) && (
+            {(isGeneratingPdf || isGeneratingExcel) && !isQuizActive && (
               <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center text-xl font-semibold">
@@ -388,12 +409,20 @@ export default function PIRLSQuestionCraftPage() {
                 </CardContent>
               </Card>
             )}
-
-            <Accordion type="single" collapsible className="w-full">
-              {generatedQuestionsOutput.questions.map((q, index) => (
-                <QuestionCard key={index} questionItem={q} questionNumber={index + 1} />
-              ))}
-            </Accordion>
+            
+            {isQuizActive && generatedQuestionsOutput && imageFiles.length > 0 ? (
+              <QuizView 
+                questionsOutput={generatedQuestionsOutput} 
+                imageFiles={imageFiles} 
+                onExitQuiz={handleExitQuiz} 
+              />
+            ) : (
+              <Accordion type="single" collapsible className="w-full">
+                {generatedQuestionsOutput?.questions.map((q, index) => (
+                  <QuestionCard key={index} questionItem={q} questionNumber={index + 1} />
+                ))}
+              </Accordion>
+            )}
           </section>
         )}
       </main>
