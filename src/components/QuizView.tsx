@@ -75,6 +75,7 @@ export function QuizView({
   isGeneratingQuizResultsPdf
 }: QuizViewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [previousQuestionIndex, setPreviousQuestionIndex] = useState<number | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(() =>
     Array(questionsOutput.questions.length).fill(null)
   );
@@ -96,7 +97,6 @@ export function QuizView({
     return null;
   }, [currentQuestion, quizState]);
 
-
   useEffect(() => {
     if (imageFilesDataURIs && imageFilesDataURIs.length > 0) {
       setImagePreviews(imageFilesDataURIs);
@@ -117,7 +117,7 @@ export function QuizView({
       generatePreviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]);
+  }, [imageFiles, imageFilesDataURIs]); // Removed imagePreviews from dependency array as it is being set here
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -127,6 +127,12 @@ export function QuizView({
       return () => clearTimeout(timer);
     }
   }, [quizState, quizResults]);
+
+  // Update previousQuestionIndex when currentQuestionIndex changes
+  useEffect(() => {
+    setPreviousQuestionIndex(currentQuestionIndex);
+  }, [currentQuestionIndex]);
+
 
   const handleOptionChange = (value: string) => {
     if (quizState !== 'answering') return;
@@ -140,12 +146,14 @@ export function QuizView({
 
   const goToNextQuestion = () => {
     if (currentQuestionIndex < questionsOutput.questions.length - 1) {
+      setPreviousQuestionIndex(currentQuestionIndex); // Set before updating current
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
+      setPreviousQuestionIndex(currentQuestionIndex); // Set before updating current
       setCurrentQuestionIndex(prev => prev - 1); 
     }
   };
@@ -173,6 +181,7 @@ export function QuizView({
 
   const handleRestartQuiz = () => {
     setCurrentQuestionIndex(0);
+    setPreviousQuestionIndex(null);
     setSelectedAnswers(Array(questionsOutput.questions.length).fill(null));
     setQuizResults(null);
     setQuizState('answering');
@@ -203,6 +212,19 @@ export function QuizView({
   const currentSelectedValue = selectedAnswers[currentQuestionIndex] !== null
     ? selectedAnswers[currentQuestionIndex]?.toString()
     : undefined;
+
+  const getAnimationClass = () => {
+    if (previousQuestionIndex === null || previousQuestionIndex === currentQuestionIndex) { // Initial load or no change
+      return "animate-in fade-in-25 duration-300";
+    }
+    if (currentQuestionIndex > previousQuestionIndex) {
+      return "animate-in slide-in-from-right-8 fade-in-0 duration-300"; // Next question
+    }
+    if (currentQuestionIndex < previousQuestionIndex) {
+      return "animate-in slide-in-from-left-8 fade-in-0 duration-300"; // Previous question
+    }
+    return ""; // Default no animation
+  };
 
 
   if (quizState === 'results' && quizResults) {
@@ -330,7 +352,7 @@ export function QuizView({
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4 pt-2 space-y-3 text-sm">
                     <p><strong>您的答案：</strong>
-                      <span className={cn(result.isCorrect ? "text-foreground" : "text-destructive line-through dark:text-red-400")}>
+                      <span className={cn(result.userAnswerIndex === null || result.isCorrect ? "text-foreground" : "text-destructive line-through dark:text-red-400")}>
                         {result.userAnswerIndex !== null
                           ? `${optionLabels[result.userAnswerIndex]}. ${result.options[result.userAnswerIndex]}`
                           : <span className="text-muted-foreground italic">未作答</span>}
@@ -407,7 +429,10 @@ export function QuizView({
         )}
         <Separator />
 
-        <div className="mt-6">
+        <div // This is the main wrapper for a single question's content
+          key={currentQuestionIndex} // Key to trigger re-render and animation
+          className={cn("mt-6", getAnimationClass())}
+        >
           <div className="flex justify-between items-center mb-2">
             <h4 className="text-lg font-semibold">
               題目 {currentQuestionIndex + 1} / {questionsOutput.questions.length}
