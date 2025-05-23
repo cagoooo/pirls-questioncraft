@@ -2,7 +2,7 @@
 // src/components/QuizView.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge, badgeVariants } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut, FileText, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut, FileText, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { VariantProps } from 'class-variance-authority';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -63,6 +64,10 @@ interface QuizResultItem {
 
 type QuizState = 'answering' | 'results';
 
+const MIN_SCALE = 0.3;
+const MAX_SCALE = 4;
+const SCALE_STEP = 0.2;
+
 export function QuizView({
   questionsOutput,
   imageFiles,
@@ -84,6 +89,15 @@ export function QuizView({
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
   const quizResultsTopRef = useRef<HTMLDivElement>(null);
   const [isSharingPdfInternal, setIsSharingPdfInternal] = useState(false);
+
+  // State for quiz image dialog
+  const [isQuizImageDialogOpen, setIsQuizImageDialogOpen] = useState(false);
+  const [selectedQuizImageForDialog, setSelectedQuizImageForDialog] = useState<string | null>(null);
+  const [dialogQuizImageScale, setDialogQuizImageScale] = useState(1);
+  const [quizImageOffset, setQuizImageOffset] = useState({ x: 0, y: 0 });
+  const [isQuizImagePanning, setIsQuizImagePanning] = useState(false);
+  const panQuizStartRef = useRef({ x: 0, y: 0 });
+  const quizImageDisplayAreaRef = useRef<HTMLDivElement>(null);
 
 
   const currentQuestion = useMemo(() => {
@@ -131,6 +145,92 @@ export function QuizView({
   useEffect(() => {
     setPreviousQuestionIndex(currentQuestionIndex);
   }, [currentQuestionIndex]);
+
+  const handleQuizImageClick = (imageUrl: string) => {
+    setSelectedQuizImageForDialog(imageUrl);
+    setDialogQuizImageScale(1);
+    setQuizImageOffset({ x: 0, y: 0 });
+    setIsQuizImagePanning(false);
+    setIsQuizImageDialogOpen(true);
+  };
+
+  const handleDialogQuizImageWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDialogQuizImageScale(prevScale => {
+      let newScale;
+      if (event.deltaY < 0) { 
+        newScale = prevScale + SCALE_STEP;
+      } else { 
+        newScale = prevScale - SCALE_STEP;
+      }
+      const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      if (clampedScale === 1) {
+        setQuizImageOffset({ x: 0, y: 0 });
+      }
+      return clampedScale;
+    });
+  }, []);
+
+  const zoomInQuizDialog = () => setDialogQuizImageScale(s => {
+    const newScale = Math.min(s + SCALE_STEP, MAX_SCALE);
+    if (newScale === 1) setQuizImageOffset({ x: 0, y: 0 });
+    return newScale;
+  });
+  const zoomOutQuizDialog = () => setDialogQuizImageScale(s => {
+    const newScale = Math.max(s - SCALE_STEP, MIN_SCALE);
+    if (newScale === 1) setQuizImageOffset({ x: 0, y: 0 });
+    return newScale;
+  });
+  const resetQuizZoomDialog = () => {
+    setDialogQuizImageScale(1);
+    setQuizImageOffset({ x: 0, y: 0 });
+  };
+
+  const handleQuizPanStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (dialogQuizImageScale <= 1) return;
+    e.preventDefault(); 
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    panQuizStartRef.current = { x: clientX - quizImageOffset.x, y: clientY - quizImageOffset.y };
+    setIsQuizImagePanning(true);
+  };
+
+  useEffect(() => {
+    const handleGlobalPanMove = (e: MouseEvent | TouchEvent) => {
+      if (!isQuizImagePanning) return;
+      if ('touches' in e && e.cancelable) e.preventDefault();
+
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      
+      setQuizImageOffset({
+        x: clientX - panQuizStartRef.current.x,
+        y: clientY - panQuizStartRef.current.y,
+      });
+    };
+
+    const handleGlobalPanEnd = () => {
+      setIsQuizImagePanning(false);
+    };
+
+    if (isQuizImagePanning) {
+      window.addEventListener('mousemove', handleGlobalPanMove);
+      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false }); 
+      window.addEventListener('mouseup', handleGlobalPanEnd);
+      window.addEventListener('touchend', handleGlobalPanEnd);
+      window.addEventListener('mouseleave', handleGlobalPanEnd); 
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalPanMove);
+      window.removeEventListener('touchmove', handleGlobalPanMove);
+      window.removeEventListener('mouseup', handleGlobalPanEnd);
+      window.removeEventListener('touchend', handleGlobalPanEnd);
+      window.removeEventListener('mouseleave', handleGlobalPanEnd);
+    };
+  }, [isQuizImagePanning]);
 
 
   const handleOptionChange = (value: string) => {
@@ -194,6 +294,7 @@ export function QuizView({
     setIsSharingPdfInternal(true);
     showFileGenerationProgress(true);
     try {
+      // Pass imagePreviews (data URIs) to the PDF generation function
       await exportQuizResultsToPDF(quizResults, imagePreviews, studentInfo, toast, updateFileGenerationProgress);
     } catch (error: any) {
       toast({
@@ -394,6 +495,7 @@ export function QuizView({
   }
 
   return (
+    <>
     <Card className={cn("w-full shadow-xl", quizState === 'answering' && "animate-in fade-in-25 zoom-in-95 duration-500")}>
       <CardHeader className="flex flex-row justify-between items-center pb-4">
         <div className="flex items-center">
@@ -413,15 +515,25 @@ export function QuizView({
             <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
               <div className="space-y-4">
                 {imagePreviews.map((src, index) => (
-                  <Image
-                    key={index} 
-                    src={src}
-                    alt={`閱讀圖片 ${index + 1}`}
-                    width={800}
-                    height={600}
-                    className="w-full h-auto rounded-md object-contain"
-                    data-ai-hint="document scan"
-                  />
+                  <DialogTrigger asChild key={index}>
+                    <div
+                        className="relative aspect-auto cursor-pointer mb-4"
+                        onClick={() => handleQuizImageClick(src)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleQuizImageClick(src); } }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`放大檢視閱讀圖片 ${index + 1}`}
+                      >
+                      <Image
+                        src={src}
+                        alt={`閱讀圖片 ${index + 1}`}
+                        width={800}
+                        height={600}
+                        className="w-full h-auto rounded-md object-contain"
+                        data-ai-hint="document scan"
+                      />
+                    </div>
+                  </DialogTrigger>
                 ))}
               </div>
               <ScrollBar orientation="vertical" />
@@ -527,7 +639,71 @@ export function QuizView({
         )}
       </CardFooter>
     </Card>
+    <Dialog 
+        open={isQuizImageDialogOpen} 
+        onOpenChange={(isOpen) => {
+            setIsQuizImageDialogOpen(isOpen);
+            if (!isOpen) {
+                setSelectedQuizImageForDialog(null);
+                setDialogQuizImageScale(1); 
+                setQuizImageOffset({ x: 0, y: 0 });
+                setIsQuizImagePanning(false);
+            }
+        }}
+    >
+        <DialogContent 
+            className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
+        >
+            <DialogHeader className="sr-only">
+                <DialogTitle>放大的閱讀圖片</DialogTitle>
+                <DialogDescription>詳細檢視閱讀文本圖片內容，可使用按鈕或滑鼠滾輪進行縮放，以及拖曳平移圖片。</DialogDescription>
+            </DialogHeader>
+            {selectedQuizImageForDialog && (
+            <div 
+                ref={quizImageDisplayAreaRef}
+                className="relative w-full h-full flex justify-center items-center overflow-hidden"
+                onWheel={handleDialogQuizImageWheel} 
+            >
+                <Image
+                src={selectedQuizImageForDialog}
+                alt="放大的閱讀圖片"
+                width={1200} 
+                height={800}
+                style={{
+                    width: 'auto',
+                    height: 'auto',
+                    maxWidth: '100%',
+                    maxHeight: 'calc(85vh - 2rem - 40px)', 
+                    objectFit: 'contain',
+                    transform: `scale(${dialogQuizImageScale}) translate(${quizImageOffset.x}px, ${quizImageOffset.y}px)`,
+                    cursor: isQuizImagePanning ? 'grabbing' : (dialogQuizImageScale > 1 ? 'grab' : 'default'),
+                    transition: isQuizImagePanning ? 'none' : 'transform 0.1s ease-out',
+                    userSelect: 'none',
+                    touchAction: dialogQuizImageScale > 1 ? 'none' : 'auto',
+                }}
+                className="rounded-md shadow-xl"
+                data-ai-hint="document scan enlarged"
+                onMouseDown={handleQuizPanStart}
+                onTouchStart={handleQuizPanStart}
+                draggable="false"
+                />
+            </div>
+            )}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1 sm:bottom-4 sm:gap-2 sm:p-2 bg-background/80 rounded-lg shadow-md">
+                <Button variant="outline" size="icon" onClick={zoomOutQuizDialog} aria-label="縮小">
+                    <ZoomOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={resetQuizZoomDialog} aria-label="重設縮放">
+                    <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={zoomInQuizDialog} aria-label="放大">
+                    <ZoomIn className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+            </div>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
-
+    
