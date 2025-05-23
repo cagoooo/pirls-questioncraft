@@ -130,7 +130,7 @@ export function QuizView({
       };
       generatePreviews();
     }
-  }, [imageFiles, imageFilesDataURIs]); // Removed imagePreviews from deps as it's set here
+  }, [imageFiles, imageFilesDataURIs]);
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -142,11 +142,10 @@ export function QuizView({
   }, [quizState, quizResults]);
 
   useEffect(() => {
-    if(previousQuestionIndex !== currentQuestionIndex) { // Only update if index truly changed
+    if(previousQuestionIndex !== currentQuestionIndex) { 
       setPreviousQuestionIndex(currentQuestionIndex);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentQuestionIndex]); // Listen to currentQuestionIndex
+  }, [currentQuestionIndex, previousQuestionIndex]); 
 
   const handleQuizImageClick = (imageUrl: string) => {
     setSelectedQuizImageForDialog(imageUrl);
@@ -655,7 +654,7 @@ export function QuizView({
         </Card>
 
         <DialogContent
-            className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
+            className="w-[calc(100vw-2rem)] max-w-none sm:w-auto sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl p-2 bg-background/95 backdrop-blur-sm rounded-lg"
         >
             <DialogHeader className="sr-only">
                 <DialogTitle>放大的閱讀圖片</DialogTitle>
@@ -715,3 +714,4 @@ export function QuizView({
     </Card>
   );
 }
+
