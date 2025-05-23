@@ -401,7 +401,7 @@ export default function PIRLSQuestionCraftPage() {
             onClick={handleGenerateQuestions}
             disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || imageFiles.length === 0}
             className={cn(
-              "w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100",
+              "w-full py-3 text-base sm:text-xl font-semibold transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100",
               "bg-accent text-accent-foreground hover:bg-accent/80"
             )}
             size="lg"
@@ -533,7 +533,7 @@ export default function PIRLSQuestionCraftPage() {
                              <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
                               <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                               <AlertTitle className="text-yellow-700 dark:text-yellow-300">重要提示：臨時分享</AlertTitle>
-                              <AlertDescription className="text-yellow-600 dark:text-yellow-500 text-sm">
+                              <AlertDescription className="text-sm text-yellow-600 dark:text-yellow-500">
                                 此分享連結是**臨時性的**，內容儲存在伺服器記憶體中。連結約在 **1 小時後或伺服器重啟/更新時失效**。
                                 不適用於永久保存或非同步測驗。學生需在連結有效期內完成測驗。
                                 在正式生產環境 (例如 Vercel)，此臨時分享的穩定性可能受限。
