@@ -400,7 +400,10 @@ export default function PIRLSQuestionCraftPage() {
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
             disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || imageFiles.length === 0}
-            className="w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100"
+            className={cn(
+              "w-full py-3 text-sm sm:text-base sm:py-4 sm:text-lg transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100",
+              "bg-accent text-accent-foreground hover:bg-accent/80"
+            )}
             size="lg"
           >
             {isLoading ? (
@@ -643,3 +646,6 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+
+    
