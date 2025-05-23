@@ -31,6 +31,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [selectedImageForDialog, setSelectedImageForDialog] = useState<string | null>(null);
   const [dialogImageScale, setDialogImageScale] = useState(1);
+  
   const imageDisplayAreaRef = useRef<HTMLDivElement>(null); 
 
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
@@ -138,25 +139,25 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
 
   useEffect(() => {
     const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-    const oldPreviews = [...imagePreviews]; // Create a copy for cleanup
+    const oldPreviews = imagePreviews; // Keep a reference to the old previews for cleanup
     
     setImagePreviews(newPreviews);
     onFilesSelected(selectedFiles); 
 
+    // Cleanup previous object URLs that are no longer in use
     return () => {
       oldPreviews.forEach(url => {
-        if (!newPreviews.includes(url)) { // Only revoke if not in new previews
+        if (!newPreviews.includes(url)) {
           URL.revokeObjectURL(url);
         }
       });
-       // If all files are cleared, newPreviews will be empty.
-      // Make sure to revoke any remaining URLs in oldPreviews that were not in newPreviews (which would be all of them).
-      if (selectedFiles.length === 0) {
-        oldPreviews.forEach(URL.revokeObjectURL);
+      // If component unmounts or selectedFiles becomes empty, revoke all current newPreviews
+      if (newPreviews.length > 0 && selectedFiles.length === 0) { // This condition might need adjustment
+        newPreviews.forEach(URL.revokeObjectURL);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]); // onFilesSelected removed as per previous lint fix to avoid re-renders if it changes identity
+  }, [selectedFiles, onFilesSelected]);
 
   const removeImage = (indexToRemove: number) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== indexToRemove));
@@ -309,7 +310,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             }
         }}
     >
-      <Card className="w-full bg-muted dark:bg-muted/80">
+      <Card className="w-full bg-accent/10 dark:bg-accent/20">
         <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
           <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <ImagePlus className="h-6 w-6 text-primary" />
@@ -324,15 +325,12 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 htmlFor="imageUpload"
                 className={cn(
                   "flex flex-col items-center justify-center w-full h-32 sm:h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
-                  (isLoading || (!canUploadMore && !isDraggingOver)) && 
-                    (!canUploadMore && !isLoading && !isDraggingOver 
-                      ? "border-accent bg-accent/10 text-accent-foreground" 
-                      : "bg-muted/50 border-muted-foreground/30 text-muted-foreground"),
-                  (isLoading || !canUploadMore) && "cursor-not-allowed",
+                  isLoading && "bg-muted/30 border-muted-foreground/20 text-muted-foreground cursor-not-allowed",
+                  !isLoading && !canUploadMore && "border-green-500/50 bg-green-500/5 text-green-700 cursor-default", // Full state
                   !isLoading && canUploadMore && (
                     isDraggingOver 
-                      ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2" 
-                      : "cursor-pointer hover:border-primary/80 border-primary/50 bg-primary/10 hover:bg-primary/20 text-foreground" 
+                      ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2" // Dragging over
+                      : "cursor-pointer border-primary/50 bg-background hover:border-primary hover:bg-primary/5 text-foreground" // Default active, can drop
                   )
                 )}
                 onDragEnter={handleDragEnter}
@@ -347,8 +345,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                   </>
                 ) : !canUploadMore ? (
                    <>
-                    <CheckCircle2 className="w-10 h-10 text-accent mb-2" />
-                    <p className="text-sm font-medium">已達圖片上傳上限 (4張)</p>
+                    <CheckCircle2 className="w-10 h-10 text-green-600 mb-2" />
+                    <p className="text-sm font-medium text-green-700">已達圖片上傳上限 (4張)</p>
                     <p className="text-xs text-muted-foreground mt-1">您可以清除部分圖片後再試</p>
                   </>
                 ) : isDraggingOver ? (
