@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
-import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf'; 
+import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
 import type { StudentInfo } from '@/app/quiz/[quizId]/page';
 
 
@@ -130,8 +130,7 @@ export function QuizView({
       };
       generatePreviews();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]);
+  }, [imageFiles, imageFilesDataURIs]); // Removed imagePreviews from deps as it's set here
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -143,8 +142,11 @@ export function QuizView({
   }, [quizState, quizResults]);
 
   useEffect(() => {
-    setPreviousQuestionIndex(currentQuestionIndex);
-  }, [currentQuestionIndex]);
+    if(previousQuestionIndex !== currentQuestionIndex) { // Only update if index truly changed
+      setPreviousQuestionIndex(currentQuestionIndex);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionIndex]); // Listen to currentQuestionIndex
 
   const handleQuizImageClick = (imageUrl: string) => {
     setSelectedQuizImageForDialog(imageUrl);
@@ -158,9 +160,9 @@ export function QuizView({
     event.preventDefault();
     setDialogQuizImageScale(prevScale => {
       let newScale;
-      if (event.deltaY < 0) { 
+      if (event.deltaY < 0) {
         newScale = prevScale + SCALE_STEP;
-      } else { 
+      } else {
         newScale = prevScale - SCALE_STEP;
       }
       const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
@@ -188,8 +190,8 @@ export function QuizView({
 
   const handleQuizPanStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (dialogQuizImageScale <= 1) return;
-    e.preventDefault(); 
-    
+    e.preventDefault();
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
@@ -204,7 +206,7 @@ export function QuizView({
 
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      
+
       setQuizImageOffset({
         x: clientX - panQuizStartRef.current.x,
         y: clientY - panQuizStartRef.current.y,
@@ -217,10 +219,10 @@ export function QuizView({
 
     if (isQuizImagePanning) {
       window.addEventListener('mousemove', handleGlobalPanMove);
-      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false }); 
+      window.addEventListener('touchmove', handleGlobalPanMove, { passive: false });
       window.addEventListener('mouseup', handleGlobalPanEnd);
       window.addEventListener('touchend', handleGlobalPanEnd);
-      window.addEventListener('mouseleave', handleGlobalPanEnd); 
+      window.addEventListener('mouseleave', handleGlobalPanEnd);
     }
 
     return () => {
@@ -245,15 +247,15 @@ export function QuizView({
 
   const goToNextQuestion = () => {
     if (currentQuestionIndex < questionsOutput.questions.length - 1) {
-      setPreviousQuestionIndex(currentQuestionIndex); 
+      setPreviousQuestionIndex(currentQuestionIndex);
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setPreviousQuestionIndex(currentQuestionIndex); 
-      setCurrentQuestionIndex(prev => prev - 1); 
+      setPreviousQuestionIndex(currentQuestionIndex);
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
@@ -294,7 +296,6 @@ export function QuizView({
     setIsSharingPdfInternal(true);
     showFileGenerationProgress(true);
     try {
-      // Pass imagePreviews (data URIs) to the PDF generation function
       await exportQuizResultsToPDF(quizResults, imagePreviews, studentInfo, toast, updateFileGenerationProgress);
     } catch (error: any) {
       toast({
@@ -314,16 +315,16 @@ export function QuizView({
     : undefined;
 
   const getAnimationClass = () => {
-    if (previousQuestionIndex === null || previousQuestionIndex === currentQuestionIndex) { 
+    if (previousQuestionIndex === null || previousQuestionIndex === currentQuestionIndex) {
       return "animate-in fade-in-25 duration-300";
     }
     if (currentQuestionIndex > previousQuestionIndex) {
-      return "animate-in slide-in-from-right-8 fade-in-0 duration-300"; 
+      return "animate-in slide-in-from-right-8 fade-in-0 duration-300";
     }
     if (currentQuestionIndex < previousQuestionIndex) {
-      return "animate-in slide-in-from-left-8 fade-in-0 duration-300"; 
+      return "animate-in slide-in-from-left-8 fade-in-0 duration-300";
     }
-    return ""; 
+    return "";
   };
 
 
@@ -351,8 +352,8 @@ export function QuizView({
     });
 
     return (
-      <Card 
-        ref={quizResultsTopRef} 
+      <Card
+        ref={quizResultsTopRef}
         className="w-full shadow-xl animate-in fade-in-50 slide-in-from-bottom-8 duration-500"
       >
         <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-2">
@@ -494,164 +495,166 @@ export function QuizView({
     );
   }
 
-  return (
-    <>
-    <Card className={cn("w-full shadow-xl", quizState === 'answering' && "animate-in fade-in-25 zoom-in-95 duration-500")}>
-      <CardHeader className="flex flex-row justify-between items-center pb-4">
-        <div className="flex items-center">
-          <BookOpen className="h-6 w-6 mr-2 text-primary" />
-          <CardTitle>PIRLS 線上測驗</CardTitle>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onExitQuiz} className="ml-auto">
-          <LogOut className="mr-2 h-4 w-4" />
-          退出測驗
-        </Button>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        {imagePreviews.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
-            <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
-              <div className="space-y-4">
-                {imagePreviews.map((src, index) => (
-                  <DialogTrigger asChild key={index}>
-                    <div
-                        className="relative aspect-auto cursor-pointer mb-4"
-                        onClick={() => handleQuizImageClick(src)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleQuizImageClick(src); } }}
-                        tabIndex={0}
-                        role="button"
-                        aria-label={`放大檢視閱讀圖片 ${index + 1}`}
-                      >
-                      <Image
-                        src={src}
-                        alt={`閱讀圖片 ${index + 1}`}
-                        width={800}
-                        height={600}
-                        className="w-full h-auto rounded-md object-contain"
-                        data-ai-hint="document scan"
-                      />
-                    </div>
-                  </DialogTrigger>
-                ))}
-              </div>
-              <ScrollBar orientation="vertical" />
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-          </div>
-        )}
-        <Separator />
-
-        <div 
-          key={currentQuestionIndex} 
-          className={cn("mt-6", getAnimationClass())}
-        >
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="text-lg font-semibold">
-              題目 {currentQuestionIndex + 1} / {questionsOutput.questions.length}
-            </h4>
-            {levelDetail && (
-              <Badge variant={levelDetail.badgeVariant} className={cn("text-xs", levelDetail.borderColorClass)}>
-                {levelDetail.icon && <levelDetail.icon className="h-3 w-3 mr-1.5" />}
-                {levelDetail.label}
-              </Badge>
-            )}
-          </div>
-
-          <div className="p-4 border rounded-lg bg-muted dark:bg-secondary shadow-md mb-6">
-             <p className="text-lg sm:text-xl font-semibold text-foreground">{currentQuestion.question}</p>
-          </div>
-
-          <RadioGroup
-            value={currentSelectedValue}
-            onValueChange={handleOptionChange}
-            className="space-y-2"
-            disabled={quizState !== 'answering'}
-          >
-            {currentQuestion.options.map((option, index) => {
-              const isSelected = selectedAnswers[currentQuestionIndex] === index;
-              return (
-                <div
-                  key={index}
-                  onClick={() => {
-                    if (quizState === 'answering') {
-                      handleOptionChange(index.toString());
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center space-x-3 p-3 border rounded-md transition-colors",
-                    quizState === 'answering' ? "cursor-pointer" : "cursor-default",
-                    isSelected
-                      ? "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
-                      : quizState === 'answering' ? "border-border hover:bg-accent/20 dark:hover:bg-accent/30" : "border-border"
-                  )}
-                >
-                  <RadioGroupItem
-                    value={index.toString()}
-                    id={`q${currentQuestionIndex}-opt${index}`}
-                    disabled={quizState !== 'answering'}
-                  />
-                  <Label
-                    htmlFor={`q${currentQuestionIndex}-opt${index}`}
-                    className={cn(
-                      "flex-1 text-sm",
-                      quizState === 'answering' ? "cursor-pointer" : "cursor-default"
-                    )}
-                  >
-                    <span className="font-semibold mr-1.5">{optionLabels[index]}.</span> {option}
-                  </Label>
-                </div>
-              );
-            })}
-          </RadioGroup>
-        </div>
-      </CardContent>
-
-      <CardFooter className="flex flex-col-reverse sm:flex-row justify-between items-center pt-6 space-y-2 sm:space-y-0">
-        <Button
-          variant="outline"
-          onClick={goToPreviousQuestion}
-          disabled={currentQuestionIndex === 0 || quizState !== 'answering'}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          上一題
-        </Button>
-        {currentQuestionIndex === questionsOutput.questions.length - 1 ? (
-          <Button
-            onClick={handleFinishQuiz}
-            disabled={quizState !== 'answering'}
-            className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 animate-bounce-subtle"
-          >
-            <CheckSquare className="mr-2 h-4 w-4" />
-            完成測驗
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            onClick={goToNextQuestion}
-            disabled={quizState !== 'answering'}
-            className="animate-bounce-subtle"
-          >
-            下一題
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-    <Dialog 
-        open={isQuizImageDialogOpen} 
+  // Main 'answering' state rendering
+  if (quizState === 'answering' && currentQuestion) {
+    return (
+      <Dialog
+        open={isQuizImageDialogOpen}
         onOpenChange={(isOpen) => {
             setIsQuizImageDialogOpen(isOpen);
             if (!isOpen) {
                 setSelectedQuizImageForDialog(null);
-                setDialogQuizImageScale(1); 
+                setDialogQuizImageScale(1);
                 setQuizImageOffset({ x: 0, y: 0 });
                 setIsQuizImagePanning(false);
             }
         }}
-    >
-        <DialogContent 
+      >
+        <Card className={cn("w-full shadow-xl", "animate-in fade-in-25 zoom-in-95 duration-500")}>
+          <CardHeader className="flex flex-row justify-between items-center pb-4">
+            <div className="flex items-center">
+              <BookOpen className="h-6 w-6 mr-2 text-primary" />
+              <CardTitle>PIRLS 線上測驗</CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onExitQuiz} className="ml-auto">
+              <LogOut className="mr-2 h-4 w-4" />
+              退出測驗
+            </Button>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            {imagePreviews.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
+                <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
+                  <div className="space-y-4">
+                    {imagePreviews.map((src, index) => (
+                      <DialogTrigger asChild key={index}>
+                        <div
+                            className="relative aspect-auto cursor-pointer mb-4"
+                            onClick={() => handleQuizImageClick(src)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleQuizImageClick(src); } }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`放大檢視閱讀圖片 ${index + 1}`}
+                          >
+                          <Image
+                            src={src}
+                            alt={`閱讀圖片 ${index + 1}`}
+                            width={800}
+                            height={600}
+                            className="w-full h-auto rounded-md object-contain"
+                            data-ai-hint="document scan"
+                          />
+                        </div>
+                      </DialogTrigger>
+                    ))}
+                  </div>
+                  <ScrollBar orientation="vertical" />
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+              </div>
+            )}
+            <Separator />
+
+            <div
+              key={currentQuestionIndex}
+              className={cn("mt-6", getAnimationClass())}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-lg font-semibold">
+                  題目 {currentQuestionIndex + 1} / {questionsOutput.questions.length}
+                </h4>
+                {levelDetail && (
+                  <Badge variant={levelDetail.badgeVariant} className={cn("text-xs", levelDetail.borderColorClass)}>
+                    {levelDetail.icon && <levelDetail.icon className="h-3 w-3 mr-1.5" />}
+                    {levelDetail.label}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="p-4 border rounded-lg bg-muted dark:bg-secondary shadow-md mb-6">
+                 <p className="text-lg sm:text-xl font-semibold text-foreground">{currentQuestion.question}</p>
+              </div>
+
+              <RadioGroup
+                value={currentSelectedValue}
+                onValueChange={handleOptionChange}
+                className="space-y-2"
+                disabled={quizState !== 'answering'}
+              >
+                {currentQuestion.options.map((option, index) => {
+                  const isSelected = selectedAnswers[currentQuestionIndex] === index;
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        if (quizState === 'answering') {
+                          handleOptionChange(index.toString());
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center space-x-3 p-3 border rounded-md transition-colors",
+                        quizState === 'answering' ? "cursor-pointer" : "cursor-default",
+                        isSelected
+                          ? "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
+                          : quizState === 'answering' ? "border-border hover:bg-accent/20 dark:hover:bg-accent/30" : "border-border"
+                      )}
+                    >
+                      <RadioGroupItem
+                        value={index.toString()}
+                        id={`q${currentQuestionIndex}-opt${index}`}
+                        disabled={quizState !== 'answering'}
+                      />
+                      <Label
+                        htmlFor={`q${currentQuestionIndex}-opt${index}`}
+                        className={cn(
+                          "flex-1 text-sm",
+                          quizState === 'answering' ? "cursor-pointer" : "cursor-default"
+                        )}
+                      >
+                        <span className="font-semibold mr-1.5">{optionLabels[index]}.</span> {option}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </RadioGroup>
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex flex-col-reverse sm:flex-row justify-between items-center pt-6 space-y-2 sm:space-y-0">
+            <Button
+              variant="outline"
+              onClick={goToPreviousQuestion}
+              disabled={currentQuestionIndex === 0 || quizState !== 'answering'}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              上一題
+            </Button>
+            {currentQuestionIndex === questionsOutput.questions.length - 1 ? (
+              <Button
+                onClick={handleFinishQuiz}
+                disabled={quizState !== 'answering'}
+                className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 animate-bounce-subtle"
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                完成測驗
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                onClick={goToNextQuestion}
+                disabled={quizState !== 'answering'}
+                className="animate-bounce-subtle"
+              >
+                下一題
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+
+        <DialogContent
             className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"
         >
             <DialogHeader className="sr-only">
@@ -659,21 +662,21 @@ export function QuizView({
                 <DialogDescription>詳細檢視閱讀文本圖片內容，可使用按鈕或滑鼠滾輪進行縮放，以及拖曳平移圖片。</DialogDescription>
             </DialogHeader>
             {selectedQuizImageForDialog && (
-            <div 
+            <div
                 ref={quizImageDisplayAreaRef}
                 className="relative w-full h-full flex justify-center items-center overflow-hidden"
-                onWheel={handleDialogQuizImageWheel} 
+                onWheel={handleDialogQuizImageWheel}
             >
                 <Image
                 src={selectedQuizImageForDialog}
                 alt="放大的閱讀圖片"
-                width={1200} 
+                width={1200}
                 height={800}
                 style={{
                     width: 'auto',
                     height: 'auto',
                     maxWidth: '100%',
-                    maxHeight: 'calc(85vh - 2rem - 40px)', 
+                    maxHeight: 'calc(85vh - 2rem - 40px)',
                     objectFit: 'contain',
                     transform: `scale(${dialogQuizImageScale}) translate(${quizImageOffset.x}px, ${quizImageOffset.y}px)`,
                     cursor: isQuizImagePanning ? 'grabbing' : (dialogQuizImageScale > 1 ? 'grab' : 'default'),
@@ -701,9 +704,14 @@ export function QuizView({
                 </Button>
             </div>
         </DialogContent>
-    </Dialog>
-    </>
+      </Dialog>
+    );
+  }
+
+  // Fallback or initial loading state if none of the above conditions are met
+  return (
+    <Card className="w-full shadow-xl flex items-center justify-center p-8">
+      <CardContent><p>載入中或狀態錯誤...</p></CardContent>
+    </Card>
   );
 }
-
-    
