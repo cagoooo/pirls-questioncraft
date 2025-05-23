@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
-interface QuestionCardProps {
+interface QuestionCardProps extends React.HTMLAttributes<HTMLDivElement> { // Accept HTMLDivAttributes
   questionItem: PirlsQuestion;
   questionNumber: number;
 }
@@ -26,12 +26,17 @@ const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; ic
 
 const optionLabels = ['A', 'B', 'C', 'D'];
 
-export function QuestionCard({ questionItem, questionNumber }: QuestionCardProps) {
+export function QuestionCard({ questionItem, questionNumber, className, style, ...props }: QuestionCardProps) {
   const levelDetail = pirlsLevelDetails[questionItem.pirlsLevel];
   const IconComponent = levelDetail.icon;
 
   return (
-    <AccordionItem value={`item-${questionNumber}`} className="border-b-0">
+    <AccordionItem 
+        value={`item-${questionNumber}`} 
+        className={cn("border-b-0", className)} // Combine with passed className
+        style={style} // Pass style
+        {...props} // Pass other HTMLDivAttributes
+    >
       <Card className={cn(
         "mb-4 shadow-md hover:shadow-lg transition-shadow duration-200 border-l-4",
         levelDetail.borderColorClass

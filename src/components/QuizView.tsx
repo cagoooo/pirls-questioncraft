@@ -117,7 +117,7 @@ export function QuizView({
       generatePreviews();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFiles, imageFilesDataURIs]); // Removed imagePreviews from dependency array as it is being set here
+  }, [imageFiles, imageFilesDataURIs]);
 
   useEffect(() => {
     if (quizState === 'results' && quizResults && quizResultsTopRef.current) {
@@ -128,7 +128,6 @@ export function QuizView({
     }
   }, [quizState, quizResults]);
 
-  // Update previousQuestionIndex when currentQuestionIndex changes
   useEffect(() => {
     setPreviousQuestionIndex(currentQuestionIndex);
   }, [currentQuestionIndex]);
@@ -146,14 +145,14 @@ export function QuizView({
 
   const goToNextQuestion = () => {
     if (currentQuestionIndex < questionsOutput.questions.length - 1) {
-      setPreviousQuestionIndex(currentQuestionIndex); // Set before updating current
+      setPreviousQuestionIndex(currentQuestionIndex); 
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setPreviousQuestionIndex(currentQuestionIndex); // Set before updating current
+      setPreviousQuestionIndex(currentQuestionIndex); 
       setCurrentQuestionIndex(prev => prev - 1); 
     }
   };
@@ -214,16 +213,16 @@ export function QuizView({
     : undefined;
 
   const getAnimationClass = () => {
-    if (previousQuestionIndex === null || previousQuestionIndex === currentQuestionIndex) { // Initial load or no change
+    if (previousQuestionIndex === null || previousQuestionIndex === currentQuestionIndex) { 
       return "animate-in fade-in-25 duration-300";
     }
     if (currentQuestionIndex > previousQuestionIndex) {
-      return "animate-in slide-in-from-right-8 fade-in-0 duration-300"; // Next question
+      return "animate-in slide-in-from-right-8 fade-in-0 duration-300"; 
     }
     if (currentQuestionIndex < previousQuestionIndex) {
-      return "animate-in slide-in-from-left-8 fade-in-0 duration-300"; // Previous question
+      return "animate-in slide-in-from-left-8 fade-in-0 duration-300"; 
     }
-    return ""; // Default no animation
+    return ""; 
   };
 
 
@@ -251,7 +250,10 @@ export function QuizView({
     });
 
     return (
-      <Card ref={quizResultsTopRef} className="w-full shadow-xl">
+      <Card 
+        ref={quizResultsTopRef} 
+        className="w-full shadow-xl animate-in fade-in-50 slide-in-from-bottom-8 duration-500"
+      >
         <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center">
             <CheckSquare className="h-7 w-7 mr-3 text-primary" />
@@ -392,7 +394,7 @@ export function QuizView({
   }
 
   return (
-    <Card className="w-full shadow-xl">
+    <Card className={cn("w-full shadow-xl", quizState === 'answering' && "animate-in fade-in-25 zoom-in-95 duration-500")}>
       <CardHeader className="flex flex-row justify-between items-center pb-4">
         <div className="flex items-center">
           <BookOpen className="h-6 w-6 mr-2 text-primary" />
@@ -429,8 +431,8 @@ export function QuizView({
         )}
         <Separator />
 
-        <div // This is the main wrapper for a single question's content
-          key={currentQuestionIndex} // Key to trigger re-render and animation
+        <div 
+          key={currentQuestionIndex} 
           className={cn("mt-6", getAnimationClass())}
         >
           <div className="flex justify-between items-center mb-2">
@@ -527,4 +529,5 @@ export function QuizView({
     </Card>
   );
 }
+
 

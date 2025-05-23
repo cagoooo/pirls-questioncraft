@@ -20,6 +20,7 @@ import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
@@ -55,13 +56,13 @@ export default function PIRLSQuestionCraftPage() {
   }, []);
 
   useEffect(() => {
-    if ((isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf) && fileProgressSectionRef.current) {
+    if ((isGeneratingPdf || isGeneratingExcel) && fileProgressSectionRef.current) {
       const timer = setTimeout(() => {
         fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100); 
       return () => clearTimeout(timer);
     }
-  }, [isGeneratingPdf, isGeneratingExcel, isGeneratingQuizResultsPdf]);
+  }, [isGeneratingPdf, isGeneratingExcel]);
 
   useEffect(() => {
     if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
@@ -198,7 +199,7 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [imageFiles, toast, loadingMessage]);
+  }, [imageFiles, toast]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -574,7 +575,7 @@ export default function PIRLSQuestionCraftPage() {
                 )}
             </div>
             
-            {isQuizActive && generatedQuestionsOutput && (imageFiles.length > 0 || (imageFiles.length === 0 && generatedQuestionsOutput.questions.length > 0 /* Allow quiz if only text was pasted and questions generated */)) ? (
+            {isQuizActive ? (
               <QuizView 
                 questionsOutput={generatedQuestionsOutput} 
                 imageFiles={imageFiles} 
@@ -587,7 +588,13 @@ export default function PIRLSQuestionCraftPage() {
             ) : (
               <Accordion type="single" collapsible className="w-full">
                 {generatedQuestionsOutput?.questions.map((q, index) => (
-                  <QuestionCard key={index} questionItem={q} questionNumber={index + 1} />
+                  <QuestionCard 
+                    key={index} 
+                    questionItem={q} 
+                    questionNumber={index + 1}
+                    className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500"
+                    style={{ animationDelay: `${index * 80}ms` }}
+                  />
                 ))}
               </Accordion>
             )}
@@ -624,3 +631,4 @@ export default function PIRLSQuestionCraftPage() {
 
 
     
+
