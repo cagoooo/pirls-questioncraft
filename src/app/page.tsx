@@ -119,11 +119,13 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     const currentImageFilesCount = imageFiles.length;
+    // Total steps: 1 (start) + N (extract per image) + 1 (combine) + 1 (generate questions) + 1 (success display)
     const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
     let completedSteps = 0;
 
     const updateDisplayProgress = (stepsDone: number, message: string) => {
       setLoadingMessage(message);
+      // Ensure progress calculation avoids division by zero if totalSteps somehow is 0
       const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
       setLoadingProgress(progress); 
     };
@@ -145,16 +147,18 @@ export default function PIRLSQuestionCraftPage() {
           if (extractionResult.success && extractionResult.extractedText) {
             extractedTextsArray.push(extractionResult.extractedText);
           } else {
+            // Log warning and show a non-critical toast for individual file failures
             console.warn(`Text extraction failed for ${file.name}: ${extractionResult.error || 'No text extracted or an error occurred'}`);
             toast({
               title: `圖片 "${file.name}" 處理提示`,
               description: extractionResult.error || '無法提取文字或圖片中無文字。',
-              variant: 'default', 
+              variant: 'default', // Using 'default' or a custom 'warning' variant
             });
           }
         }
       }
 
+      // Check if any text was extracted only if images were uploaded
       if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
         throw new Error('所有圖片中均未偵測到有效文字內容。');
       }
@@ -193,13 +197,16 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
+      // Update progress message to reflect where the error occurred
       const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
       updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
 
     } finally {
       setIsLoading(false);
+      // Don't set progress to 100 here, success path handles it.
+      // Error path shows error message with current progress.
     }
-  }, [imageFiles, toast]);
+  }, [imageFiles, toast, loadingMessage]); // Added loadingMessage to dep array for error message update
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -602,7 +609,9 @@ export default function PIRLSQuestionCraftPage() {
         )}
       </main>
       
-      <footer className="w-full max-w-3xl mt-16 mb-8 p-6 bg-muted dark:bg-card rounded-xl shadow-lg text-center text-base text-muted-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-secondary dark:hover:bg-muted">
+      <footer
+        className="w-full max-w-3xl mt-16 mb-8 p-6 bg-foreground dark:bg-background rounded-xl shadow-lg text-center text-base text-background dark:text-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-foreground/90 dark:hover:bg-background/90"
+      >
         <p className="leading-relaxed">
           &copy; {currentYear ? currentYear : ''}{' '}
           <a 
@@ -631,4 +640,6 @@ export default function PIRLSQuestionCraftPage() {
 
 
     
+
+
 
