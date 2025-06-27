@@ -19,7 +19,7 @@ import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ProgressCallback = (progress: number, message: string) => void;
@@ -627,6 +627,17 @@ export default function PIRLSQuestionCraftPage() {
           </a>
         </p>
       </footer>
+
+      <a
+        href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 flex items-center gap-2 h-12 px-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-yellow-400 transition-all duration-300 ease-in-out transform hover:scale-105"
+      >
+        <Sparkles className="h-5 w-5" />
+        <span className="text-sm">點『石』成金🐝(評語優化)</span>
+      </a>
+
     </div>
   );
 }
@@ -646,6 +657,9 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+
+    
 
 
     
