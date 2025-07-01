@@ -405,7 +405,7 @@ export default function PIRLSQuestionCraftPage() {
           <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
             <CardHeader>
               <CardTitle className="text-xl font-semibold flex items-center"><Blocks className="mr-2 h-5 w-5 text-primary" />選擇題組模式</CardTitle>
-              <CardDescription>選擇您希望 AI 生成的題目數量與組合，以符合不同的評量需求。</CardDescription>
+              <CardDescription>選擇您希望 APP 生成的題目數量與組合，以符合不同的評量需求。</CardDescription>
             </CardHeader>
             <CardContent>
               <RadioGroup
