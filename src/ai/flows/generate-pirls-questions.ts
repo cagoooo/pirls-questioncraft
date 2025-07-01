@@ -12,12 +12,20 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+// This is the schema for the input that the UI will provide.
 const GeneratePirlsQuestionsInputSchema = z.object({
   extractedText: z
     .string()
     .describe('從上傳圖片中提取的文字內容。'),
+  questionMode: z.enum(['8-questions', '10-questions']).describe('選擇要生成的題組模式：8題或10題。'),
 });
 export type GeneratePirlsQuestionsInput = z.infer<typeof GeneratePirlsQuestionsInputSchema>;
+
+// This is the internal schema used by the prompt itself.
+const InternalPromptInputSchema = z.object({
+  extractedText: z.string(),
+  is10QuestionMode: z.boolean(),
+});
 
 const PirlsQuestionSchema = z.object({
   question: z.string().describe('問題的文字內容。'),
@@ -36,9 +44,8 @@ const PirlsQuestionSchema = z.object({
 });
 
 const GeneratePirlsQuestionsOutputSchema = z.object({
-  questions: z.array(PirlsQuestionSchema).length(8).describe('八個PIRLS風格的選擇題。'),
+  questions: z.array(PirlsQuestionSchema).describe('一個PIRLS風格的選擇題陣列。'),
 });
-
 export type GeneratePirlsQuestionsOutput = z.infer<typeof GeneratePirlsQuestionsOutputSchema>;
 
 export async function generatePirlsQuestions(
@@ -49,18 +56,27 @@ export async function generatePirlsQuestions(
 
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsPrompt',
-  input: {schema: GeneratePirlsQuestionsInputSchema},
+  input: {schema: InternalPromptInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
   prompt: `您是一位專門為PIRLS（國際閱讀素養進展研究）閱讀理解評估設計題目的專家。
 
-您的任務是根據提供的文本生成八個選擇題。每個問題都應符合PIRLS四個閱讀素養層次之一：
+您的任務是根據提供的文本生成選擇題。每個問題都應符合PIRLS四個閱讀素養層次之一：
 
 1.  訊息提取與檢索（Locate and Retrieve）：這類問題要求學生在文本中找到明確陳述的資訊。
 2.  直接推論（Make Straightforward Inferences）：這類問題要求學生根據文本中呈現的資訊做出簡單的結論。
 3.  詮釋與整合（Interpret and Integrate）：這類問題要求學生結合文本不同部分的資訊來理解作者的含義或目的。
 4.  評估與批判（Evaluate and Critique）：這類問題挑戰學生評估文本的品質和可信度。
 
-您必須為每個PIRLS層次生成兩個問題，總共八個問題。
+{{#if is10QuestionMode}}
+您必須根據以下分佈生成 **十個** 問題：
+- **訊息提取與檢索**: 3 題
+- **直接推論**: 3 題
+- **詮釋與整合**: 2 題
+- **評估與批判**: 2 題
+總共十題。
+{{else}}
+您必須為每個PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
+{{/if}}
 
 每個問題必須有四個答案選項，其中只有一個是正確答案。請提供正確答案的索引（0-3）。
 
@@ -81,8 +97,13 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
     inputSchema: GeneratePirlsQuestionsInputSchema,
     outputSchema: GeneratePirlsQuestionsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input) => {
+    // Map the public input to the internal prompt's input format
+    const promptInput = {
+      extractedText: input.extractedText,
+      is10QuestionMode: input.questionMode === '10-questions',
+    };
+    const {output} = await prompt(promptInput);
     return output!;
   }
 );

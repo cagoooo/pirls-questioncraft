@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Accordion } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
@@ -19,13 +19,16 @@ import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
@@ -169,7 +172,10 @@ export default function PIRLSQuestionCraftPage() {
       
       completedSteps++;
       updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
-      const questionsResult = await generatePirlsQuestions({ extractedText: combinedText });
+      const questionsResult = await generatePirlsQuestions({
+        extractedText: combinedText,
+        questionMode,
+      });
       
       if (questionsResult && questionsResult.questions) {
         completedSteps++;
@@ -206,7 +212,7 @@ export default function PIRLSQuestionCraftPage() {
       // Don't set progress to 100 here, success path handles it.
       // Error path shows error message with current progress.
     }
-  }, [imageFiles, toast, loadingMessage]); // Added loadingMessage to dep array for error message update
+  }, [imageFiles, toast, loadingMessage, questionMode]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -396,6 +402,52 @@ export default function PIRLSQuestionCraftPage() {
         )}
 
         {!isQuizActive && (
+          <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold flex items-center"><Blocks className="mr-2 h-5 w-5 text-primary" />選擇題組模式</CardTitle>
+              <CardDescription>選擇您希望 AI 生成的題目數量與組合，以符合不同的評量需求。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={questionMode}
+                onValueChange={(value) => {
+                  if (!isLoading) setQuestionMode(value as '8-questions' | '10-questions');
+                }}
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf}
+              >
+                <div>
+                  <RadioGroupItem value="8-questions" id="mode-8" className="peer sr-only" />
+                  <Label
+                    htmlFor="mode-8"
+                    className={cn(
+                      "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                      isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                    )}
+                  >
+                    <span className="mb-2 block text-base font-semibold">標準模式 (8題)</span>
+                    <p className="text-sm text-muted-foreground">各PIRLS層次各2題，適合標準評量。</p>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="10-questions" id="mode-10" className="peer sr-only" />
+                  <Label
+                    htmlFor="mode-10"
+                    className={cn(
+                      "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                      isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                    )}
+                  >
+                    <span className="mb-2 block text-base font-semibold">延伸模式 (10題)</span>
+                    <p className="text-sm text-muted-foreground">強化基礎能力：訊息提取與直接推論各3題。</p>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isQuizActive && (
           <Button
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
@@ -466,7 +518,7 @@ export default function PIRLSQuestionCraftPage() {
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
                 <h2 className="text-2xl font-semibold text-center flex items-center justify-center">
                   <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-                  {isQuizActive ? "PIRLS 線上測驗" : "為您生成的PIRLS題目"}
+                  {isQuizActive ? "PIRLS 線上測驗" : `為您生成的PIRLS題目 (${generatedQuestionsOutput.questions.length}題)`}
                 </h2>
                 {!isQuizActive && (
                   <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
@@ -494,9 +546,9 @@ export default function PIRLSQuestionCraftPage() {
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
                             <DialogTitle>分享您的測驗</DialogTitle>
-                            <DialogDescription>
+                            <DialogDesc>
                               透過以下臨時連結或QR Code分享此測驗給學生。
-                            </DialogDescription>
+                            </DialogDesc>
                           </DialogHeader>
                           <div className="space-y-4 py-2">
                             {isSharingQuiz && (
