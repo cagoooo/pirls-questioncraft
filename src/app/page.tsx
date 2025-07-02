@@ -25,6 +25,60 @@ import { Label } from '@/components/ui/label';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
+/**
+ * Resizes an image file to a maximum dimension while maintaining aspect ratio
+ * and converts it to a JPEG data URI for optimization.
+ * @param file The image file to resize.
+ * @param maxSize The maximum width or height of the image.
+ * @returns A promise that resolves with the data URI of the resized image.
+ */
+const resizeImage = (file: File, maxSize: number = 2048): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (!e.target?.result) {
+        return reject(new Error("FileReader did not return a result."));
+      }
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Calculate the new dimensions
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          return reject(new Error('Failed to get canvas 2D context.'));
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert canvas to JPEG data URI for better compression
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.onerror = (err) => reject(err);
+      img.src = e.target.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+};
+
+
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
@@ -75,16 +129,6 @@ export default function PIRLSQuestionCraftPage() {
     }
   }, [isGeneratingQuizResultsPdf]);
 
-
-  const convertFileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleImageFilesChange = useCallback((files: File[]) => {
     setImageFiles(files);
     setGeneratedQuestionsOutput(null);
@@ -128,8 +172,8 @@ export default function PIRLSQuestionCraftPage() {
     updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      updateDisplayProgress(20, '正在處理圖片並直接生成PIRLS題目...');
-      const photoDataUris = await Promise.all(imageFiles.map(convertFileToDataUri));
+      updateDisplayProgress(20, '正在壓縮與處理圖片...');
+      const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
 
       if (photoDataUris.length === 0) {
         throw new Error('無法處理圖片，請確認檔案是否正確。');
@@ -276,7 +320,7 @@ export default function PIRLSQuestionCraftPage() {
     setIsShareDialogOpen(true); // Open dialog to show loading/link
 
     try {
-      const imageFilesDataURIs = await Promise.all(imageFiles.map(file => convertFileToDataUri(file)));
+      const imageFilesDataURIs = await Promise.all(imageFiles.map(file => resizeImage(file)));
       const response = await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -674,3 +718,6 @@ export default function PIRLSQuestionCraftPage() {
     
 
 
+
+
+    
