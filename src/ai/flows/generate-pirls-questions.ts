@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview Generates PIRLS-style multiple-choice questions based on text extracted from images.
+ * @fileOverview Generates PIRLS-style multiple-choice questions based on image content.
  *
  * - generatePirlsQuestions - A function that generates PIRLS questions.
  * - GeneratePirlsQuestionsInput - The input type for the generatePirlsQuestions function.
