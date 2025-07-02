@@ -14,18 +14,12 @@ import {z} from 'genkit';
 
 // This is the schema for the input that the UI will provide.
 const GeneratePirlsQuestionsInputSchema = z.object({
-  extractedText: z
-    .string()
-    .describe('從上傳圖片中提取的文字內容。'),
+  photoDataUris: z.array(z.string()).describe(
+    "An array of photos of the text to be used, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+  ),
   questionMode: z.enum(['8-questions', '10-questions']).describe('選擇要生成的題組模式：8題或10題。'),
 });
 export type GeneratePirlsQuestionsInput = z.infer<typeof GeneratePirlsQuestionsInputSchema>;
-
-// This is the internal schema used by the prompt itself.
-const InternalPromptInputSchema = z.object({
-  extractedText: z.string(),
-  is10QuestionMode: z.boolean(),
-});
 
 const PirlsQuestionSchema = z.object({
   question: z.string().describe('問題的文字內容。'),
@@ -56,11 +50,11 @@ export async function generatePirlsQuestions(
 
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsPrompt',
-  input: {schema: InternalPromptInputSchema},
+  input: {schema: GeneratePirlsQuestionsInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
   prompt: `您是一位專門為PIRLS（國際閱讀素養進展研究）閱讀理解評估設計題目的專家。
 
-您的任務是根據提供的文本生成選擇題。每個問題都應符合PIRLS四個閱讀素養層次之一：
+您的任務是根據提供的圖片內容生成選擇題。每個問題都應符合PIRLS四個閱讀素養層次之一：
 
 1.  訊息提取與檢索（Locate and Retrieve）：這類問題要求學生在文本中找到明確陳述的資訊。
 2.  直接推論（Make Straightforward Inferences）：這類問題要求學生根據文本中呈現的資訊做出簡單的結論。
@@ -84,8 +78,8 @@ const prompt = ai.definePrompt({
 
 每個問題還必須標明其PIRLS層次（pirlsLevel）。
 
-提供的文本內容如下：
-{{extractedText}}
+提供的圖片內容如下：
+{{#each photoDataUris}}{{media url=this}}{{/each}}
 
 請確保輸出的結果是一個有效的JSON物件，且其結構需符合指定的輸出結構描述。
   `,
@@ -98,12 +92,10 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
     outputSchema: GeneratePirlsQuestionsOutputSchema,
   },
   async (input) => {
-    // Map the public input to the internal prompt's input format
-    const promptInput = {
-      extractedText: input.extractedText,
-      is10QuestionMode: input.questionMode === '10-questions',
-    };
-    const {output} = await prompt(promptInput);
+    const {output} = await prompt({
+      ...input,
+      is10QuestionMode: input.questionMode === '10-questions'
+    });
     return output!;
   }
 );

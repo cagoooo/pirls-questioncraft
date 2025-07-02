@@ -13,7 +13,6 @@ import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
-import { extractTextFromImage, type ExtractTextFromImageOutput } from '@/ai/flows/extract-text-from-image';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
@@ -112,74 +111,38 @@ export default function PIRLSQuestionCraftPage() {
     }
 
     setIsLoading(true);
-    setError(null); 
-    setGeneratedQuestionsOutput(null); 
+    setError(null);
+    setGeneratedQuestionsOutput(null);
     setIsQuizActive(false);
     setCurrentShareLink('');
-    
+
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
 
-    const currentImageFilesCount = imageFiles.length;
-    // Total steps: 1 (start) + N (extract per image) + 1 (combine) + 1 (generate questions) + 1 (success display)
-    const totalSteps = 1 + currentImageFilesCount + 1 + 1 + 1; 
-    let completedSteps = 0;
-
-    const updateDisplayProgress = (stepsDone: number, message: string) => {
+    const updateDisplayProgress = (progress: number, message: string) => {
       setLoadingMessage(message);
-      // Ensure progress calculation avoids division by zero if totalSteps somehow is 0
-      const progress = totalSteps > 0 ? Math.max(0, Math.min(100, (stepsDone / totalSteps) * 100)) : 0;
-      setLoadingProgress(progress); 
+      setLoadingProgress(progress);
     };
-    
-    completedSteps++;
-    updateDisplayProgress(completedSteps, '準備開始處理...'); 
+
+    updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      const extractedTextsArray: string[] = [];
-      if (currentImageFilesCount > 0) {
-        for (let i = 0; i < currentImageFilesCount; i++) {
-          const file = imageFiles[i]; 
-          completedSteps++;
-          updateDisplayProgress(completedSteps, `提取 "${file.name}" 中的文字... (${i + 1}/${currentImageFilesCount})`);
-          
-          const photoDataUri = await convertFileToDataUri(file);
-          const extractionResult: ExtractTextFromImageOutput = await extractTextFromImage({ photoDataUri });
-          
-          if (extractionResult.success && extractionResult.extractedText) {
-            extractedTextsArray.push(extractionResult.extractedText);
-          } else {
-            // Log warning and show a non-critical toast for individual file failures
-            console.warn(`Text extraction failed for ${file.name}: ${extractionResult.error || 'No text extracted or an error occurred'}`);
-            toast({
-              title: `圖片 "${file.name}" 處理提示`,
-              description: extractionResult.error || '無法提取文字或圖片中無文字。',
-              variant: 'default', // Using 'default' or a custom 'warning' variant
-            });
-          }
-        }
+      updateDisplayProgress(20, '處理圖片中...');
+      const photoDataUris = await Promise.all(imageFiles.map(convertFileToDataUri));
+
+      if (photoDataUris.length === 0) {
+        throw new Error('無法處理圖片，請確認檔案是否正確。');
       }
 
-      // Check if any text was extracted only if images were uploaded
-      if (currentImageFilesCount > 0 && extractedTextsArray.length === 0) {
-        throw new Error('所有圖片中均未偵測到有效文字內容。');
-      }
-      
-      completedSteps++;
-      updateDisplayProgress(completedSteps, '整合文字內容...');
-      const combinedText = extractedTextsArray.join('\n\n---\n\n');
-      
-      completedSteps++;
-      updateDisplayProgress(completedSteps, '開始生成PIRLS題目...');
+      updateDisplayProgress(50, '開始生成PIRLS題目...');
       const questionsResult = await generatePirlsQuestions({
-        extractedText: combinedText,
+        photoDataUris,
         questionMode,
       });
-      
+
       if (questionsResult && questionsResult.questions) {
-        completedSteps++;
-        updateDisplayProgress(completedSteps, '題目已成功生成！'); 
+        updateDisplayProgress(100, '題目已成功生成！');
         setGeneratedQuestionsOutput(questionsResult);
         toast({
           title: '成功！',
@@ -193,7 +156,6 @@ export default function PIRLSQuestionCraftPage() {
       } else {
         throw new Error('APP未能成功生成題目。');
       }
-
     } catch (err: any) {
       console.error("生成題目時發生錯誤:", err);
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
@@ -203,16 +165,11 @@ export default function PIRLSQuestionCraftPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Update progress message to reflect where the error occurred
-      const currentProgressMessage = loadingMessage.split('...')[0] || '處理';
-      updateDisplayProgress(completedSteps, `${currentProgressMessage}時發生錯誤`);
-
+      updateDisplayProgress(loadingProgress, '處理時發生錯誤');
     } finally {
       setIsLoading(false);
-      // Don't set progress to 100 here, success path handles it.
-      // Error path shows error message with current progress.
     }
-  }, [imageFiles, toast, loadingMessage, questionMode]);
+  }, [imageFiles, toast, questionMode, loadingProgress]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -715,3 +672,4 @@ export default function PIRLSQuestionCraftPage() {
 
 
     
+
