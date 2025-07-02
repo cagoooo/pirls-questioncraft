@@ -15,7 +15,7 @@ import {z} from 'genkit';
 // This is the schema for the input that the UI will provide.
 const GeneratePirlsQuestionsInputSchema = z.object({
   photoDataUris: z.array(z.string()).describe(
-    "An array of photos of the text to be used, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    "An array of photos of the text to be used, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
   ),
   questionMode: z.enum(['8-questions', '10-questions']).describe('選擇要生成的題組模式：8題或10題。'),
 });

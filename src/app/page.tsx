@@ -128,14 +128,14 @@ export default function PIRLSQuestionCraftPage() {
     updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      updateDisplayProgress(20, '處理圖片中...');
+      updateDisplayProgress(20, '正在處理圖片並直接生成PIRLS題目...');
       const photoDataUris = await Promise.all(imageFiles.map(convertFileToDataUri));
 
       if (photoDataUris.length === 0) {
         throw new Error('無法處理圖片，請確認檔案是否正確。');
       }
 
-      updateDisplayProgress(50, '開始生成PIRLS題目...');
+      updateDisplayProgress(50, 'AI 正在分析圖片並設計題目...');
       const questionsResult = await generatePirlsQuestions({
         photoDataUris,
         questionMode,
@@ -672,4 +672,5 @@ export default function PIRLSQuestionCraftPage() {
 
 
     
+
 
