@@ -37,6 +37,8 @@ const PirlsQuestionSchema = z.object({
     .describe('問題對應的PIRLS閱讀素養層次。'),
 });
 
+type PirlsQuestion = z.infer<typeof PirlsQuestionSchema>;
+
 const GeneratePirlsQuestionsOutputSchema = z.object({
   questions: z.array(PirlsQuestionSchema).describe('一個PIRLS風格的選擇題陣列。'),
 });
@@ -96,6 +98,21 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
       ...input,
       is10QuestionMode: input.questionMode === '10-questions'
     });
+
+    // Sort the questions by PIRLS level to ensure a consistent order from easy to hard.
+    if (output && output.questions) {
+      const pirlsLevelOrder: Record<PirlsQuestion['pirlsLevel'], number> = {
+        'locate & retrieve': 1,
+        'make straightforward inferences': 2,
+        'interpret & integrate': 3,
+        'evaluate & critique': 4,
+      };
+
+      output.questions.sort((a, b) => {
+        return pirlsLevelOrder[a.pirlsLevel] - pirlsLevelOrder[b.pirlsLevel];
+      });
+    }
+    
     return output!;
   }
 );
