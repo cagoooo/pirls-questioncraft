@@ -18,7 +18,7 @@ import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -682,6 +682,16 @@ export default function PIRLSQuestionCraftPage() {
       </footer>
 
       <a
+        href="https://document-ai-companion-ipad4.replit.app"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-4 left-4 sm:bottom-8 sm:left-8 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105"
+      >
+        <Bot className="h-5 w-5" />
+        <span className="text-sm">創建專屬助手🦄</span>
+      </a>
+
+      <a
         href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
         target="_blank"
         rel="noopener noreferrer"
@@ -719,5 +729,7 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
