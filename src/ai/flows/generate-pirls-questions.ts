@@ -18,6 +18,7 @@ const GeneratePirlsQuestionsInputSchema = z.object({
     "An array of photos of the text to be used, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
   ),
   questionMode: z.enum(['8-questions', '10-questions']).describe('選擇要生成的題組模式：8題或10題。'),
+  languageMode: z.enum(['zh-TW', 'en']).describe('選擇題目與選項的語言：繁體中文或英文。'),
 });
 export type GeneratePirlsQuestionsInput = z.infer<typeof GeneratePirlsQuestionsInputSchema>;
 
@@ -69,6 +70,15 @@ const prompt = ai.definePrompt({
 您必須為每個PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
 {{/if}}
 
+**語言模式指令 (Language Mode Instruction):**
+{{#if isEnglishMode}}
+- **題目和選項語言 (Question and Options Language)**: 您必須以**「英文」**撰寫所有的 "question" 和 "options" 欄位。
+- **解題引導語言 (Explanation Language)**: "explanation" 欄位**「必須」**使用**「繁體中文（台灣常用語彙）」**撰寫。
+{{else}}
+- **所有欄位語言 (All Fields Language)**: 所有欄位，包括 "question", "options", 和 "explanation"，都必須使用**「繁體中文（台灣常用語彙）」**撰寫。
+{{/if}}
+
+
 **重要指令：**
 1.  **內容整合**：當提供多張圖片時，請將它們視為一個**連續、完整的文本**。您生成的題組必須全面涵蓋**所有圖片**的內容，避免只專注於其中一兩張。請確保各層次的問題能適當地分佈在整個文本脈絡中。
 2.  **題幹品質**：問題設計需專業，緊密圍繞圖片的核心資訊、細節、主題或觀點。
@@ -97,7 +107,8 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
   async (input) => {
     const {output} = await prompt({
       ...input,
-      is10QuestionMode: input.questionMode === '10-questions'
+      is10QuestionMode: input.questionMode === '10-questions',
+      isEnglishMode: input.languageMode === 'en',
     });
 
     // Sort the questions by PIRLS level to ensure a consistent order from easy to hard.

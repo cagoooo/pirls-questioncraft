@@ -18,7 +18,7 @@ import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -82,6 +82,7 @@ const resizeImage = (file: File, maxSize: number = 2048): Promise<string> => {
 export default function PIRLSQuestionCraftPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
+  const [languageMode, setLanguageMode] = useState<'zh-TW' | 'en'>('zh-TW');
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
@@ -183,6 +184,7 @@ export default function PIRLSQuestionCraftPage() {
       const questionsResult = await generatePirlsQuestions({
         photoDataUris,
         questionMode,
+        languageMode,
       });
 
       if (questionsResult && questionsResult.questions) {
@@ -213,7 +215,7 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [imageFiles, toast, questionMode, loadingProgress]);
+  }, [imageFiles, toast, questionMode, languageMode, loadingProgress]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -403,49 +405,95 @@ export default function PIRLSQuestionCraftPage() {
         )}
 
         {!isQuizActive && (
-          <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold flex items-center"><Blocks className="mr-2 h-5 w-5 text-primary" />選擇題組模式</CardTitle>
-              <CardDescription>選擇您希望 APP 生成的題目數量與組合，以符合不同的評量需求。</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={questionMode}
-                onValueChange={(value) => {
-                  if (!isLoading) setQuestionMode(value as '8-questions' | '10-questions');
-                }}
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf}
-              >
-                <div>
-                  <RadioGroupItem value="8-questions" id="mode-8" className="peer sr-only" />
-                  <Label
-                    htmlFor="mode-8"
-                    className={cn(
-                      "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                      isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                    )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold flex items-center"><Blocks className="mr-2 h-5 w-5 text-primary" />題組模式</CardTitle>
+                <CardDescription>選擇您希望 APP 生成的題目數量與組合。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup
+                  value={questionMode}
+                  onValueChange={(value) => {
+                    if (!isLoading) setQuestionMode(value as '8-questions' | '10-questions');
+                  }}
+                  className="grid grid-cols-1 gap-4"
+                  disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf}
+                >
+                  <div>
+                    <RadioGroupItem value="8-questions" id="mode-8" className="peer sr-only" />
+                    <Label
+                      htmlFor="mode-8"
+                      className={cn(
+                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      )}
+                    >
+                      <span className="mb-2 block text-base font-semibold">標準模式 (8題)</span>
+                      <p className="text-sm text-muted-foreground">各PIRLS層次各2題，適合標準評量。</p>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="10-questions" id="mode-10" className="peer sr-only" />
+                    <Label
+                      htmlFor="mode-10"
+                      className={cn(
+                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      )}
+                    >
+                      <span className="mb-2 block text-base font-semibold">延伸模式 (10題)</span>
+                      <p className="text-sm text-muted-foreground">強化基礎能力：訊息提取與直接推論各3題。</p>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+
+            <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-100">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold flex items-center"><Languages className="mr-2 h-5 w-5 text-primary" />語言模式</CardTitle>
+                <CardDescription>選擇題目與選項的語言，詳解將維持中文。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                 <RadioGroup
+                    value={languageMode}
+                    onValueChange={(value) => {
+                      if (!isLoading) setLanguageMode(value as 'zh-TW' | 'en');
+                    }}
+                    className="grid grid-cols-1 gap-4"
+                    disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf}
                   >
-                    <span className="mb-2 block text-base font-semibold">標準模式 (8題)</span>
-                    <p className="text-sm text-muted-foreground">各PIRLS層次各2題，適合標準評量。</p>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem value="10-questions" id="mode-10" className="peer sr-only" />
-                  <Label
-                    htmlFor="mode-10"
-                    className={cn(
-                      "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                      isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                    )}
-                  >
-                    <span className="mb-2 block text-base font-semibold">延伸模式 (10題)</span>
-                    <p className="text-sm text-muted-foreground">強化基礎能力：訊息提取與直接推論各3題。</p>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </CardContent>
-          </Card>
+                  <div>
+                    <RadioGroupItem value="zh-TW" id="lang-zh" className="peer sr-only" />
+                    <Label
+                      htmlFor="lang-zh"
+                      className={cn(
+                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      )}
+                    >
+                      <span className="mb-2 block text-base font-semibold">繁體中文</span>
+                      <p className="text-sm text-muted-foreground">所有內容均以繁體中文呈現。</p>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="en" id="lang-en" className="peer sr-only" />
+                    <Label
+                      htmlFor="lang-en"
+                      className={cn(
+                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
+                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                      )}
+                    >
+                      <span className="mb-2 block text-base font-semibold">English</span>
+                      <p className="text-sm text-muted-foreground">題目與選項為英文，適合英語閱讀測驗。</p>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {!isQuizActive && (
