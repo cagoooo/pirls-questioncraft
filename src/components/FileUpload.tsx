@@ -42,13 +42,33 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   const processNewFiles = useCallback((newFilesArray: File[]) => {
     if (isLoading) return;
 
-    const currentFileCount = selectedFiles.length;
-    const filesToAdd = newFilesArray.slice(0, 4 - currentFileCount);
+    // Filter out TIFF files and notify user
+    const supportedFiles = newFilesArray.filter(file => !file.type.includes('tiff'));
+    const tiffFilesCount = newFilesArray.length - supportedFiles.length;
 
-    if (newFilesArray.length > filesToAdd.length) {
+    if (tiffFilesCount > 0) {
+        toast({
+            title: '不支援的檔案格式',
+            description: `偵測到 ${tiffFilesCount} 個 TIFF 檔案。此格式不被支援，請轉換為 JPG, PNG, WEBP 或 HEIC 格式後再試。`,
+            variant: 'destructive',
+            duration: 7000,
+        });
+    }
+    
+    if (supportedFiles.length === 0) {
+        if (newFilesArray.length > 0) { // This means all files were filtered out
+             // The TIFF toast is already shown
+        }
+        return;
+    }
+
+    const currentFileCount = selectedFiles.length;
+    const filesToAdd = supportedFiles.slice(0, 4 - currentFileCount);
+
+    if (supportedFiles.length > filesToAdd.length) {
         toast({
             title: '上傳限制',
-            description: `最多只能選擇 4 張圖片。您嘗試加入 ${newFilesArray.length} 張，但只能再加入 ${filesToAdd.length} 張。`,
+            description: `最多只能選擇 4 張圖片。您嘗試加入 ${supportedFiles.length} 張，但只能再加入 ${filesToAdd.length} 張。`,
             variant: 'destructive',
         });
     }
@@ -108,6 +128,14 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
       if (item.type.indexOf('image') !== -1) {
         const blob = item.getAsFile();
         if (blob) {
+          if (blob.type.includes('tiff')) {
+             toast({
+                title: '不支援的格式',
+                description: '無法貼上 TIFF 圖片。請使用 JPG, PNG 等格式。',
+                variant: 'destructive',
+             });
+             continue; // Skip TIFF files
+          }
           const extension = blob.type.split('/')[1] || 'png';
           const fileName = `pasted-image-${Date.now()}.${extension}`;
           const file = new File([blob], fileName, { type: blob.type });
@@ -316,7 +344,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             <ImagePlus className="h-6 w-6 text-primary" />
             上傳圖片
           </CardTitle>
-          <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG, TIFF），或截圖貼上圖片。</CardDescription>
+          <CardDescription>請選擇 1 至 4 張圖片（建議使用 JPG, PNG, WEBP, HEIC），或直接貼上螢幕截圖。</CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="space-y-6">
@@ -373,7 +401,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 id="imageUpload"
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,image/tiff"
+                accept="image/*"
                 multiple
                 onChange={handleFileChange}
                 disabled={isLoading || !canUploadMore}
@@ -491,3 +519,4 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   );
 }
 
+    
