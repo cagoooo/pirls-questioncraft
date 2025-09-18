@@ -203,7 +203,7 @@ export default function PIRLSQuestionCraftPage() {
         throw new Error('APP未能成功生成題目。');
       }
     } catch (err: any) {
-      console.error("生成題目時發生錯誤:", err);
+      console.error("生成題目時發生錯誤:", err.message, err.stack);
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
       setError(errorMessage);
       toast({
