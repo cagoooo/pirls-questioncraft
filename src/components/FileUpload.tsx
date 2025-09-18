@@ -316,7 +316,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             <ImagePlus className="h-6 w-6 text-primary" />
             上傳圖片
           </CardTitle>
-          <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG），或截圖貼上圖片。</CardDescription>
+          <CardDescription>請選擇 1 至 4 張包含文字的圖片（例如：JPG, PNG, TIFF），或截圖貼上圖片。</CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
           <div className="space-y-6">
@@ -373,7 +373,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 id="imageUpload"
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,image/tiff"
                 multiple
                 onChange={handleFileChange}
                 disabled={isLoading || !canUploadMore}
