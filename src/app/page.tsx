@@ -762,7 +762,8 @@ export default function PIRLSQuestionCraftPage() {
             {isQuizActive ? (
               <QuizView 
                 questionsOutput={generatedQuestionsOutput} 
-                imageFiles={imageFiles} 
+                imageFiles={imageFiles}
+                inputText={inputText}
                 onExitQuiz={handleExitQuiz}
                 toast={toast}
                 showFileGenerationProgress={handleShowQuizResultsPdfProgress}
@@ -850,6 +851,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 

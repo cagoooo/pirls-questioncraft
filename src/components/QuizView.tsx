@@ -35,6 +35,7 @@ interface QuizViewProps {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFiles: File[];
   imageFilesDataURIs?: string[];
+  inputText?: string;
   studentInfo?: StudentInfo;
   onExitQuiz: () => void;
   toast: typeof Toast;
@@ -72,6 +73,7 @@ export function QuizView({
   questionsOutput,
   imageFiles,
   imageFilesDataURIs,
+  inputText,
   studentInfo,
   onExitQuiz,
   toast,
@@ -496,17 +498,20 @@ export function QuizView({
 
   // Main 'answering' state rendering
   if (quizState === 'answering' && currentQuestion) {
+    const hasImages = imagePreviews.length > 0;
+    const hasText = inputText && inputText.trim().length > 0;
+
     return (
       <Dialog
         open={isQuizImageDialogOpen}
         onOpenChange={(isOpen) => {
-            setIsQuizImageDialogOpen(isOpen);
             if (!isOpen) {
                 setSelectedQuizImageForDialog(null);
                 setDialogQuizImageScale(1);
                 setQuizImageOffset({ x: 0, y: 0 });
                 setIsQuizImagePanning(false);
             }
+            setIsQuizImageDialogOpen(isOpen);
         }}
       >
         <Card className={cn("w-full shadow-xl", "animate-in fade-in-25 zoom-in-95 duration-500")}>
@@ -522,33 +527,37 @@ export function QuizView({
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {imagePreviews.length > 0 && (
+             {(hasImages || hasText) && (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
                 <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
-                  <div className="space-y-4">
-                    {imagePreviews.map((src, index) => (
-                      <DialogTrigger asChild key={index}>
-                        <div
-                            className="relative aspect-auto cursor-pointer mb-4"
-                            onClick={() => handleQuizImageClick(src)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleQuizImageClick(src); } }}
-                            tabIndex={0}
-                            role="button"
-                            aria-label={`放大檢視閱讀圖片 ${index + 1}`}
-                          >
-                          <Image
-                            src={src}
-                            alt={`閱讀圖片 ${index + 1}`}
-                            width={800}
-                            height={600}
-                            className="w-full h-auto rounded-md object-contain"
-                            data-ai-hint="document scan"
-                          />
-                        </div>
-                      </DialogTrigger>
-                    ))}
-                  </div>
+                  {hasText ? (
+                    <p className="text-base whitespace-pre-wrap">{inputText}</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {imagePreviews.map((src, index) => (
+                        <DialogTrigger asChild key={index}>
+                          <div
+                              className="relative aspect-auto cursor-pointer mb-4"
+                              onClick={() => handleQuizImageClick(src)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleQuizImageClick(src); } }}
+                              tabIndex={0}
+                              role="button"
+                              aria-label={`放大檢視閱讀圖片 ${index + 1}`}
+                            >
+                            <Image
+                              src={src}
+                              alt={`閱讀圖片 ${index + 1}`}
+                              width={800}
+                              height={600}
+                              className="w-full h-auto rounded-md object-contain"
+                              data-ai-hint="document scan"
+                            />
+                          </div>
+                        </DialogTrigger>
+                      ))}
+                    </div>
+                  )}
                   <ScrollBar orientation="vertical" />
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
@@ -715,3 +724,5 @@ export function QuizView({
   );
 }
 
+
+    
