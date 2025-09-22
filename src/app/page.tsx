@@ -360,7 +360,7 @@ export default function PIRLSQuestionCraftPage() {
       const bodyPayload = {
         questionsOutput: generatedQuestionsOutput,
         imageFilesDataURIs,
-        // TODO: Also send text if inputMode is text
+        inputText: inputMode === 'text' ? inputText : '',
       };
 
       const response = await fetch('/api/share', {

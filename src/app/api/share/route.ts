@@ -6,6 +6,7 @@ import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-que
 interface QuizPayload {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFilesDataURIs: string[];
+  inputText?: string; // Added to store text content
   createdAt: number;
 }
 
@@ -34,16 +35,18 @@ export async function POST(request: NextRequest) {
   cleanupExpiredQuizzes(); 
   try {
     const body = await request.json();
-    const { questionsOutput, imageFilesDataURIs } = body;
+    const { questionsOutput, imageFilesDataURIs, inputText } = body;
 
-    if (!questionsOutput || !imageFilesDataURIs || !Array.isArray(imageFilesDataURIs)) {
-      return NextResponse.json({ success: false, error: 'Missing or invalid questionsOutput or imageFilesDataURIs.' }, { status: 400 });
+    // Adjusted validation to allow either image or text
+    if (!questionsOutput || (!imageFilesDataURIs && !inputText)) {
+      return NextResponse.json({ success: false, error: 'Missing or invalid payload. Required: questionsOutput and either imageFilesDataURIs or inputText.' }, { status: 400 });
     }
 
     const quizId = generateUniqueId();
     tempQuizStore.set(quizId, {
       questionsOutput,
-      imageFilesDataURIs,
+      imageFilesDataURIs: imageFilesDataURIs || [],
+      inputText: inputText || '',
       createdAt: Date.now(),
     });
 

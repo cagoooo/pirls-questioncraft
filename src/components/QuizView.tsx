@@ -1,4 +1,3 @@
-
 // src/components/QuizView.tsx
 "use client";
 
@@ -297,7 +296,14 @@ export function QuizView({
     setIsSharingPdfInternal(true);
     showFileGenerationProgress(true);
     try {
-      await exportQuizResultsToPDF(quizResults, imagePreviews, studentInfo, toast, updateFileGenerationProgress);
+      await exportQuizResultsToPDF(
+        quizResults,
+        imagePreviews,
+        inputText,
+        studentInfo,
+        toast,
+        updateFileGenerationProgress
+      );
     } catch (error: any) {
       toast({
         title: "分享結果失敗",
@@ -723,6 +729,3 @@ export function QuizView({
     </Card>
   );
 }
-
-
-    

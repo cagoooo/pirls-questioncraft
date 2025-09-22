@@ -20,6 +20,7 @@ import { Progress } from '@/components/ui/progress';
 interface QuizData {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFilesDataURIs: string[];
+  inputText?: string;
 }
 
 export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
@@ -253,6 +254,7 @@ export default function SharedQuizPage() {
             questionsOutput={quizData.questionsOutput}
             imageFiles={[]}
             imageFilesDataURIs={quizData.imageFilesDataURIs}
+            inputText={quizData.inputText}
             studentInfo={studentInfo}
             onExitQuiz={() => {
                 toast({ title: "測驗已結束", description: "感謝您的參與！您可以關閉此頁面。" });
@@ -279,5 +281,3 @@ export default function SharedQuizPage() {
     </div>
   );
 }
-
-

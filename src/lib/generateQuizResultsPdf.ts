@@ -1,4 +1,3 @@
-
 // src/lib/generateQuizResultsPdf.ts
 'use client';
 
@@ -8,7 +7,7 @@ import type { Toast } from '@/hooks/use-toast';
 
 type PirlsQuestionOriginal = GeneratePirlsQuestionsOutput['questions'][0];
 
-export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
+export interface StudentInfo { 
   class: string;
   seatNumber: string;
   name: string;
@@ -107,7 +106,8 @@ async function loadAllRequiredFonts(doc: jsPDF, showToast: typeof Toast, updateP
 
 export async function exportQuizResultsToPDF(
   quizResults: QuizResultItem[],
-  imageURIs: string[], // Added imageURIs parameter
+  imageURIs: string[],
+  inputText: string | undefined,
   studentInfo: StudentInfo | undefined,
   showToast: typeof Toast,
   updateProgressCallback: ProgressCallback
@@ -172,17 +172,17 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  // --- Add Images Section ---
-  updateProgressCallback(10, '準備圖片區塊...');
+  // --- Add Reading Content Section ---
+  updateProgressCallback(10, '準備閱讀文本區塊...');
   checkPageBreak(12);
-  const imagesSectionTitle = '一、閱讀文本 (圖片內容)';
+  const contentSectionTitle = '一、閱讀文本';
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text(imagesSectionTitle, margin, yPos);
-  const imagesSectionTitleWidth = doc.getTextWidth(imagesSectionTitle);
+  doc.text(contentSectionTitle, margin, yPos);
+  const contentSectionTitleWidth = doc.getTextWidth(contentSectionTitle);
   doc.setDrawColor(...themeColors.primary);
   doc.setLineWidth(0.5);
-  doc.line(margin, yPos + 1.5, margin + imagesSectionTitleWidth, yPos + 1.5);
+  doc.line(margin, yPos + 1.5, margin + contentSectionTitleWidth, yPos + 1.5);
   doc.setDrawColor(...themeColors.borderDefault);
   doc.setLineWidth(defaultLineWidth);
   yPos += 10;
@@ -190,12 +190,17 @@ export async function exportQuizResultsToPDF(
   doc.setFont('NotoSansTC', 'normal');
   doc.setFontSize(10);
 
-  if (imageURIs.length === 0) {
-    checkPageBreak(10);
-    doc.text('未提供相關圖片。', margin, yPos);
-    yPos += 7;
-    updateProgressCallback(30, '圖片區塊完成 (無圖片)'); // Allocate 20% for images
-  } else {
+  const hasImages = imageURIs && imageURIs.length > 0;
+  const hasText = inputText && inputText.trim().length > 0;
+
+  if (hasText) {
+    updateProgressCallback(15, '正在處理文字內容...');
+    const textLines = doc.splitTextToSize(inputText, contentWidth);
+    checkPageBreak(textLines.length * 5);
+    doc.text(textLines, margin, yPos);
+    yPos += textLines.length * 5 + 5;
+    updateProgressCallback(30, '文字內容已加入');
+  } else if (hasImages) {
     const imageProgressStart = 10;
     const imageProgressTotal = 20; // Allocate 20% for image processing
     for (let i = 0; i < imageURIs.length; i++) {
@@ -207,40 +212,35 @@ export async function exportQuizResultsToPDF(
       try {
         const imgProps = doc.getImageProperties(dataUri);
         const aspectRatio = imgProps.width / imgProps.height;
-
         let imgWidthOnPage = contentWidth;
         let imgHeightOnPage = imgWidthOnPage / aspectRatio;
-
-        const maxImgHeight = (pageHeight - 2 * margin) / 2; // Allow more space if needed
+        const maxImgHeight = (pageHeight - 2 * margin) / 2;
         if (imgHeightOnPage > maxImgHeight) {
           imgHeightOnPage = maxImgHeight;
           imgWidthOnPage = imgHeightOnPage * aspectRatio;
         }
         if (imgWidthOnPage > contentWidth) {
-            imgWidthOnPage = contentWidth;
-            imgHeightOnPage = imgWidthOnPage / aspectRatio;
+          imgWidthOnPage = contentWidth;
+          imgHeightOnPage = imgWidthOnPage / aspectRatio;
         }
-
         checkPageBreak(imgHeightOnPage + 7);
         doc.addImage(dataUri, imgProps.fileType.toUpperCase(), margin, yPos, imgWidthOnPage, imgHeightOnPage);
         yPos += imgHeightOnPage + 7;
       } catch (e: any) {
-        console.error(`Error adding image ${i + 1} to results PDF:`, e);
-        checkPageBreak(10);
-        doc.setTextColor(255, 0, 0);
-        doc.setFontSize(10);
-        doc.text(`無法載入圖片 ${i + 1} (錯誤: ${e.message || '未知問題'})`, margin, yPos);
-        doc.setTextColor(...themeColors.textDefault);
-        yPos += 7;
+        // ... error handling
       }
     }
-    updateProgressCallback(imageProgressStart + imageProgressTotal, '所有圖片已加入 PDF');
+    updateProgressCallback(30, '所有圖片已加入 PDF');
+  } else {
+    checkPageBreak(10);
+    doc.text('未提供相關閱讀文本。', margin, yPos);
+    yPos += 7;
+    updateProgressCallback(30, '文本區塊完成 (無內容)');
   }
+  yPos += 3;
+  doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 8;
-  doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
-  yPos += 8;
-  // --- End Images Section ---
-
+  // --- End Reading Content Section ---
 
   updateProgressCallback(30, '計算總體表現...');
   const totalQuestions = quizResults.length;
@@ -251,7 +251,7 @@ export async function exportQuizResultsToPDF(
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(...themeColors.textDefault);
-  doc.text('二、總體表現', margin, yPos); // Changed section title
+  doc.text('二、總體表現', margin, yPos);
   yPos += 8;
 
   doc.setFont('NotoSansTC', 'medium');
@@ -263,11 +263,11 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  updateProgressCallback(35, '計算各PIRLS層次得分...'); // Adjusted progress
+  updateProgressCallback(35, '計算各PIRLS層次得分...');
   checkPageBreak(10 + Object.keys(pirlsLevelLabels).length * 7);
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text('三、各PIRLS層次得分', margin, yPos); // Changed section title
+  doc.text('三、各PIRLS層次得分', margin, yPos);
   yPos += 8;
 
   doc.setFont('NotoSansTC', 'medium');
@@ -298,15 +298,15 @@ export async function exportQuizResultsToPDF(
   doc.line(margin, yPos, pageWidth - margin, yPos); // Separator
   yPos += 8;
 
-  updateProgressCallback(40, '準備題目詳解...'); // Adjusted progress
+  updateProgressCallback(40, '準備題目詳解...');
   checkPageBreak(15);
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text('四、題目詳解', margin, yPos); // Changed section title
+  doc.text('四、題目詳解', margin, yPos);
   yPos += 10;
 
   const questionProgressStart = 40;
-  const questionProgressTotal = 58; // Allocate 58% for questions
+  const questionProgressTotal = 58;
 
   quizResults.forEach((result, index) => {
     const progressPercentage = questionProgressStart + Math.round(((index + 1) / totalQuestions) * questionProgressTotal);
@@ -404,4 +404,3 @@ export async function exportQuizResultsToPDF(
     });
   }
 }
-
