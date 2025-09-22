@@ -401,7 +401,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 id="imageUpload"
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                 multiple
                 onChange={handleFileChange}
                 disabled={isLoading || !canUploadMore}

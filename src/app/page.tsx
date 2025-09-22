@@ -9,21 +9,25 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 type ProgressCallback = (progress: number, message: string) => void;
+type InputMode = 'image' | 'text';
 
 /**
  * Resizes an image file to a maximum dimension while maintaining aspect ratio
@@ -80,7 +84,9 @@ const resizeImage = (file: File, maxSize: number = 2048): Promise<string> => {
 
 
 export default function PIRLSQuestionCraftPage() {
+  const [inputMode, setInputMode] = useState<InputMode>('image');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [inputText, setInputText] = useState('');
   const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
   const [languageMode, setLanguageMode] = useState<'zh-TW' | 'en'>('zh-TW');
   const [isLoading, setIsLoading] = useState(false);
@@ -143,13 +149,23 @@ export default function PIRLSQuestionCraftPage() {
       return () => clearTimeout(timer);
     }
   }, []);
+  
+  const handleInputTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    setGeneratedQuestionsOutput(null);
+    setError(null);
+    setIsQuizActive(false);
+    setCurrentShareLink('');
+  }, []);
 
 
   const handleGenerateQuestions = useCallback(async () => {
-    if (imageFiles.length === 0) {
+    const isReady = (inputMode === 'image' && imageFiles.length > 0) || (inputMode === 'text' && inputText.trim().length > 0);
+
+    if (!isReady) {
       toast({
-        title: '沒有圖片',
-        description: '請先上傳至少一張圖片。',
+        title: inputMode === 'image' ? '沒有圖片' : '沒有文字',
+        description: inputMode === 'image' ? '請先上傳至少一張圖片。' : '請在文字區塊中輸入或貼上內容。',
         variant: 'destructive',
       });
       return;
@@ -173,19 +189,32 @@ export default function PIRLSQuestionCraftPage() {
     updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      updateDisplayProgress(20, '正在壓縮與處理圖片...');
-      const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
+      let questionsResult: GeneratePirlsQuestionsOutput;
 
-      if (photoDataUris.length === 0) {
-        throw new Error('無法處理圖片，請確認檔案是否正確。');
+      if (inputMode === 'image') {
+        updateDisplayProgress(20, '正在壓縮與處理圖片...');
+        const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
+
+        if (photoDataUris.length === 0) {
+          throw new Error('無法處理圖片，請確認檔案是否正確。');
+        }
+
+        updateDisplayProgress(50, 'AI 正在分析圖片並設計題目...');
+        questionsResult = await generatePirlsQuestions({
+          photoDataUris,
+          questionMode,
+          languageMode,
+        });
+
+      } else { // inputMode === 'text'
+        updateDisplayProgress(40, 'AI 正在分析文字並設計題目...');
+        questionsResult = await generatePirlsQuestionsFromText({
+          text: inputText,
+          questionMode,
+          languageMode,
+        });
       }
 
-      updateDisplayProgress(50, 'AI 正在分析圖片並設計題目...');
-      const questionsResult = await generatePirlsQuestions({
-        photoDataUris,
-        questionMode,
-        languageMode,
-      });
 
       if (questionsResult && questionsResult.questions) {
         updateDisplayProgress(100, '題目已成功生成！');
@@ -215,7 +244,7 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [imageFiles, toast, questionMode, languageMode, loadingProgress]);
+  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, loadingProgress]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -223,14 +252,19 @@ export default function PIRLSQuestionCraftPage() {
   };
 
   const handleDownloadPdf = async () => {
-    if (!generatedQuestionsOutput || imageFiles.length === 0) {
-      toast({
-        title: '無法下載 PDF',
-        description: '請先生成題目並確認已上傳圖片。',
-        variant: 'destructive',
-      });
+    if (!generatedQuestionsOutput) {
+      toast({ title: '無法下載 PDF', description: '請先生成題目。', variant: 'destructive' });
       return;
     }
+    if (inputMode === 'text') {
+      toast({ title: 'PDF 功能限制', description: '從純文字生成的題組目前不支援匯出為包含文本的 PDF。', variant: 'destructive' });
+      return;
+    }
+    if (imageFiles.length === 0) {
+      toast({ title: '無法下載 PDF', description: '請確認已上傳圖片以匯出包含文本的 PDF。', variant: 'destructive' });
+      return;
+    }
+
     setIsGeneratingPdf(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化 PDF 產生程序...');
@@ -285,7 +319,7 @@ export default function PIRLSQuestionCraftPage() {
   };
 
   const handleStartQuiz = () => {
-    if (generatedQuestionsOutput && imageFiles.length > 0) {
+    if (generatedQuestionsOutput && (imageFiles.length > 0 || inputText.trim().length > 0)) {
       setIsQuizActive(true);
       setTimeout(() => {
         resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -293,7 +327,7 @@ export default function PIRLSQuestionCraftPage() {
     } else {
        toast({
         title: '無法開始測驗',
-        description: '請先上傳圖片並成功生成題目。',
+        description: '請先提供內容 (圖片或文字) 並成功生成題目。',
         variant: 'destructive',
       });
     }
@@ -313,8 +347,8 @@ export default function PIRLSQuestionCraftPage() {
   };
 
   const handleShareQuiz = async () => {
-    if (!generatedQuestionsOutput || imageFiles.length === 0) {
-      toast({ title: "無法分享", description: "請先生成題目並上傳圖片。", variant: "destructive" });
+    if (!generatedQuestionsOutput || (imageFiles.length === 0 && inputText.trim().length === 0)) {
+      toast({ title: "無法分享", description: "請先生成題目並上傳圖片或輸入文字。", variant: "destructive" });
       return;
     }
     setIsSharingQuiz(true);
@@ -322,11 +356,17 @@ export default function PIRLSQuestionCraftPage() {
     setIsShareDialogOpen(true); // Open dialog to show loading/link
 
     try {
-      const imageFilesDataURIs = await Promise.all(imageFiles.map(file => resizeImage(file)));
+      const imageFilesDataURIs = inputMode === 'image' ? await Promise.all(imageFiles.map(file => resizeImage(file))) : [];
+      const bodyPayload = {
+        questionsOutput: generatedQuestionsOutput,
+        imageFilesDataURIs,
+        // TODO: Also send text if inputMode is text
+      };
+
       const response = await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionsOutput: generatedQuestionsOutput, imageFilesDataURIs }),
+        body: JSON.stringify(bodyPayload),
       });
       const data = await response.json();
 
@@ -392,16 +432,44 @@ export default function PIRLSQuestionCraftPage() {
           PIRLS 閱讀素養題組生成站
         </h1>
         <p className="mt-4 text-md sm:text-lg text-muted-foreground">
-          上傳圖片，APP 為您分析內容並設計PIRLS四層次選擇題。
+          上傳圖片或貼上文本，APP 為您分析內容並設計PIRLS四層次選擇題。
         </p>
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
         {!isQuizActive && (
-          <FileUpload 
-            onFilesSelected={handleImageFilesChange} 
-            isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf} 
-          />
+          <Tabs value={inputMode} onValueChange={(value) => setInputMode(value as InputMode)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="image"><ImageIcon className="mr-2 h-4 w-4" />上傳圖片</TabsTrigger>
+              <TabsTrigger value="text"><FileText className="mr-2 h-4 w-4" />貼上文本</TabsTrigger>
+            </TabsList>
+            <TabsContent value="image" className="mt-6">
+              <FileUpload 
+                onFilesSelected={handleImageFilesChange} 
+                isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf} 
+              />
+            </TabsContent>
+            <TabsContent value="text" className="mt-6">
+              <Card className="w-full bg-accent/10 dark:bg-accent/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+                    <FileText className="h-6 w-6 text-primary" />
+                    貼上文本內容
+                  </CardTitle>
+                  <CardDescription>請將您想分析的文字（例如從 PDF、Word 或網頁複製的內容）貼到下面的文字框中。</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="請在此貼上您的文本內容..."
+                    value={inputText}
+                    onChange={handleInputTextChange}
+                    className="h-48 text-base"
+                    disabled={isLoading}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         )}
 
         {!isQuizActive && (
@@ -500,7 +568,11 @@ export default function PIRLSQuestionCraftPage() {
           <Button
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
-            disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || imageFiles.length === 0}
+            disabled={
+              isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf ||
+              (inputMode === 'image' && imageFiles.length === 0) ||
+              (inputMode === 'text' && inputText.trim().length === 0)
+            }
             className={cn(
               "w-full py-3 text-base sm:text-xl font-semibold transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100",
               "bg-accent text-accent-foreground hover:bg-accent/80"
@@ -573,7 +645,7 @@ export default function PIRLSQuestionCraftPage() {
                   <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
                     <Button
                         onClick={handleStartQuiz}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput}
                         variant="outline"
                         className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
                     >
@@ -584,7 +656,7 @@ export default function PIRLSQuestionCraftPage() {
                         <DialogTrigger asChild>
                           <Button
                             onClick={handleShareQuiz}
-                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
+                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput}
                             variant="outline"
                             className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
                           >
@@ -650,8 +722,9 @@ export default function PIRLSQuestionCraftPage() {
                       </Dialog>
                     <Button
                         onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || imageFiles.length === 0}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || !generatedQuestionsOutput || (inputMode === 'image' && imageFiles.length === 0)}
                         variant="outline"
+                        title={inputMode === 'text' ? '從純文字生成的題組目前不支援匯出為包含文本的 PDF。' : ''}
                     >
                         {isGeneratingPdf ? (
                             <>
