@@ -136,12 +136,27 @@ export default function PIRLSQuestionCraftPage() {
     }
   }, [isGeneratingQuizResultsPdf]);
 
-  const handleImageFilesChange = useCallback((files: File[]) => {
-    setImageFiles(files);
+  const handleModeChange = (newMode: InputMode) => {
+    setInputMode(newMode);
+    if (newMode === 'image') {
+      setInputText('');
+    } else {
+      setImageFiles([]);
+    }
+    // Reset results when changing mode
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
-    setCurrentShareLink(''); // Reset share link if images change
+    setCurrentShareLink('');
+  };
+
+  const handleImageFilesChange = useCallback((files: File[]) => {
+    setImageFiles(files);
+    setInputText(''); // Clear text input
+    setGeneratedQuestionsOutput(null);
+    setError(null);
+    setIsQuizActive(false);
+    setCurrentShareLink('');
     if (files.length > 0 && generateButtonRef.current) {
       const timer = setTimeout(() => {
         generateButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -152,6 +167,7 @@ export default function PIRLSQuestionCraftPage() {
   
   const handleInputTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
+    setImageFiles([]); // Clear image files
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
@@ -438,7 +454,7 @@ export default function PIRLSQuestionCraftPage() {
 
       <main className="w-full max-w-3xl space-y-8">
         {!isQuizActive && (
-          <Tabs value={inputMode} onValueChange={(value) => setInputMode(value as InputMode)} className="w-full">
+          <Tabs value={inputMode} onValueChange={(value) => handleModeChange(value as InputMode)} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="image"><ImageIcon className="mr-2 h-4 w-4" />上傳圖片</TabsTrigger>
               <TabsTrigger value="text"><FileText className="mr-2 h-4 w-4" />貼上文本</TabsTrigger>
@@ -851,6 +867,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
