@@ -54,7 +54,6 @@ export async function generatePirlsQuestionsFromText(
 
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsFromTextPrompt',
-  model: 'googleai/gemini-pro',
   input: {schema: GeneratePirlsQuestionsFromTextInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchemaForText},
   prompt: `您是一位資深的課程設計師與評量專家，專精於為 PIRLS（國際閱讀素養進展研究）閱讀理解評估設計高品質的題目。
