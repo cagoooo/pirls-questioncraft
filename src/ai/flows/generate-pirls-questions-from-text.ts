@@ -69,7 +69,7 @@ const prompt = ai.definePrompt({
 - **評估與批判 (Evaluate and Critique)**: 2 題
 總共十題。
 {{else}}
-您必須為每個PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
+您必須為每个PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
 {{/if}}
 
 **語言模式指令 (Language Mode Instruction):**
