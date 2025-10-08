@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut, FileText, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ArrowRight, XCircle, BookOpen, CheckCircle, AlertTriangle, CheckSquare, RotateCcw, LogOut, FileText, Loader2, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 import type { VariantProps } from 'class-variance-authority';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -90,6 +90,8 @@ export function QuizView({
   const [quizResults, setQuizResults] = useState<QuizResultItem[] | null>(null);
   const quizResultsTopRef = useRef<HTMLDivElement>(null);
   const [isSharingPdfInternal, setIsSharingPdfInternal] = useState(false);
+  const [isCurrentQuestionAnswered, setIsCurrentQuestionAnswered] = useState(false);
+
 
   // State for quiz image dialog
   const [isQuizImageDialogOpen, setIsQuizImageDialogOpen] = useState(false);
@@ -145,8 +147,9 @@ export function QuizView({
   useEffect(() => {
     if(previousQuestionIndex !== currentQuestionIndex) { 
       setPreviousQuestionIndex(currentQuestionIndex);
+      setIsCurrentQuestionAnswered(selectedAnswers[currentQuestionIndex] !== null);
     }
-  }, [currentQuestionIndex, previousQuestionIndex]); 
+  }, [currentQuestionIndex, previousQuestionIndex, selectedAnswers]); 
 
   const handleQuizImageClick = (imageUrl: string) => {
     setSelectedQuizImageForDialog(imageUrl);
@@ -236,13 +239,14 @@ export function QuizView({
 
 
   const handleOptionChange = (value: string) => {
-    if (quizState !== 'answering') return;
+    if (isCurrentQuestionAnswered) return;
     const answerIndex = parseInt(value, 10);
     setSelectedAnswers(prev => {
       const newAnswers = [...prev];
       newAnswers[currentQuestionIndex] = answerIndex;
       return newAnswers;
     });
+    setIsCurrentQuestionAnswered(true);
   };
 
   const goToNextQuestion = () => {
@@ -286,6 +290,7 @@ export function QuizView({
     setSelectedAnswers(Array(questionsOutput.questions.length).fill(null));
     setQuizResults(null);
     setQuizState('answering');
+    setIsCurrentQuestionAnswered(false);
   };
 
   const handleShareResultsPdf = async () => {
@@ -469,12 +474,14 @@ export function QuizView({
                           : <span className="text-muted-foreground italic">未作答</span>}
                       </span>
                     </p>
-                     {result.isCorrect && (
-                       <p className="text-green-600 dark:text-green-400 font-medium flex items-center">
-                         <CheckCircle className="h-4 w-4 mr-2" /> 恭喜答對！
-                       </p>
-                     )}
-                    {!result.isCorrect && result.explanation && (
+                    {!result.isCorrect && (
+                        <p><strong>正確答案：</strong>
+                          <span className="text-green-600 dark:text-green-400 font-medium">
+                            {optionLabels[result.correctAnswerIndex]}. {result.options[result.correctAnswerIndex]}
+                          </span>
+                        </p>
+                    )}
+                    {result.explanation && (
                       <div className="mt-2">
                         <p className="font-semibold text-xs text-muted-foreground mb-1">解題引導：</p>
                         <CardDescription className="text-xs whitespace-pre-wrap p-3 bg-muted/60 dark:bg-muted/30 rounded-md border border-dashed">
@@ -506,6 +513,7 @@ export function QuizView({
   if (quizState === 'answering' && currentQuestion) {
     const hasImages = imagePreviews.length > 0;
     const hasText = inputText && inputText.trim().length > 0;
+    const isAnswerCorrect = selectedAnswers[currentQuestionIndex] === currentQuestion.correctAnswerIndex;
 
     return (
       <Dialog
@@ -595,44 +603,57 @@ export function QuizView({
                 value={currentSelectedValue}
                 onValueChange={handleOptionChange}
                 className="space-y-2"
-                disabled={quizState !== 'answering'}
+                disabled={isCurrentQuestionAnswered}
               >
                 {currentQuestion.options.map((option, index) => {
                   const isSelected = selectedAnswers[currentQuestionIndex] === index;
+                  const isCorrect = index === currentQuestion.correctAnswerIndex;
                   return (
                     <div
                       key={index}
-                      onClick={() => {
-                        if (quizState === 'answering') {
-                          handleOptionChange(index.toString());
-                        }
-                      }}
+                      onClick={() => handleOptionChange(index.toString())}
                       className={cn(
-                        "flex items-center space-x-3 p-3 border rounded-md transition-colors",
-                        quizState === 'answering' ? "cursor-pointer" : "cursor-default",
-                        isSelected
-                          ? "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
-                          : quizState === 'answering' ? "border-border hover:bg-accent/20 dark:hover:bg-accent/30" : "border-border"
+                        "flex items-center space-x-3 p-3 border rounded-md transition-all duration-200",
+                        isCurrentQuestionAnswered ? "cursor-default" : "cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/30",
+                        isSelected && !isCorrect && isCurrentQuestionAnswered && "bg-destructive/20 border-destructive ring-1 ring-destructive",
+                        isCorrect && isCurrentQuestionAnswered && "bg-green-500/20 border-green-600 ring-1 ring-green-600",
+                        isSelected && !isCurrentQuestionAnswered && "bg-primary/10 border-primary ring-1 ring-primary dark:bg-primary/20"
                       )}
                     >
                       <RadioGroupItem
                         value={index.toString()}
                         id={`q${currentQuestionIndex}-opt${index}`}
-                        disabled={quizState !== 'answering'}
+                        disabled={isCurrentQuestionAnswered}
                       />
                       <Label
                         htmlFor={`q${currentQuestionIndex}-opt${index}`}
-                        className={cn(
-                          "flex-1 text-sm",
-                          quizState === 'answering' ? "cursor-pointer" : "cursor-default"
-                        )}
+                        className={cn("flex-1 text-sm", isCurrentQuestionAnswered ? "cursor-default" : "cursor-pointer")}
                       >
                         <span className="font-semibold mr-1.5">{optionLabels[index]}.</span> {option}
                       </Label>
+                      {isCurrentQuestionAnswered && isCorrect && <CheckCircle className="h-5 w-5 text-green-600" />}
+                      {isCurrentQuestionAnswered && isSelected && !isCorrect && <XCircle className="h-5 w-5 text-destructive" />}
                     </div>
                   );
                 })}
               </RadioGroup>
+
+              {isCurrentQuestionAnswered && (
+                <Card className={cn(
+                    "mt-4 animate-in fade-in duration-500",
+                    isAnswerCorrect ? "bg-green-500/10 border-green-500/50" : "bg-destructive/10 border-destructive/50"
+                )}>
+                  <CardContent className="p-4 space-y-2">
+                    <p className={cn("font-bold text-sm", isAnswerCorrect ? "text-green-700 dark:text-green-300" : "text-destructive dark:text-red-300")}>
+                        {isAnswerCorrect ? '恭喜答對！' : `答錯了！正確答案是 ${optionLabels[currentQuestion.correctAnswerIndex]}`}
+                    </p>
+                    <div className="text-xs text-muted-foreground whitespace-pre-wrap pt-2 border-t border-dashed">
+                        <p className="font-semibold flex items-center gap-1"><Sparkles className="h-3 w-3" />解題引導：</p>
+                        {currentQuestion.explanation}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </CardContent>
 
@@ -640,30 +661,30 @@ export function QuizView({
             <Button
               variant="outline"
               onClick={goToPreviousQuestion}
-              disabled={currentQuestionIndex === 0 || quizState !== 'answering'}
+              disabled={currentQuestionIndex === 0}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               上一題
             </Button>
-            {currentQuestionIndex === questionsOutput.questions.length - 1 ? (
-              <Button
-                onClick={handleFinishQuiz}
-                disabled={quizState !== 'answering'}
-                className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 animate-bounce-subtle"
-              >
-                <CheckSquare className="mr-2 h-4 w-4" />
-                完成測驗
-              </Button>
-            ) : (
-              <Button
-                variant="default"
-                onClick={goToNextQuestion}
-                disabled={quizState !== 'answering'}
-                className="animate-bounce-subtle"
-              >
-                下一題
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+            {isCurrentQuestionAnswered && (
+              currentQuestionIndex === questionsOutput.questions.length - 1 ? (
+                <Button
+                  onClick={handleFinishQuiz}
+                  className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 animate-bounce-subtle"
+                >
+                  <CheckSquare className="mr-2 h-4 w-4" />
+                  查看結果
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  onClick={goToNextQuestion}
+                  className="animate-bounce-subtle"
+                >
+                  下一題
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )
             )}
           </CardFooter>
         </Card>
