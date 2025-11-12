@@ -24,12 +24,12 @@ export async function exportPIRLStoPaGamOQuizGroup(
 
     // Row for "Quiz Group Header" (題組題本) - The "Dragon Head" row
     const groupHeaderRow: (string | number | null)[] = new Array(25).fill(null);
-    groupHeaderRow[0] = 1; // A: 編號
-    groupHeaderRow[1] = '閱讀素養題組'; // B: 科目
-    groupHeaderRow[2] = '資訊冊'; // C: 冊次
-    groupHeaderRow[3] = '資訊章'; // D: 章節
-    groupHeaderRow[5] = articleTitle; // F: 標題(必填)
-    groupHeaderRow[6] = articleContent; // G: 內容(必填)
+    groupHeaderRow[0] = 1;                  // A: 編號
+    groupHeaderRow[1] = '閱讀素養題組';   // B: 科目
+    groupHeaderRow[2] = '資訊冊';         // C: 冊次
+    groupHeaderRow[3] = '資訊章';         // D: 章節
+    groupHeaderRow[5] = articleTitle;       // F: 標題(必填)
+    groupHeaderRow[6] = articleContent;     // G: 內容(必填)
     dataRows.push(groupHeaderRow);
 
     // Subsequent Rows: The individual questions
@@ -39,10 +39,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
       const row: (string | number | null)[] = new Array(25).fill(null);
       
       row[0] = `1_${index + 1}`;                     // A: 編號 (e.g., 1_1, 1_2)
-      row[1] = '閱讀素養題組'; // B: 科目
-      row[2] = '資訊冊'; // C: 冊次
-      row[3] = '資訊章'; // D: 章節
-      // F (標題) and G (內容) are intentionally left blank for question rows
+      // B, C, D are intentionally left blank for question rows as they belong to the group
       row[8] = q.question;                            // I: 題目(必填)
       row[10] = q.options[0] || '';                   // K: 選項A
       row[12] = q.options[1] || '';                   // M: 選項B
