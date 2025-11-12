@@ -22,7 +22,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     // --- Data Preparation ---
     const dataRows: (string | number | null)[][] = [];
 
-    // Row 1: The "Quiz Group Header" (題組題本)
+    // Row for "Quiz Group Header" (題組題本)
     const groupHeaderRow: (string | number | null)[] = new Array(25).fill(null);
     groupHeaderRow[0] = 1; // A: 編號
     groupHeaderRow[1] = '閱讀素養題組'; // B: 科目
@@ -39,9 +39,6 @@ export async function exportPIRLStoPaGamOQuizGroup(
       const row: (string | number | null)[] = new Array(25).fill(null);
       
       row[0] = `1_${index + 1}`;                     // A: 編號 (e.g., 1_1, 1_2)
-      row[1] = '閱讀素養題組';                        // B: 科目
-      row[2] = '資訊冊';                              // C: 冊次
-      row[3] = '資訊章';                              // D: 章節
       row[8] = q.question;                            // I: 題目(必填)
       row[10] = q.options[0] || '';                   // K: 選項A
       row[12] = q.options[1] || '';                   // M: 選項B
