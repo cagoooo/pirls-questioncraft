@@ -32,7 +32,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
         [],
         [],
         [],
-        ['(請勿更動以上內容) 第十二列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列'],
+        ['(請勿更動以上內容) 第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列'],
     ];
 
     const data: (string | number | null)[][] = [];
@@ -42,16 +42,16 @@ export async function exportPIRLStoPaGamOQuizGroup(
       
       const row: (string | number | null)[] = new Array(25).fill(null);
       
-      row[0] = index + 1;                             // A: 編號
+      row[0] = `1_${index + 1}`;                     // A: 編號
       row[1] = '閱讀素養題組';                        // B: 科目
       row[2] = '資訊冊';                              // C: 冊次
       row[3] = '資訊章';                              // D: 章節
       // E: 難度 (null)
       row[5] = articleTitle;                          // F: 標題
       // G: 標題多媒體檔名 (null)
-      row[7] = articleContent;                        // H: 內容
+      row[7] = articleContent;                        // H: 內容 - This is v1.1, correct for v1.0 is G
       // I: 內容多媒體檔名 (null)
-      row[9] = q.question;                            // J: 題目
+      row[9] = q.question;                            // J: 題目 - This is v1.1, correct for v1.0 is I
       // K: 題目多媒體檔名 (null)
       row[11] = q.options[0] || '';                   // L: 選項A
       // M: 選項A多媒體檔名 (null)
@@ -72,8 +72,16 @@ export async function exportPIRLStoPaGamOQuizGroup(
 
     updateProgressCallback(90, '正在建立 PaGamO 題組 Excel 工作表...');
 
-    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
+    const worksheet = XLSX.utils.aoa_to_sheet(finalData, {cellDates: false, sheetStubs: true});
     
+    // We need to merge cells for the header
+    worksheet['!merges'] = [
+      { s: { r: 0, c: 5 }, e: { r: 0, c: 8 } }, // 題組共同內容
+      { s: { r: 0, c: 9 }, e: { r: 0, c: 20 } },// 題組個別題目
+      { s: { r: 0, c: 21 }, e: { r: 0, c: 24 } },// 答案
+    ];
+
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
@@ -98,3 +106,4 @@ export async function exportPIRLStoPaGamOQuizGroup(
     });
   }
 }
+    
