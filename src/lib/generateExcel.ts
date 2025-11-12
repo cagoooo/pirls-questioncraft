@@ -56,7 +56,8 @@ export async function exportPIRLStoExcel(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PIRLS 題組');
 
     updateProgressCallback(95, '準備下載 Loilonote 檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_Loilonote_題組.xlsx');
+    // The bookSST option is recommended for compatibility with non-standard clients
+    XLSX.writeFile(workbook, 'PIRLS_Loilonote_題組.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'Loilonote 檔案已開始下載！');
     showToast({

@@ -73,7 +73,8 @@ export async function exportPIRLStoPaGamO(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
     updateProgressCallback(95, '準備下載 PaGamO 檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx');
+    // The bookSST option is recommended for compatibility with non-standard clients
+    XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'PaGamO 檔案已開始下載！');
     showToast({
