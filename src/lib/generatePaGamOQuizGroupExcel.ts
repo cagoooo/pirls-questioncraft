@@ -1,4 +1,3 @@
-
 // src/lib/generatePaGamOQuizGroupExcel.ts
 'use client';
 
@@ -42,28 +41,28 @@ export async function exportPIRLStoPaGamOQuizGroup(
       
       const row: (string | number | null)[] = new Array(25).fill(null);
       
-      row[0] = index + 1;                                     // A: 編號
-      row[1] = '閱讀素養題組';                                  // B: 科目
-      row[2] = '資訊冊';                                        // C: 冊次
-      row[3] = '資訊章';                                        // D: 章節
+      row[0] = index + 1;                             // A: 編號
+      row[1] = '閱讀素養題組';                        // B: 科目
+      row[2] = '資訊冊';                            // C: 冊次
+      row[3] = '資訊章';                            // D: 章節
       // E: 難度 (null)
-      row[5] = articleTitle;                                  // F: 標題
-      // G: 標題多媒體檔名 (null) - This is actually H in the screenshot, F is title. User mapping is wrong. Let's follow screenshot
-      row[7] = articleContent;                                // H: 內容
-      // I: 內容多媒體檔名 (null)
-      row[9] = q.question;                                    // J: 題目
-      // K: 題目多媒體檔名 (null)
-      row[11] = q.options[0] || '';                           // L: 選項A
-      // M: 選項A多媒體檔名 (null)
-      row[13] = q.options[1] || '';                           // N: 選項B
-      // O: 選項B多媒體檔名 (null)
-      row[15] = q.options[2] || '';                           // P: 選項C
-      // Q: 選項C多媒體檔名 (null)
-      row[17] = q.options[3] || '';                           // R: 選項D
-      // S, T, U are empty
-      row[21] = optionLabels[q.correctAnswerIndex];           // V: 正確答案
-      row[22] = q.explanation;                                // W: 文字詳解
-      // X, Y are empty
+      row[5] = articleTitle;                        // F: 標題
+      // G: 標題多媒體檔名 (is H in screenshot template, F is title) -> WRONG, this should be G, which is 6
+      row[6] = articleContent;                      // H: 內容 -> this should be G, index 6
+      // H: (null)
+      row[8] = q.question;                          // J: 題目 -> This is I, index 8
+      // J: (null)
+      row[10] = q.options[0] || '';                  // K: 選項A -> K is 10
+      // L: (null)
+      row[12] = q.options[1] || '';                  // M: 選項B -> M is 12
+      // N: (null)
+      row[14] = q.options[2] || '';                  // O: 選項C -> O is 14
+      // P: (null)
+      row[16] = q.options[3] || '';                  // Q: 選項D -> Q is 16
+      // R, S, T are empty
+      row[20] = optionLabels[q.correctAnswerIndex];  // U: 正確答案 -> U is 20
+      row[21] = q.explanation;                       // V: 文字詳解 -> V is 21
+      // W, X, Y are empty
       
       data.push(row);
     });

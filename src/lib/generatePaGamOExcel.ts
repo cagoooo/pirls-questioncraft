@@ -29,8 +29,6 @@ export async function exportPIRLStoPaGamO(
     ];
 
 
-    const optionLabels = ['A', 'B', 'C', 'D'];
-
     const rawData: (string | number)[][] = [];
 
     questionsOutput.questions.forEach((q, index) => {
@@ -38,8 +36,6 @@ export async function exportPIRLStoPaGamO(
       
       const row: (string | number)[] = new Array(23).fill('');
       
-      // PaGamO format expects the correct answer to be the first option ('A').
-      // So we need to reorder the options.
       const options = [...q.options];
       const correctAnswerText = options.splice(q.correctAnswerIndex, 1)[0];
       const finalOptions = [correctAnswerText, ...options];
@@ -49,33 +45,22 @@ export async function exportPIRLStoPaGamO(
       row[1] = '閱讀素養題組';              // B: 科目
       row[2] = '資訊冊';                      // C: 冊次
       row[3] = '資訊章';                      // D: 章節
-      // E is empty (難度)
       row[5] = q.question;                   // F: 題目
-      // G is empty (題目多媒體檔名)
       row[7] = finalOptions[0] || '';        // H: 選項A (正確答案)
-      // I is empty
       row[9] = finalOptions[1] || '';        // J: 選項B
-      // K is empty
       row[11] = finalOptions[2] || '';       // L: 選項C
-      // M is empty
       row[13] = finalOptions[3] || '';       // N: 選項D
-      // O, P, Q are empty
       row[17] = correctAnswerLabel;          // R: 正確答案 (A, B, C, D)
       row[18] = q.explanation;               // S: 詳解
-      // T, U, V, W are empty
       
       rawData.push(row);
     });
 
     updateProgressCallback(50, '正在複製前三題...');
     
-    // Duplicate the first 3 questions and insert them
     let finalDataRows = [...rawData];
     if (rawData.length >= 3) {
-      const questionsToDuplicate = rawData.slice(0, 3).map(row => {
-          const newRow = [...row]; // Create a mutable copy of the row
-          return newRow;
-      });
+      const questionsToDuplicate = rawData.slice(0, 3);
       finalDataRows.splice(3, 0, ...questionsToDuplicate);
     }
     
