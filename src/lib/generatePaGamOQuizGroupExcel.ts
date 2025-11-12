@@ -22,13 +22,13 @@ export async function exportPIRLStoPaGamOQuizGroup(
     // --- Data Preparation ---
     const dataRows: (string | number | null)[][] = [];
 
-    // Row for "Quiz Group Header" (題組題本)
+    // Row for "Quiz Group Header" (題組題本) - The "Dragon Head" row
     const groupHeaderRow: (string | number | null)[] = new Array(25).fill(null);
     groupHeaderRow[0] = 1; // A: 編號
     groupHeaderRow[1] = '閱讀素養題組'; // B: 科目
     groupHeaderRow[2] = '資訊冊'; // C: 冊次
     groupHeaderRow[3] = '資訊章'; // D: 章節
-    groupHeaderRow[5] = articleTitle; // F: 標題
+    groupHeaderRow[5] = articleTitle; // F: 標題(必填)
     groupHeaderRow[6] = articleContent; // G: 內容(必填)
     dataRows.push(groupHeaderRow);
 
@@ -39,6 +39,10 @@ export async function exportPIRLStoPaGamOQuizGroup(
       const row: (string | number | null)[] = new Array(25).fill(null);
       
       row[0] = `1_${index + 1}`;                     // A: 編號 (e.g., 1_1, 1_2)
+      row[1] = '閱讀素養題組'; // B: 科目
+      row[2] = '資訊冊'; // C: 冊次
+      row[3] = '資訊章'; // D: 章節
+      // F (標題) and G (內容) are intentionally left blank for question rows
       row[8] = q.question;                            // I: 題目(必填)
       row[10] = q.options[0] || '';                   // K: 選項A
       row[12] = q.options[1] || '';                   // M: 選項B
@@ -88,6 +92,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
         { s: { r: 1, c: 10 }, e: { r: 1, c: 19 } },// K2:T2 '選項'
         { s: { r: 1, c: 20 }, e: { r: 1, c: 22 } },// U2:W2 '答案和詳解'
         { s: { r: 1, c: 23 }, e: { r: 1, c: 24 } },// X2:Y2 '設定'
+        { s: { r: 8, c: 0 }, e: { r: 8, c: 24 } }, // A9:Y9 for the warning text
     ];
     
     // Add the actual data starting from row 11 (origin: A11)
