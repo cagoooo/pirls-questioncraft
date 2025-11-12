@@ -1,3 +1,4 @@
+
 // src/lib/generatePaGamOExcel.ts
 'use client';
 
@@ -15,9 +16,6 @@ export async function exportPIRLStoPaGamO(
   try {
     updateProgressCallback(0, '開始準備 PaGamO 資料...');
 
-    const optionLabels = ['A', 'B', 'C', 'D'];
-
-    // Header data based on the PaGamO template.
     const header: (string | null)[][] = [
       ['版本資訊', 'v1.1'],
       ['題目資訊'],
@@ -31,6 +29,9 @@ export async function exportPIRLStoPaGamO(
       ['(請勿更動以上內容) 第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列'],
     ];
 
+
+    const optionLabels = ['A', 'B', 'C', 'D'];
+
     const data: (string | number)[][] = [];
 
     questionsOutput.questions.forEach((q, index) => {
@@ -40,7 +41,8 @@ export async function exportPIRLStoPaGamO(
       
       const options = [...q.options];
       const correctAnswerText = options.splice(q.correctAnswerIndex, 1)[0];
-      const correctAnswerLabel = optionLabels[q.correctAnswerIndex];
+      // The correct answer label is always 'A' for the first option in the PaGamO format
+      const correctAnswerLabel = 'A';
 
       row[0] = index + 1;                  // A: 編號
       row[1] = '閱讀素養題組';              // B: 科目
@@ -63,34 +65,6 @@ export async function exportPIRLStoPaGamO(
       data.push(row);
     });
 
-    // Duplicate the first 3 questions and insert them after the 3rd question.
-    if (data.length >= 3) {
-      const firstThreeQuestions = data.slice(0, 3);
-      data.splice(3, 0, ...firstThreeQuestions);
-
-      // Re-number all questions after duplication
-      data.forEach((row, index) => {
-        // Find the original question number (before duplication)
-        let originalQuestionIndex;
-        if (index < 3) { // 1, 2, 3
-            originalQuestionIndex = index;
-        } else if (index < 6) { // copied 1, 2, 3
-            originalQuestionIndex = index - 3;
-        } else { // 4, 5, 6...
-            originalQuestionIndex = index - 3;
-        }
-
-        // Set question number based on its position in the original, unduplicated sequence
-        row[0] = originalQuestionIndex + 1;
-      });
-
-      // Special case: re-number the duplicated questions to be 1, 2, 3 again
-      data[3][0] = 1;
-      data[4][0] = 2;
-      data[5][0] = 3;
-    }
-
-
     const finalData = [...header, ...data];
 
     updateProgressCallback(90, '正在建立 PaGamO Excel 工作表...');
@@ -101,7 +75,7 @@ export async function exportPIRLStoPaGamO(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
     updateProgressCallback(95, '準備下載 PaGamO 檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
+    XLSX.writeFile(workbook, 'PIRLS_PaGamO_選擇題.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'PaGamO 檔案已開始下載！');
     showToast({
