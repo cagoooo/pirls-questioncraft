@@ -856,7 +856,7 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadPaGamOQuizGroup}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || inputMode !== 'text'}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || (inputMode === 'text' && inputText.trim().length === 0)}
                         variant="outline"
                         title={inputMode !== 'text' ? '此功能僅在「貼上文本」模式下可用。' : '匯出適用於 PaGamO 平台的題組格式'}
                     >
