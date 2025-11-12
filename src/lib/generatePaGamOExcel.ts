@@ -63,6 +63,34 @@ export async function exportPIRLStoPaGamO(
       data.push(row);
     });
 
+    // Duplicate the first 3 questions and insert them after the 3rd question.
+    if (data.length >= 3) {
+      const firstThreeQuestions = data.slice(0, 3);
+      data.splice(3, 0, ...firstThreeQuestions);
+
+      // Re-number all questions after duplication
+      data.forEach((row, index) => {
+        // Find the original question number (before duplication)
+        let originalQuestionIndex;
+        if (index < 3) { // 1, 2, 3
+            originalQuestionIndex = index;
+        } else if (index < 6) { // copied 1, 2, 3
+            originalQuestionIndex = index - 3;
+        } else { // 4, 5, 6...
+            originalQuestionIndex = index - 3;
+        }
+
+        // Set question number based on its position in the original, unduplicated sequence
+        row[0] = originalQuestionIndex + 1;
+      });
+
+      // Special case: re-number the duplicated questions to be 1, 2, 3 again
+      data[3][0] = 1;
+      data[4][0] = 2;
+      data[5][0] = 3;
+    }
+
+
     const finalData = [...header, ...data];
 
     updateProgressCallback(90, '正在建立 PaGamO Excel 工作表...');
