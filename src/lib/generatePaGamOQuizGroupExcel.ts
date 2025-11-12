@@ -10,7 +10,8 @@ type ProgressCallback = (progress: number, message: string) => void;
 
 export async function exportPIRLStoPaGamOQuizGroup(
   questionsOutput: GeneratePirlsQuestionsOutput,
-  inputText: string,
+  articleContent: string,
+  articleTitle: string,
   showToast: typeof Toast,
   updateProgressCallback: ProgressCallback
 ) {
@@ -35,7 +36,6 @@ export async function exportPIRLStoPaGamOQuizGroup(
     ];
 
     const data: (string | number)[][] = [];
-    const articleTitle = questionsOutput.questions[0]?.question.substring(0, 15) || "閱讀題組";
 
     questionsOutput.questions.forEach((q, index) => {
       updateProgressCallback(10 + Math.round(((index + 1) / questionsOutput.questions.length) * 80), `處理題組題目 ${index + 1} / ${questionsOutput.questions.length}`);
@@ -49,7 +49,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
       // 4: 難度 (null)
       row[5] = articleTitle;               // 標題
       // 6: 標題多媒體檔名 (null)
-      row[7] = inputText;                  // 內容
+      row[7] = articleContent;             // 內容
       // 8: 內容多媒體檔名 (null)
       row[9] = q.question;                 // 題目
       // 10: 題目多媒體檔名 (null)
@@ -89,7 +89,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
     updateProgressCallback(95, '準備下載 PaGamO 題組檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
+    XLSX.writeFile(workbook, 'PIRLS_PaGamO_選擇題.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'PaGamO 題組檔案已開始下載！');
     showToast({
@@ -109,5 +109,3 @@ export async function exportPIRLStoPaGamOQuizGroup(
     });
   }
 }
-
-    

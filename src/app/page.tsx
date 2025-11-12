@@ -17,6 +17,7 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
 import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
+import { generateTextAndTitleFromImages } from '@/ai/flows/generate-text-and-title-from-images';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
@@ -370,22 +371,50 @@ export default function PIRLSQuestionCraftPage() {
   };
 
   const handleDownloadPaGamOQuizGroup = async () => {
-    if (!generatedQuestionsOutput || inputText.trim().length === 0) {
-      toast({
-        title: '無法下載題組',
-        description: '請先在文字模式下生成題目。',
-        variant: 'destructive',
-      });
+    if (!generatedQuestionsOutput) {
+      toast({ title: '無法下載題組', description: '請先生成題目。', variant: 'destructive' });
       return;
     }
+    
     setIsGeneratingPaGamOQuizGroup(true);
     setFileGenerationProgress(0);
-    setFileGenerationMessage('正在初始化 PaGamO 題組檔案產生程序...');
+    setFileGenerationMessage('正在準備 PaGamO 題組檔案...');
     setTimeout(() => {
       fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
+    
     try {
-      await exportPIRLStoPaGamOQuizGroup(generatedQuestionsOutput, inputText, toast, fileProgressCallback);
+      let articleContent: string;
+      let articleTitle: string;
+
+      if (inputMode === 'text') {
+        if (inputText.trim().length === 0) {
+          throw new Error('文字模式下需要文本內容才能匯出題組。');
+        }
+        articleContent = inputText;
+        // For text mode, we can take the first question as a pseudo-title or generate one.
+        // For simplicity, let's derive it.
+        articleTitle = generatedQuestionsOutput.questions[0]?.question.substring(0, 20) + '...' || '閱讀題組';
+      } else { // image mode
+        if (imageFiles.length === 0) {
+          throw new Error('圖片模式下需要圖片才能匯出題組。');
+        }
+        setFileGenerationMessage('AI 正在從圖片辨識文字與生成標題...');
+        setFileGenerationProgress(25);
+        const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
+        const textFromImagesResult = await generateTextAndTitleFromImages({ photoDataUris });
+        
+        if (!textFromImagesResult || !textFromImagesResult.articleContent) {
+          throw new Error('AI 無法從圖片中辨識出文字內容。');
+        }
+        articleContent = textFromImagesResult.articleContent;
+        articleTitle = textFromImagesResult.title;
+      }
+      
+      setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
+      setFileGenerationProgress(75);
+      await exportPIRLStoPaGamOQuizGroup(generatedQuestionsOutput, articleContent, articleTitle, toast, fileProgressCallback);
+
     } catch (paGamOError: any) {
       console.error("PaGamO 題組檔案生成失敗:", paGamOError);
       toast({
@@ -856,9 +885,9 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadPaGamOQuizGroup}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || (inputMode === 'text' && inputText.trim().length === 0)}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
                         variant="outline"
-                        title={inputMode !== 'text' ? '此功能僅在「貼上文本」模式下可用。' : '匯出適用於 PaGamO 平台的題組格式'}
+                        title={'匯出適用於 PaGamO 平台的題組格式'}
                     >
                         {isGeneratingPaGamOQuizGroup ? (
                             <>
@@ -980,3 +1009,4 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
