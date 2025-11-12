@@ -16,6 +16,7 @@ export async function exportPIRLStoPaGamO(
     updateProgressCallback(0, '開始準備 PaGamO 資料...');
 
     const data: (string | number)[][] = [];
+    const optionLabels = ['A', 'B', 'C', 'D'];
 
     // Add 10 empty rows to meet PaGamO's format requirement (data starts from row 11)
     for (let i = 0; i < 10; i++) {
@@ -28,7 +29,8 @@ export async function exportPIRLStoPaGamO(
       const row: (string | number)[] = new Array(23).fill('');
       
       const options = [...q.options];
-      const correctAnswer = options.splice(q.correctAnswerIndex, 1)[0];
+      const correctAnswerText = options.splice(q.correctAnswerIndex, 1)[0];
+      const correctAnswerLabel = optionLabels[q.correctAnswerIndex];
 
       row[0] = index + 1;                  // A: 編號
       row[1] = '閱讀素養題組';              // B: 科目
@@ -37,7 +39,7 @@ export async function exportPIRLStoPaGamO(
       // E is empty
       row[5] = q.question;                   // F: 題目
       // G is empty
-      row[7] = correctAnswer;                // H: 選項A (正確答案)
+      row[7] = correctAnswerText;            // H: 選項A (正確答案)
       // I is empty
       row[9] = options[0] || '';           // J: 選項B
       // K is empty
@@ -45,7 +47,7 @@ export async function exportPIRLStoPaGamO(
       // M is empty
       row[13] = options[2] || '';          // N: 選項D
       // O, P, Q are empty
-      row[17] = correctAnswer;               // R: 正確答案
+      row[17] = correctAnswerLabel;          // R: 正確答案 (A, B, C, D)
       // S, T, U, V, W are empty
       
       data.push(row);
