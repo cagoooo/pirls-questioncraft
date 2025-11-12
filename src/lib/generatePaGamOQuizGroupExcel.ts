@@ -67,6 +67,12 @@ export async function exportPIRLStoPaGamOQuizGroup(
     worksheet['U2'] = { t: 's', v: '答案和詳解' };
     worksheet['X2'] = { t: 's', v: '設定' };
 
+    // --- Fixed Content for Rows 6, 7, 8 ---
+    worksheet['A6'] = { t: 's', v: '範例' };
+    worksheet['A7'] = { t: 's',v: '1' };
+    worksheet['A8'] = { t: 's', v: '1_1' };
+
+
     // Row 9: Warning text (in A9 only, no merge)
     worksheet['A9'] = { t: 's', v: '（請勿更動以上內容）第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列' };
 
@@ -95,7 +101,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     XLSX.utils.sheet_add_aoa(worksheet, dataRows, { origin: 'A11' });
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'reading_comprehension');
 
     updateProgressCallback(95, '準備下載 PaGamO 題組檔案...');
     XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
