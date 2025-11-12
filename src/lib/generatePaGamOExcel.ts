@@ -15,13 +15,23 @@ export async function exportPIRLStoPaGamO(
   try {
     updateProgressCallback(0, '開始準備 PaGamO 資料...');
 
-    const data: (string | number)[][] = [];
     const optionLabels = ['A', 'B', 'C', 'D'];
 
-    // Add 10 empty rows to meet PaGamO's format requirement (data starts from row 11)
-    for (let i = 0; i < 10; i++) {
-      data.push([]);
-    }
+    // Header data based on the provided image
+    const header: (string | null)[][] = [
+      ['版本資訊', 'v1.1'],
+      ['題目資訊'],
+      ['編號(必填)', '科目(必填)', '冊次(必填)', '章節(必填)', '難度'],
+      ['說明', '1. 世界地圖重要知識點\n2. 題型，目前系統支援單選題(含是非題)、複選題\n3. 若您不清楚冊次章節可留空，系統將自動為您存放於自訂章節。\n4. 若您想入第一～六冊，請直接輸入1, 2, 3, 4, 5, 6。'],
+      ['範例', '國文', '第一冊', '第一章', null],
+      [null, '英文', 'B8C', 'Hobbies/Sports', null],
+      [],
+      [],
+      [],
+      ['(請勿更動以上內容) 第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列'],
+    ];
+
+    const data: (string | number)[][] = [];
 
     questionsOutput.questions.forEach((q, index) => {
       updateProgressCallback(10 + Math.round(((index + 1) / questionsOutput.questions.length) * 80), `處理題目 ${index + 1} / ${questionsOutput.questions.length}`);
@@ -53,9 +63,11 @@ export async function exportPIRLStoPaGamO(
       data.push(row);
     });
 
+    const finalData = [...header, ...data];
+
     updateProgressCallback(90, '正在建立 PaGamO Excel 工作表...');
 
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
