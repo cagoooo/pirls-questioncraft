@@ -69,14 +69,14 @@ export async function exportPIRLStoPaGamOQuizGroup(
 
     // --- Fixed Content for Rows 6, 7, 8 ---
     worksheet['A6'] = { t: 's', v: '範例' };
-    worksheet['A7'] = { t: 's',v: '1' };
+    worksheet['A7'] = { t: 's', v: '1' };
     worksheet['A8'] = { t: 's', v: '1_1' };
 
 
     // Row 9: Warning text (in A9 only, no merge)
     worksheet['A9'] = { t: 's', v: '（請勿更動以上內容）第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列' };
 
-    // Row 10: Detailed column headers
+    // Row 3 and 10: Detailed column headers
     const row10Headers = [
         '編號(必填)', '科目(必填)', '冊次(必填)', '章節(必填)', '難度',
         '標題(必填)', '內容(必填)', '內容多媒體檔名', '題目(必填)', '題目多媒體檔名',
@@ -85,7 +85,8 @@ export async function exportPIRLStoPaGamOQuizGroup(
         '正確答案(必填)', '文字詳解', '文字詳解多媒體檔名', '選項排列',
         '標籤（僅限課程題庫使用）'
     ];
-    XLSX.utils.sheet_add_aoa(worksheet, [row10Headers], { origin: 'A10' });
+    XLSX.utils.sheet_add_aoa(worksheet, [row10Headers], { origin: 'A3' }); // Write to row 3
+    XLSX.utils.sheet_add_aoa(worksheet, [row10Headers], { origin: 'A10' }); // Write to row 10
 
     // Apply merges for Row 2
     worksheet['!merges'] = [
