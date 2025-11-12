@@ -15,11 +15,11 @@ export async function exportPIRLStoPaGamOQuizGroup(
   updateProgressCallback: ProgressCallback
 ) {
   try {
-    updateProgressCallback(0, '開始準備 PaGamO 題組資料...');
+    updateProgressCallback(0, '開始準備 PaGamO 題組資料 (v1.0 格式)...');
 
     const optionLabels = ['A', 'B', 'C', 'D'];
 
-    // This header is exactly 11 rows to match the PaGamO template screenshot.
+    // This header is exactly 11 rows to match the PaGamO v1.0 template.
     // Data will start on row 12.
     const header: (string | null)[][] = [
         ['版本資訊', 'v1.0', null, null, null, '題組共同內容', null, null, null, '題組個別題目', null, null, null, null, null, null, null, null, null, null, null, '答案', null, null, null],
@@ -40,30 +40,29 @@ export async function exportPIRLStoPaGamOQuizGroup(
     questionsOutput.questions.forEach((q, index) => {
       updateProgressCallback(10 + Math.round(((index + 1) / questionsOutput.questions.length) * 80), `處理題組題目 ${index + 1} / ${questionsOutput.questions.length}`);
       
-      // Create an array of 25 nulls, matching the number of columns.
       const row: (string | number | null)[] = new Array(25).fill(null);
       
       row[0] = index + 1;                             // A: 編號
       row[1] = '閱讀素養題組';                        // B: 科目
-      row[2] = '資訊冊';                            // C: 冊次
-      row[3] = '資訊章';                            // D: 章節
+      row[2] = '資訊冊';                              // C: 冊次
+      row[3] = '資訊章';                              // D: 章節
       // E: 難度 (null)
-      row[5] = articleTitle;                        // F: 標題
+      row[5] = articleTitle;                          // F: 標題
       // G: 標題多媒體檔名 (null)
-      row[7] = articleContent;                      // H: 內容
+      row[7] = articleContent;                        // H: 內容
       // I: 內容多媒體檔名 (null)
-      row[9] = q.question;                          // J: 題目
+      row[9] = q.question;                            // J: 題目
       // K: 題目多媒體檔名 (null)
-      row[11] = q.options[0] || '';                 // L: 選項A
+      row[11] = q.options[0] || '';                   // L: 選項A
       // M: 選項A多媒體檔名 (null)
-      row[13] = q.options[1] || '';                 // N: 選項B
+      row[13] = q.options[1] || '';                   // N: 選項B
       // O: 選項B多媒體檔名 (null)
-      row[15] = q.options[2] || '';                 // P: 選項C
+      row[15] = q.options[2] || '';                   // P: 選項C
       // Q: 選項C多媒體檔名 (null)
-      row[17] = q.options[3] || '';                 // R: 選項D
+      row[17] = q.options[3] || '';                   // R: 選項D
       // S, T, U are for Option E and its media (null)
-      row[21] = optionLabels[q.correctAnswerIndex]; // V: 正確答案
-      row[22] = q.explanation;                      // W: 文字詳解
+      row[21] = optionLabels[q.correctAnswerIndex];   // V: 正確答案
+      row[22] = q.explanation;                        // W: 文字詳解
       // X, Y are for explanation media and option shuffling (null)
       
       data.push(row);
@@ -74,9 +73,6 @@ export async function exportPIRLStoPaGamOQuizGroup(
     updateProgressCallback(90, '正在建立 PaGamO 題組 Excel 工作表...');
 
     const worksheet = XLSX.utils.aoa_to_sheet(finalData);
-    
-    // As per the template, the header rows should not be hidden, but be part of the sheet.
-    // PaGamO's importer likely skips the first 11 rows.
     
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
