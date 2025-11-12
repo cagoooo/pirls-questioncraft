@@ -17,7 +17,7 @@ export async function exportPIRLStoPaGamO(
 
     const optionLabels = ['A', 'B', 'C', 'D'];
 
-    // Header data based on the provided image
+    // Header data based on the PaGamO template.
     const header: (string | null)[][] = [
       ['版本資訊', 'v1.1'],
       ['題目資訊'],
@@ -73,7 +73,6 @@ export async function exportPIRLStoPaGamO(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
     updateProgressCallback(95, '準備下載 PaGamO 檔案...');
-    // The bookSST option is recommended for compatibility with non-standard clients
     XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'PaGamO 檔案已開始下載！');
