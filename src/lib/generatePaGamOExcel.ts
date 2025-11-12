@@ -1,4 +1,3 @@
-
 // src/lib/generatePaGamOExcel.ts
 'use client';
 
@@ -8,11 +7,6 @@ import type { Toast } from '@/hooks/use-toast';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
-// Helper to convert array of arrays to a TSV string
-const aoaToTsv = (data: (string | number)[][]): string => {
-  return data.map(row => row.join('\t')).join('\n');
-};
-
 export async function exportPIRLStoPaGamO(
   questionsOutput: GeneratePirlsQuestionsOutput,
   showToast: typeof Toast,
@@ -20,51 +14,40 @@ export async function exportPIRLStoPaGamO(
 ) {
   try {
     updateProgressCallback(0, '開始準備 PaGamO 資料...');
-    
-    // According to the prompt, PaGamO format does not use headers.
-    // The structure is fixed with 23 columns.
 
-    const data = questionsOutput.questions.map((q, index) => {
+    const data: (string | number)[][] = [];
+
+    // Add 10 empty rows to meet PaGamO's format requirement (data starts from row 11)
+    for (let i = 0; i < 10; i++) {
+      data.push([]);
+    }
+
+    questionsOutput.questions.forEach((q, index) => {
       updateProgressCallback(10 + Math.round(((index + 1) / questionsOutput.questions.length) * 80), `處理題目 ${index + 1} / ${questionsOutput.questions.length}`);
       
       const row: (string | number)[] = new Array(23).fill('');
       
-      // A. Static Fields
+      row[0] = index + 1;
       row[1] = '閱讀素養題組';
       row[2] = '資訊冊';
       row[3] = '資訊章';
-
-      // B. Dynamic Fields
-      row[0] = index + 1; // 編號 (starts from 1)
-      row[5] = q.question; // 題目
+      row[5] = q.question;
       
-      // PaGamO expects answer options in specific columns, not necessarily contiguous
-      // It also requires correct answer to be in a specific field which is not provided in this format.
-      // The format from the user prompt has correct answer in a specific field which is not used here.
-      // The prompt also seems to imply a single answer question type.
-      // Based on the prompt, the correct answer should be implicitly Option A. Let's adjust.
-      // The prompt also says "if the question does not need C, leave it blank". This suggests not all questions have 4 options.
-      // But the input data has 4 options. We will provide all 4.
-
-      // Let's re-map the options. The correct answer will be option A (column 8).
+      // The correct answer must be in Option A (column H/index 7) for PaGamO.
       const options = [...q.options];
       const correctAnswer = options.splice(q.correctAnswerIndex, 1)[0];
       
-      row[7] = correctAnswer;  // Options are re-ordered. Correct is always A.
-      row[9] = options[0] || '';
-      row[11] = options[1] || '';
-      row[13] = options[2] || '';
+      row[7] = correctAnswer; // Option A
+      row[9] = options[0] || '';   // Option B
+      row[11] = options[1] || '';  // Option C
+      row[13] = options[2] || '';  // Option D
       
-      return row;
+      data.push(row);
     });
 
     updateProgressCallback(90, '正在建立 PaGamO Excel 工作表...');
 
-    // Since the format is strict and doesn't use headers, we'll build a worksheet from an array of arrays.
     const worksheet = XLSX.utils.aoa_to_sheet(data);
-
-    // PaGamO format doesn't need specific column widths, but we can add them for readability if opened in Excel.
-    // Let's skip this for now to adhere strictly to the PaGamO generation rules.
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
