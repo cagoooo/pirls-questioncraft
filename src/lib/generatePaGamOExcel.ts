@@ -27,20 +27,26 @@ export async function exportPIRLStoPaGamO(
       
       const row: (string | number)[] = new Array(23).fill('');
       
-      row[0] = index + 1;
-      row[1] = '閱讀素養題組';
-      row[2] = '資訊冊';
-      row[3] = '資訊章';
-      row[5] = q.question;
-      
-      // The correct answer must be in Option A (column H/index 7) for PaGamO.
       const options = [...q.options];
       const correctAnswer = options.splice(q.correctAnswerIndex, 1)[0];
-      
-      row[7] = correctAnswer; // Option A
-      row[9] = options[0] || '';   // Option B
-      row[11] = options[1] || '';  // Option C
-      row[13] = options[2] || '';  // Option D
+
+      row[0] = index + 1;                  // A: 編號
+      row[1] = '閱讀素養題組';              // B: 科目
+      row[2] = '資訊冊';                      // C: 冊次
+      row[3] = '資訊章';                      // D: 章節
+      // E is empty
+      row[5] = q.question;                   // F: 題目
+      // G is empty
+      row[7] = correctAnswer;                // H: 選項A (正確答案)
+      // I is empty
+      row[9] = options[0] || '';           // J: 選項B
+      // K is empty
+      row[11] = options[1] || '';          // L: 選項C
+      // M is empty
+      row[13] = options[2] || '';          // N: 選項D
+      // O, P, Q are empty
+      row[17] = correctAnswer;               // R: 正確答案
+      // S, T, U, V, W are empty
       
       data.push(row);
     });
