@@ -70,7 +70,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     worksheet['U2'] = { t: 's', v: '答案和詳解' };
     worksheet['X2'] = { t: 's', v: '設定' };
 
-    // Row 9: Warning text
+    // Row 9: Warning text (in A9 only, no merge)
     worksheet['A9'] = { t: 's', v: '（請勿更動以上內容）第十一列開始為要上傳的內容，請參照範例填寫，最多可填寫 1,000 列' };
 
     // Row 10: Detailed column headers
@@ -84,7 +84,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     ];
     XLSX.utils.sheet_add_aoa(worksheet, [row10Headers], { origin: 'A10' });
 
-    // Apply merges
+    // Apply merges for Row 2
     worksheet['!merges'] = [
         { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, // A2:E2 '題組資訊'
         { s: { r: 1, c: 5 }, e: { r: 1, c: 7 } }, // F2:H2 '題組共用內容'
@@ -92,7 +92,6 @@ export async function exportPIRLStoPaGamOQuizGroup(
         { s: { r: 1, c: 10 }, e: { r: 1, c: 19 } },// K2:T2 '選項'
         { s: { r: 1, c: 20 }, e: { r: 1, c: 22 } },// U2:W2 '答案和詳解'
         { s: { r: 1, c: 23 }, e: { r: 1, c: 24 } },// X2:Y2 '設定'
-        { s: { r: 8, c: 0 }, e: { r: 8, c: 24 } }, // A9:Y9 for the warning text
     ];
     
     // Add the actual data starting from row 11 (origin: A11)
