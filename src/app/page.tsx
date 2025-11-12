@@ -306,7 +306,7 @@ export default function PIRLSQuestionCraftPage() {
   const handleDownloadExcel = async () => {
     if (!generatedQuestionsOutput) {
       toast({
-        title: '無法下載 Excel',
+        title: '無法下載',
         description: '請先生成題目。',
         variant: 'destructive',
       });
@@ -314,20 +314,20 @@ export default function PIRLSQuestionCraftPage() {
     }
     setIsGeneratingExcel(true);
     setFileGenerationProgress(0);
-    setFileGenerationMessage('正在初始化 Excel 產生程序...');
+    setFileGenerationMessage('正在初始化檔案產生程序...');
     setTimeout(() => {
       fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
     try {
       await exportPIRLStoExcel(generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (excelError: any) {
-      console.error("Excel 生成失敗:", excelError);
+      console.error("檔案生成失敗:", excelError);
       toast({
-        title: 'Excel 生成失敗',
-        description: excelError.message || '無法生成 Excel 檔案，請稍後再試。',
+        title: '檔案生成失敗',
+        description: excelError.message || '無法生成檔案，請稍後再試。',
         variant: 'destructive',
       });
-      setFileGenerationMessage(`Excel 生成失敗: ${excelError.message || '未知錯誤'}`);
+      setFileGenerationMessage(`檔案生成失敗: ${excelError.message || '未知錯誤'}`);
       setFileGenerationProgress(0);
     } finally {
       setIsGeneratingExcel(false);
@@ -762,12 +762,12 @@ export default function PIRLSQuestionCraftPage() {
                         {isGeneratingExcel ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Excel準備中...
+                                Loilonote準備中...
                             </>
                         ) : (
                             <>
                                 <SheetIcon className="mr-2 h-4 w-4" />
-                                下載 Excel
+                                匯出Loilonote
                             </>
                         )}
                     </Button>
@@ -867,6 +867,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
