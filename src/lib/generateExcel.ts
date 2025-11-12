@@ -1,4 +1,3 @@
-
 // src/lib/generateExcel.ts
 'use client';
 
@@ -56,13 +55,13 @@ export async function exportPIRLStoExcel(
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PIRLS 題組');
 
-    updateProgressCallback(95, '準備下載 Excel 檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_QuestionCraft_題組.xlsx');
+    updateProgressCallback(95, '準備下載 Loilonote 檔案...');
+    XLSX.writeFile(workbook, 'PIRLS_Loilonote_題組.xlsx');
     
-    updateProgressCallback(100, 'Excel 檔案已開始下載！');
+    updateProgressCallback(100, 'Loilonote 檔案已開始下載！');
     showToast({
-      title: "成功下載 Excel",
-      description: "PIRLS 題組 Excel 檔案已成功下載。請檢查您的下載資料夾。",
+      title: "成功下載 Loilonote 檔案",
+      description: "PIRLS 題組 Loilonote 檔案已成功下載。請檢查您的下載資料夾。",
       variant: "default",
       className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
     });
