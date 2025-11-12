@@ -89,7 +89,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'PaGamO 題組');
 
     updateProgressCallback(95, '準備下載 PaGamO 題組檔案...');
-    XLSX.writeFile(workbook, 'PIRLS_PaGamO_選擇題.xlsx', { bookSST: true });
+    XLSX.writeFile(workbook, 'PIRLS_PaGamO_題組.xlsx', { bookSST: true });
     
     updateProgressCallback(100, 'PaGamO 題組檔案已開始下載！');
     showToast({
@@ -109,3 +109,5 @@ export async function exportPIRLStoPaGamOQuizGroup(
     });
   }
 }
+
+    

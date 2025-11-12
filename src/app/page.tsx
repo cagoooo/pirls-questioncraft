@@ -20,6 +20,7 @@ import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questi
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
+import { exportPIRLStoPaGamOQuizGroup } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon } from 'lucide-react';
@@ -94,6 +95,7 @@ export default function PIRLSQuestionCraftPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
   const [isGeneratingPaGamO, setIsGeneratingPaGamO] = useState(false);
+  const [isGeneratingPaGamOQuizGroup, setIsGeneratingPaGamOQuizGroup] = useState(false);
   const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -121,13 +123,13 @@ export default function PIRLSQuestionCraftPage() {
   }, []);
 
   useEffect(() => {
-    if ((isGeneratingPdf || isGeneratingExcel || isGeneratingPaGamO) && fileProgressSectionRef.current) {
+    if ((isGeneratingPdf || isGeneratingExcel || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup) && fileProgressSectionRef.current) {
       const timer = setTimeout(() => {
         fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100); 
       return () => clearTimeout(timer);
     }
-  }, [isGeneratingPdf, isGeneratingExcel, isGeneratingPaGamO]);
+  }, [isGeneratingPdf, isGeneratingExcel, isGeneratingPaGamO, isGeneratingPaGamOQuizGroup]);
 
   useEffect(() => {
     if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
@@ -367,6 +369,37 @@ export default function PIRLSQuestionCraftPage() {
     }
   };
 
+  const handleDownloadPaGamOQuizGroup = async () => {
+    if (!generatedQuestionsOutput || inputText.trim().length === 0) {
+      toast({
+        title: '無法下載題組',
+        description: '請先在文字模式下生成題目。',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsGeneratingPaGamOQuizGroup(true);
+    setFileGenerationProgress(0);
+    setFileGenerationMessage('正在初始化 PaGamO 題組檔案產生程序...');
+    setTimeout(() => {
+      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+    try {
+      await exportPIRLStoPaGamOQuizGroup(generatedQuestionsOutput, inputText, toast, fileProgressCallback);
+    } catch (paGamOError: any) {
+      console.error("PaGamO 題組檔案生成失敗:", paGamOError);
+      toast({
+        title: 'PaGamO 題組檔案生成失敗',
+        description: paGamOError.message || '無法生成檔案，請稍後再試。',
+        variant: 'destructive',
+      });
+      setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
+      setFileGenerationProgress(0);
+    } finally {
+      setIsGeneratingPaGamOQuizGroup(false);
+    }
+  };
+
   const handleStartQuiz = () => {
     if (generatedQuestionsOutput && (imageFiles.length > 0 || inputText.trim().length > 0)) {
       setIsQuizActive(true);
@@ -495,7 +528,7 @@ export default function PIRLSQuestionCraftPage() {
             <TabsContent value="image" className="mt-6">
               <FileUpload 
                 onFilesSelected={handleImageFilesChange} 
-                isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO} 
+                isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup} 
               />
             </TabsContent>
             <TabsContent value="text" className="mt-6">
@@ -535,7 +568,7 @@ export default function PIRLSQuestionCraftPage() {
                     if (!isLoading) setQuestionMode(value as '8-questions' | '10-questions');
                   }}
                   className="grid grid-cols-1 gap-4"
-                  disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO}
+                  disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
                 >
                   <div>
                     <RadioGroupItem value="8-questions" id="mode-8" className="peer sr-only" />
@@ -579,7 +612,7 @@ export default function PIRLSQuestionCraftPage() {
                       if (!isLoading) setLanguageMode(value as 'zh-TW' | 'en');
                     }}
                     className="grid grid-cols-1 gap-4"
-                    disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO}
+                    disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
                   >
                   <div>
                     <RadioGroupItem value="zh-TW" id="lang-zh" className="peer sr-only" />
@@ -618,7 +651,7 @@ export default function PIRLSQuestionCraftPage() {
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
             disabled={
-              isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO ||
+              isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup ||
               (inputMode === 'image' && imageFiles.length === 0) ||
               (inputMode === 'text' && inputText.trim().length === 0)
             }
@@ -669,7 +702,7 @@ export default function PIRLSQuestionCraftPage() {
 
         {generatedQuestionsOutput && !isLoading && (
           <section ref={resultsSectionRef} className="mt-8">
-             {(isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO) && (
+             {(isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup) && (
               <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center text-xl font-semibold">
@@ -694,7 +727,7 @@ export default function PIRLSQuestionCraftPage() {
                   <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
                     <Button
                         onClick={handleStartQuiz}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || !generatedQuestionsOutput}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
                         variant="outline"
                         className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
                     >
@@ -705,7 +738,7 @@ export default function PIRLSQuestionCraftPage() {
                         <DialogTrigger asChild>
                           <Button
                             onClick={handleShareQuiz}
-                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || !generatedQuestionsOutput}
+                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
                             variant="outline"
                             className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
                           >
@@ -771,7 +804,7 @@ export default function PIRLSQuestionCraftPage() {
                       </Dialog>
                     <Button
                         onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || !generatedQuestionsOutput || (inputMode === 'image' && imageFiles.length === 0)}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || (inputMode === 'image' && imageFiles.length === 0)}
                         variant="outline"
                         title={inputMode === 'text' ? '從純文字生成的題組目前不支援匯出為包含文本的 PDF。' : ''}
                     >
@@ -789,7 +822,7 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadExcel}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || !generatedQuestionsOutput}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
                         variant="outline"
                     >
                         {isGeneratingExcel ? (
@@ -806,7 +839,7 @@ export default function PIRLSQuestionCraftPage() {
                     </Button>
                     <Button
                         onClick={handleDownloadPaGamO}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || !generatedQuestionsOutput}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
                         variant="outline"
                     >
                         {isGeneratingPaGamO ? (
@@ -818,6 +851,24 @@ export default function PIRLSQuestionCraftPage() {
                             <>
                                 <SheetIcon className="mr-2 h-4 w-4" />
                                 匯出PaGamO
+                            </>
+                        )}
+                    </Button>
+                    <Button
+                        onClick={handleDownloadPaGamOQuizGroup}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || inputMode !== 'text'}
+                        variant="outline"
+                        title={inputMode !== 'text' ? '此功能僅在「貼上文本」模式下可用。' : '匯出適用於 PaGamO 平台的題組格式'}
+                    >
+                        {isGeneratingPaGamOQuizGroup ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                PaGamO題組準備中...
+                            </>
+                        ) : (
+                            <>
+                                <SheetIcon className="mr-2 h-4 w-4" />
+                                匯出PaGamO題組
                             </>
                         )}
                     </Button>
@@ -917,6 +968,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
