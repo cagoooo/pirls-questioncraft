@@ -55,8 +55,7 @@ export async function exportPIRLStoPaGamOQuizGroup(
       row[1] = '閱讀素養題組';                        // B: 科目
       row[2] = '資訊冊';                              // C: 冊次
       row[3] = '資訊章';                              // D: 章節
-      row[5] = articleTitle;                          // F: 標題 (must be same as group header)
-      row[6] = articleContent;                        // G: 內容(必填) - also required in question rows
+      // F (標題) and G (內容) are intentionally left blank for question rows
       row[8] = q.question;                            // I: 題目(必填)
       row[10] = q.options[0] || '';                   // K: 選項A
       row[12] = q.options[1] || '';                   // M: 選項B
