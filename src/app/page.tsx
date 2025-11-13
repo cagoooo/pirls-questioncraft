@@ -550,9 +550,9 @@ export default function PIRLSQuestionCraftPage() {
       <main className="w-full max-w-3xl space-y-8">
         {!isQuizActive && (
           <Tabs value={inputMode} onValueChange={(value) => handleModeChange(value as InputMode)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="image"><ImageIcon className="mr-2 h-4 w-4" />上傳圖片</TabsTrigger>
-              <TabsTrigger value="text"><FileText className="mr-2 h-4 w-4" />貼上文本</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 h-auto">
+              <TabsTrigger value="image" className="py-2"><ImageIcon className="mr-2 h-4 w-4" />上傳圖片</TabsTrigger>
+              <TabsTrigger value="text" className="py-2"><FileText className="mr-2 h-4 w-4" />貼上文本</TabsTrigger>
             </TabsList>
             <TabsContent value="image" className="mt-6">
               <FileUpload 
@@ -1009,4 +1009,3 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
-
