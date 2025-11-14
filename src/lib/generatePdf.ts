@@ -179,15 +179,16 @@ export async function exportPIRLStoPDF({
   
   if (inputText && inputText.trim().length > 0) {
     updateProgressCallback(25, '正在處理文本內容...');
-    const textLines = doc.splitTextToSize(inputText, contentWidth);
-
-    // *** START: Robust text drawing logic ***
+    // **FIX:** Replace tab characters with spaces to prevent jsPDF layout issues.
+    const sanitizedText = inputText.replace(/\t/g, '  ');
+    const textLines = doc.splitTextToSize(sanitizedText, contentWidth);
+    
+    // **FIX:** Iterate and draw line by line, checking for page breaks each time.
     textLines.forEach((line: string) => {
-      checkPageBreak(lineHeight); // Check space for each line BEFORE drawing
-      doc.text(line, margin, yPos);
-      yPos += lineHeight;
+        checkPageBreak(lineHeight);
+        doc.text(line, margin, yPos);
+        yPos += lineHeight;
     });
-    // *** END: Robust text drawing logic ***
 
     yPos += 5; // Add some space after the text block
     updateProgressCallback(50, '文本內容已加入');
