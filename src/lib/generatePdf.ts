@@ -144,7 +144,7 @@ export async function exportPIRLStoPDF({
   const margin = 15; 
   const contentWidth = pageWidth - 2 * margin;
   const defaultLineWidth = 0.2;
-  const lineHeight = 5;
+  const lineHeight = 6; // Increased line height for better readability
 
   function checkPageBreak(neededHeight: number) {
     if (yPos + neededHeight > pageHeight - margin) {
@@ -181,11 +181,13 @@ export async function exportPIRLStoPDF({
     updateProgressCallback(25, '正在處理文本內容...');
     const textLines = doc.splitTextToSize(inputText, contentWidth);
 
+    // *** START: Robust text drawing logic ***
     textLines.forEach((line: string) => {
-        checkPageBreak(lineHeight); // Check space for each line BEFORE drawing
-        doc.text(line, margin, yPos);
-        yPos += lineHeight;
+      checkPageBreak(lineHeight); // Check space for each line BEFORE drawing
+      doc.text(line, margin, yPos);
+      yPos += lineHeight;
     });
+    // *** END: Robust text drawing logic ***
 
     yPos += 5; // Add some space after the text block
     updateProgressCallback(50, '文本內容已加入');
@@ -289,7 +291,7 @@ export async function exportPIRLStoPDF({
     q.options.forEach((option, optIndex) => {
       const optionFullText = `${optionLabels[optIndex]} ${option}`;
       const optionTextLines = doc.splitTextToSize(optionFullText, contentWidth - 8); 
-      checkPageBreak(optionTextLines.length * 5 + 1); 
+      checkPageBreak(optionTextLines.length * 5 + 1.5); 
       doc.text(optionTextLines, margin + 5, yPos);
       yPos += optionTextLines.length * 5 + 1.5;
     });
