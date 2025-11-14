@@ -144,6 +144,7 @@ export async function exportPIRLStoPDF({
   const margin = 15; 
   const contentWidth = pageWidth - 2 * margin;
   const defaultLineWidth = 0.2;
+  const lineHeight = 5;
 
   function checkPageBreak(neededHeight: number) {
     if (yPos + neededHeight > pageHeight - margin) {
@@ -179,9 +180,12 @@ export async function exportPIRLStoPDF({
   if (inputText && inputText.trim().length > 0) {
       updateProgressCallback(25, '正在處理文本內容...');
       const textLines = doc.splitTextToSize(inputText, contentWidth);
-      checkPageBreak(textLines.length * 5 + 5); // Check before drawing
-      doc.text(textLines, margin, yPos);
-      yPos += textLines.length * 5 + 5;
+      textLines.forEach((line: string) => {
+          checkPageBreak(lineHeight);
+          doc.text(line, margin, yPos);
+          yPos += lineHeight;
+      });
+      yPos += 5; // Add some space after the text block
       updateProgressCallback(50, '文本內容已加入');
   } else if (imageFiles.length > 0) {
     for (let i = 0; i < imageFiles.length; i++) {
