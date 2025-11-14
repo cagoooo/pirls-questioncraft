@@ -963,7 +963,7 @@ export default function PIRLSQuestionCraftPage() {
         href="https://document-ai-companion-ipad4.replit.app"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-4 right-4 sm:bottom-8 sm:left-8 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105"
+        className="fixed bottom-4 right-4 sm:bottom-8 sm:right-auto sm:left-8 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105"
       >
         <Bot className="h-5 w-5" />
         <span className="text-sm">創建專屬助手🦄</span>
@@ -1007,6 +1007,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
