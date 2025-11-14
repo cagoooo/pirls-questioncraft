@@ -178,15 +178,17 @@ export async function exportPIRLStoPDF({
   doc.setFontSize(10);
   
   if (inputText && inputText.trim().length > 0) {
-      updateProgressCallback(25, '正在處理文本內容...');
-      const textLines = doc.splitTextToSize(inputText, contentWidth);
-      textLines.forEach((line: string) => {
-          checkPageBreak(lineHeight);
-          doc.text(line, margin, yPos);
-          yPos += lineHeight;
-      });
-      yPos += 5; // Add some space after the text block
-      updateProgressCallback(50, '文本內容已加入');
+    updateProgressCallback(25, '正在處理文本內容...');
+    const textLines = doc.splitTextToSize(inputText, contentWidth);
+
+    textLines.forEach((line: string) => {
+        checkPageBreak(lineHeight); // Check space for each line BEFORE drawing
+        doc.text(line, margin, yPos);
+        yPos += lineHeight;
+    });
+
+    yPos += 5; // Add some space after the text block
+    updateProgressCallback(50, '文本內容已加入');
   } else if (imageFiles.length > 0) {
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
