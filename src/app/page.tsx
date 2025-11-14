@@ -294,7 +294,7 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
     try {
       await exportPIRLStoPDF({
-          questionsOutput,
+          questionsOutput: generatedQuestionsOutput,
           imageFiles: inputMode === 'image' ? imageFiles : [],
           inputText: inputMode === 'text' ? inputText : undefined,
           showToast: toast,
@@ -312,6 +312,11 @@ export default function PIRLSQuestionCraftPage() {
     } finally {
       setIsGeneratingPdf(false);
     }
+  };
+
+  const updateProgressCallback: ProgressCallback = (progress, message) => {
+    setFileGenerationProgress(progress);
+    setFileGenerationMessage(message);
   };
 
   const handleDownloadExcel = async () => {
@@ -1002,6 +1007,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
