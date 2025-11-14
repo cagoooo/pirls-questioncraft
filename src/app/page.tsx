@@ -277,12 +277,12 @@ export default function PIRLSQuestionCraftPage() {
       toast({ title: '無法下載 PDF', description: '請先生成題目。', variant: 'destructive' });
       return;
     }
-    if (inputMode === 'text') {
-      toast({ title: 'PDF 功能限制', description: '從純文字生成的題組目前不支援匯出為包含文本的 PDF。', variant: 'destructive' });
+    if (inputMode === 'image' && imageFiles.length === 0) {
+      toast({ title: '無法下載 PDF', description: '請確認已上傳圖片以匯出包含文本的 PDF。', variant: 'destructive' });
       return;
     }
-    if (imageFiles.length === 0) {
-      toast({ title: '無法下載 PDF', description: '請確認已上傳圖片以匯出包含文本的 PDF。', variant: 'destructive' });
+     if (inputMode === 'text' && inputText.trim().length === 0) {
+      toast({ title: '無法下載 PDF', description: '文本內容為空，無法生成 PDF。', variant: 'destructive' });
       return;
     }
 
@@ -293,7 +293,13 @@ export default function PIRLSQuestionCraftPage() {
       fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
     try {
-      await exportPIRLStoPDF(imageFiles, generatedQuestionsOutput, toast, fileProgressCallback);
+      await exportPIRLStoPDF({
+          questionsOutput,
+          imageFiles: inputMode === 'image' ? imageFiles : [],
+          inputText: inputMode === 'text' ? inputText : undefined,
+          showToast: toast,
+          updateProgressCallback,
+      });
     } catch (pdfError: any) {
       console.error("PDF 生成失敗:", pdfError);
       toast({
@@ -833,9 +839,8 @@ export default function PIRLSQuestionCraftPage() {
                       </Dialog>
                     <Button
                         onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput || (inputMode === 'image' && imageFiles.length === 0)}
+                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
                         variant="outline"
-                        title={inputMode === 'text' ? '從純文字生成的題組目前不支援匯出為包含文本的 PDF。' : ''}
                     >
                         {isGeneratingPdf ? (
                             <>

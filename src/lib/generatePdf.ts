@@ -10,6 +10,14 @@ type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
 type ProgressCallback = (progress: number, message: string) => void;
 
+interface PdfExportOptions {
+  questionsOutput: GeneratePirlsQuestionsOutput;
+  showToast: typeof Toast;
+  updateProgressCallback: ProgressCallback;
+  imageFiles?: File[];
+  inputText?: string;
+}
+
 const convertFileToDataUri = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -114,12 +122,13 @@ async function loadAllFonts(doc: jsPDF, showToast: typeof Toast, updateProgress:
   }
 }
 
-export async function exportPIRLStoPDF(
-  imageFiles: File[],
-  questionsOutput: GeneratePirlsQuestionsOutput,
-  showToast: typeof Toast,
-  updateProgressCallback: ProgressCallback
-) {
+export async function exportPIRLStoPDF({
+  questionsOutput,
+  imageFiles = [],
+  inputText,
+  showToast,
+  updateProgressCallback
+}: PdfExportOptions) {
   updateProgressCallback(0, '開始準備 PDF...');
   const doc = new jsPDF({
     orientation: 'p',
@@ -150,29 +159,31 @@ export async function exportPIRLStoPDF(
   doc.text('PIRLS 閱讀素養題組', pageWidth / 2, yPos, { align: 'center' });
   yPos += 15;
 
-  updateProgressCallback(20, '準備圖片區塊...');
+  updateProgressCallback(20, '準備閱讀文本區塊...');
   checkPageBreak(12);
-  const imagesSectionTitle = '一、閱讀文本 (圖片內容)';
+  const readingSectionTitle = '一、閱讀文本';
   doc.setFont('NotoSansTC', 'bold');
   doc.setFontSize(16);
-  doc.text(imagesSectionTitle, margin, yPos);
-  const imagesSectionTitleWidth = doc.getTextWidth(imagesSectionTitle);
+  doc.text(readingSectionTitle, margin, yPos);
+  const readingSectionTitleWidth = doc.getTextWidth(readingSectionTitle);
   doc.setDrawColor(...themeColors.primary);
   doc.setLineWidth(0.5);
-  doc.line(margin, yPos + 1.5, margin + imagesSectionTitleWidth, yPos + 1.5);
+  doc.line(margin, yPos + 1.5, margin + readingSectionTitleWidth, yPos + 1.5);
   doc.setDrawColor(...themeColors.borderDefault); 
   doc.setLineWidth(defaultLineWidth);
   yPos += 10;
 
   doc.setFont('NotoSansTC', 'normal');
   doc.setFontSize(10);
-
-  if (imageFiles.length === 0) {
-    checkPageBreak(10);
-    doc.text('未上傳任何圖片。', margin, yPos);
-    yPos += 7;
-    updateProgressCallback(50, '圖片區塊完成 (無圖片)');
-  } else {
+  
+  if (inputText && inputText.trim().length > 0) {
+      updateProgressCallback(25, '正在處理文本內容...');
+      const textLines = doc.splitTextToSize(inputText, contentWidth);
+      checkPageBreak(textLines.length * 5 + 5);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 5 + 5;
+      updateProgressCallback(50, '文本內容已加入');
+  } else if (imageFiles.length > 0) {
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
       updateProgressCallback(20 + Math.round((i / imageFiles.length) * 30), `正在處理圖片 ${i + 1} / ${imageFiles.length}...`);
@@ -208,6 +219,11 @@ export async function exportPIRLStoPDF(
       }
     }
     updateProgressCallback(50, '所有圖片已加入 PDF');
+  } else {
+    checkPageBreak(10);
+    doc.text('未提供閱讀文本。', margin, yPos);
+    yPos += 7;
+    updateProgressCallback(50, '文本區塊完成 (無內容)');
   }
   yPos += 8; 
 
