@@ -179,7 +179,7 @@ export async function exportPIRLStoPDF({
   if (inputText && inputText.trim().length > 0) {
       updateProgressCallback(25, '正在處理文本內容...');
       const textLines = doc.splitTextToSize(inputText, contentWidth);
-      checkPageBreak(textLines.length * 5 + 5);
+      checkPageBreak(textLines.length * 5 + 5); // Check before drawing
       doc.text(textLines, margin, yPos);
       yPos += textLines.length * 5 + 5;
       updateProgressCallback(50, '文本內容已加入');
