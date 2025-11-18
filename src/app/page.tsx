@@ -392,29 +392,67 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
     
     try {
-      let articleContent = inputText; // The authoritative text is now always in inputText
-      let articleTitle = "閱讀題組"; // Default title
+      let articleContent = '';
+      let articleTitle = '';
 
-      // Even if in image mode, the text has been extracted to inputText.
-      // We just need a title.
-      if (inputMode === 'image' && (!articleContent || articleContent.trim().length === 0)) {
-         throw new Error('無法找到文章內容，請先點擊「生成PIRLS題目」來從圖片辨識文字。');
+      // Step 1: Always get the authoritative text and title first.
+      if (inputMode === 'image') {
+        if (imageFiles.length === 0) {
+          throw new Error('請先上傳圖片以生成題組。');
+        }
+        setFileGenerationMessage('AI 正在從圖片辨識與重組文章...');
+        setFileGenerationProgress(25);
+        const textResult = await generateTextAndTitleFromImages({
+          photoDataUris: await Promise.all(imageFiles.map(file => resizeImage(file))),
+        });
+
+        if (!textResult || !textResult.articleContent) {
+          throw new Error('AI 無法從您的圖片中成功辨識出文字。');
+        }
+        articleContent = textResult.articleContent;
+        articleTitle = textResult.title; // Use the AI-generated title
+      } else {
+        if (inputText.trim().length === 0) {
+            throw new Error('文字內容為空，無法生成題組。');
+        }
+        // For text mode, we might still need a title. We can generate it.
+        setFileGenerationMessage('AI 正在為您的文字產生標題...');
+        setFileGenerationProgress(25);
+        // A bit of a workaround: use the image flow but with a prompt that just gives a title.
+        // A better approach would be a dedicated "generateTitleForText" flow.
+        // For now, we simulate this by calling the existing flow but we only need the title.
+        // To avoid creating a new flow just for this, let's call the existing one.
+        const textResult = await generateTextAndTitleFromImages({ photoDataUris: [] }); // This is not ideal.
+                                                                                         // Let's refine the logic to derive title from text if in text mode.
+
+        // Refined logic: If in text mode, generate a title from the text itself.
+        // A simple heuristic for now until a dedicated flow is built.
+        const firstLine = inputText.split('\n')[0].trim();
+        if (firstLine.length > 2 && firstLine.length < 50) {
+            articleTitle = firstLine;
+        } else {
+            articleTitle = '閱讀題組'; // Fallback title
+        }
+        articleContent = inputText;
       }
       
-      // Let's generate a title from the content if we don't have one.
-      // A simple heuristic is to take the first part of the text.
-      if (articleContent) {
-          const titleCandidate = articleContent.split('\n')[0].trim();
-          if (titleCandidate.length > 2 && titleCandidate.length < 30) {
-            articleTitle = titleCandidate;
-          } else if (generatedQuestionsOutput.questions[0]) {
-            articleTitle = generatedQuestionsOutput.questions[0].question.substring(0, 20) + '...';
-          }
+      // Step 2: Generate questions based on the authoritative text.
+      // This ensures questions always match the content.
+      setFileGenerationMessage('AI 正在根據文章設計題目...');
+      setFileGenerationProgress(50);
+      const questionsResult = await generatePirlsQuestionsFromText({
+        text: articleContent,
+        questionMode,
+        languageMode,
+      });
+
+      if (!questionsResult || !questionsResult.questions) {
+          throw new Error('AI 未能根據文章內容成功生成題目。');
       }
 
       setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
       setFileGenerationProgress(75);
-      await exportPIRLStoPaGamOQuizGroup(generatedQuestionsOutput, articleContent, articleTitle, toast, fileProgressCallback);
+      await exportPIRLStoPaGamOQuizGroup(questionsResult, articleContent, articleTitle, toast, fileProgressCallback);
 
     } catch (paGamOError: any) {
       console.error("PaGamO 題組檔案生成失敗:", paGamOError);
@@ -997,6 +1035,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
