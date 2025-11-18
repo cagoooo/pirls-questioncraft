@@ -2,11 +2,8 @@
 'use server';
 
 /**
- * @fileOverview Generates PIRLS-style multiple-choice questions based on image content.
- *
- * - generatePirlsQuestions - A function that generates PIRLS questions.
- * - GeneratePirlsQuestionsInput - The input type for the generatePirlsQuestions function.
- * - GeneratePirlsQuestionsOutput - The output type for the generatePirlsQuestions function.
+ * @fileOverview This file is DEPRECATED. Question generation is now handled by generate-pirls-questions-from-text.
+ * It is kept for potential reference but is no longer used in the main application flow.
  */
 
 import {ai} from '@/ai/genkit';
@@ -45,14 +42,17 @@ const GeneratePirlsQuestionsOutputSchema = z.object({
 });
 export type GeneratePirlsQuestionsOutput = z.infer<typeof GeneratePirlsQuestionsOutputSchema>;
 
+// This function is deprecated and should not be used directly.
+// It remains for potential compatibility or reference.
 export async function generatePirlsQuestions(
   input: GeneratePirlsQuestionsInput
 ): Promise<GeneratePirlsQuestionsOutput> {
+  console.warn('DEPRECATED: generatePirlsQuestions is called. Use generatePirlsQuestionsFromText instead.');
   return generatePirlsQuestionsFlow(input);
 }
 
 const prompt = ai.definePrompt({
-  name: 'generatePirlsQuestionsPrompt',
+  name: 'generatePirlsQuestionsPrompt_DEPRECATED',
   model: 'googleai/gemini-2.0-flash-lite',
   input: {schema: GeneratePirlsQuestionsInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
@@ -68,7 +68,7 @@ const prompt = ai.definePrompt({
 - **評估與批判 (Evaluate and Critique)**: 2 題
 總共十題。
 {{else}}
-您必須為每個PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
+您必須為每个PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
 {{/if}}
 
 **語言模式指令 (Language Mode Instruction):**
@@ -101,7 +101,7 @@ const prompt = ai.definePrompt({
 
 const generatePirlsQuestionsFlow = ai.defineFlow(
   {
-    name: 'generatePirlsQuestionsFlow',
+    name: 'generatePirlsQuestionsFlow_DEPRECATED',
     inputSchema: GeneratePirlsQuestionsInputSchema,
     outputSchema: GeneratePirlsQuestionsOutputSchema,
   },
@@ -129,3 +129,5 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

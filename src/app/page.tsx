@@ -15,8 +15,7 @@ import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
-import { generatePirlsQuestions, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
-import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
+import { generatePirlsQuestionsFromText, type GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions-from-text';
 import { generateTextAndTitleFromImages } from '@/ai/flows/generate-text-and-title-from-images';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
@@ -186,7 +185,7 @@ export default function PIRLSQuestionCraftPage() {
     if (!isReady) {
       toast({
         title: inputMode === 'image' ? '沒有圖片' : '沒有文字',
-        description: inputMode === 'image' ? '請先上傳至少一張圖片。' : '請在文字區塊中輸入或貼上內容。',
+        description: inputMode === 'image' ? '請先上傳至少一張圖片。' : '在文字區塊中輸入或貼上內容。',
         variant: 'destructive',
       });
       return;
@@ -210,32 +209,30 @@ export default function PIRLSQuestionCraftPage() {
     updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      let questionsResult: GeneratePirlsQuestionsOutput;
-
+      let authoritativeText = '';
       if (inputMode === 'image') {
         updateDisplayProgress(20, '正在壓縮與處理圖片...');
         const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
-
         if (photoDataUris.length === 0) {
           throw new Error('無法處理圖片，請確認檔案是否正確。');
         }
-
-        updateDisplayProgress(50, 'AI 正在分析圖片並設計題目...');
-        questionsResult = await generatePirlsQuestions({
-          photoDataUris,
-          questionMode,
-          languageMode,
-        });
-
-      } else { // inputMode === 'text'
-        updateDisplayProgress(40, 'AI 正在分析文字並設計題目...');
-        questionsResult = await generatePirlsQuestionsFromText({
-          text: inputText,
-          questionMode,
-          languageMode,
-        });
+        updateDisplayProgress(30, 'AI 正在從圖片辨識與重組文章...');
+        const textResult = await generateTextAndTitleFromImages({ photoDataUris });
+        if (!textResult || !textResult.articleContent) {
+          throw new Error('AI 無法從圖片中成功辨識出文字。');
+        }
+        authoritativeText = textResult.articleContent;
+        setInputText(authoritativeText); // Also update the textarea for user visibility
+      } else {
+        authoritativeText = inputText;
       }
 
+      updateDisplayProgress(60, 'AI 正在根據文章內容設計題目...');
+      const questionsResult = await generatePirlsQuestionsFromText({
+        text: authoritativeText,
+        questionMode,
+        languageMode,
+      });
 
       if (questionsResult && questionsResult.questions) {
         updateDisplayProgress(100, '題目已成功生成！');
@@ -277,9 +274,9 @@ export default function PIRLSQuestionCraftPage() {
       toast({ title: '無法下載 PDF', description: '請先生成題目。', variant: 'destructive' });
       return;
     }
-    if (inputMode === 'image' && imageFiles.length === 0) {
-      toast({ title: '無法下載 PDF', description: '請確認已上傳圖片以匯出包含文本的 PDF。', variant: 'destructive' });
-      return;
+    if (inputMode === 'image' && imageFiles.length === 0 && (!inputText || inputText.trim().length === 0)) {
+        toast({ title: '無法下載 PDF', description: '請確認已上傳圖片或輸入文字以匯出包含文本的 PDF。', variant: 'destructive' });
+        return;
     }
      if (inputMode === 'text' && inputText.trim().length === 0) {
       toast({ title: '無法下載 PDF', description: '文本內容為空，無法生成 PDF。', variant: 'destructive' });
@@ -296,7 +293,7 @@ export default function PIRLSQuestionCraftPage() {
       await exportPIRLStoPDF({
           questionsOutput: generatedQuestionsOutput,
           imageFiles: inputMode === 'image' ? imageFiles : [],
-          inputText: inputMode === 'text' ? inputText : undefined,
+          inputText: inputText, // Always pass inputText as it's the authoritative source
           showToast: toast,
           updateProgressCallback,
       });
@@ -395,33 +392,26 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
     
     try {
-      let articleContent: string;
-      let articleTitle: string;
+      let articleContent = inputText; // The authoritative text is now always in inputText
+      let articleTitle = "閱讀題組"; // Default title
 
-      if (inputMode === 'text') {
-        if (inputText.trim().length === 0) {
-          throw new Error('文字模式下需要文本內容才能匯出題組。');
-        }
-        articleContent = inputText;
-        // For text mode, we can take the first question as a pseudo-title or generate one.
-        // For simplicity, let's derive it.
-        articleTitle = generatedQuestionsOutput.questions[0]?.question.substring(0, 20) + '...' || '閱讀題組';
-      } else { // image mode
-        if (imageFiles.length === 0) {
-          throw new Error('圖片模式下需要圖片才能匯出題組。');
-        }
-        setFileGenerationMessage('AI 正在從圖片辨識文字與生成標題...');
-        setFileGenerationProgress(25);
-        const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
-        const textFromImagesResult = await generateTextAndTitleFromImages({ photoDataUris });
-        
-        if (!textFromImagesResult || !textFromImagesResult.articleContent) {
-          throw new Error('AI 無法從圖片中辨識出文字內容。');
-        }
-        articleContent = textFromImagesResult.articleContent;
-        articleTitle = textFromImagesResult.title;
+      // Even if in image mode, the text has been extracted to inputText.
+      // We just need a title.
+      if (inputMode === 'image' && (!articleContent || articleContent.trim().length === 0)) {
+         throw new Error('無法找到文章內容，請先點擊「生成PIRLS題目」來從圖片辨識文字。');
       }
       
+      // Let's generate a title from the content if we don't have one.
+      // A simple heuristic is to take the first part of the text.
+      if (articleContent) {
+          const titleCandidate = articleContent.split('\n')[0].trim();
+          if (titleCandidate.length > 2 && titleCandidate.length < 30) {
+            articleTitle = titleCandidate;
+          } else if (generatedQuestionsOutput.questions[0]) {
+            articleTitle = generatedQuestionsOutput.questions[0].question.substring(0, 20) + '...';
+          }
+      }
+
       setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
       setFileGenerationProgress(75);
       await exportPIRLStoPaGamOQuizGroup(generatedQuestionsOutput, articleContent, articleTitle, toast, fileProgressCallback);
@@ -1007,6 +997,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
