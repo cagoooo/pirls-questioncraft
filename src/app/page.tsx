@@ -39,7 +39,7 @@ type InputMode = 'image' | 'text';
  * @param maxSize The maximum width or height of the image.
  * @returns A promise that resolves with the data URI of the resized image.
  */
-const resizeImage = (file: File, maxSize: number = 2048): Promise<string> => {
+const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -75,7 +75,7 @@ const resizeImage = (file: File, maxSize: number = 2048): Promise<string> => {
         ctx.drawImage(img, 0, 0, width, height);
 
         // Convert canvas to JPEG data URI for better compression
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.onerror = (err) => reject(err);
       img.src = e.target.result as string;
@@ -1063,3 +1063,4 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
