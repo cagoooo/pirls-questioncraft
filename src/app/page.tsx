@@ -117,6 +117,7 @@ export default function PIRLSQuestionCraftPage() {
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
   const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
+  const textInputAreaRef = useRef<HTMLDivElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -140,6 +141,15 @@ export default function PIRLSQuestionCraftPage() {
         return () => clearTimeout(timer);
     }
   }, [isGeneratingQuizResultsPdf]);
+  
+  useEffect(() => {
+    if (inputMode === 'text' && textInputAreaRef.current) {
+      const timer = setTimeout(() => {
+        textInputAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [inputMode]);
 
   const handleModeChange = (newMode: InputMode) => {
     setInputMode(newMode);
@@ -396,7 +406,6 @@ export default function PIRLSQuestionCraftPage() {
       let articleContent = '';
       let articleTitle = '';
 
-      // Step 1: Always get the authoritative text and title first.
       if (inputMode === 'image') {
         if (imageFiles.length === 0) {
           throw new Error('請先上傳圖片以生成題組。');
@@ -411,28 +420,21 @@ export default function PIRLSQuestionCraftPage() {
           throw new Error('AI 無法從您的圖片中成功辨識出文字。');
         }
         articleContent = textResult.articleContent;
-        articleTitle = textResult.title; // Use the AI-generated title
+        articleTitle = textResult.title;
+        setInputText(articleContent);
       } else {
         if (inputText.trim().length === 0) {
             throw new Error('文字內容為空，無法生成題組。');
         }
-        // For text mode, we might still need a title. We can generate it.
         setFileGenerationMessage('AI 正在為您的文字產生標題...');
         setFileGenerationProgress(25);
-        // A bit of a workaround: use the image flow but with a prompt that just gives a title.
-        // A better approach would be a dedicated "generateTitleForText" flow.
-        // For now, we simulate this by calling the existing flow but we only need the title.
-        // To avoid creating a new flow just for this, let's call the existing one.
-        // This is not ideal, but for now we generate a title from the text itself if in text mode.
-        // This is a temporary solution until a dedicated flow is created.
+        
         const textResult = await generateTextAndTitleFromImages({ photoDataUris: [] }); 
         
         articleContent = inputText;
         articleTitle = textResult.title || '閱讀題組';
       }
       
-      // Step 2: Generate questions based on the authoritative text.
-      // This ensures questions always match the content.
       setFileGenerationMessage('AI 正在根據文章設計題目...');
       setFileGenerationProgress(50);
       const questionsResult = await generatePirlsQuestionsFromText({
@@ -460,6 +462,7 @@ export default function PIRLSQuestionCraftPage() {
       setFileGenerationProgress(0);
     } finally {
       setIsGeneratingPaGamOQuizGroup(false);
+      setInputMode('text');
     }
   };
 
@@ -603,7 +606,7 @@ export default function PIRLSQuestionCraftPage() {
                 isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup} 
               />
             </TabsContent>
-            <TabsContent value="text" className="mt-6">
+            <TabsContent value="text" className="mt-6" ref={textInputAreaRef}>
               <Card className="w-full bg-accent/10 dark:bg-accent/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
@@ -995,7 +998,7 @@ export default function PIRLSQuestionCraftPage() {
         href="https://document-ai-companion-ipad4.replit.app"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-4 right-4 sm:bottom-8 sm:right-auto sm:left-8 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105"
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105 sm:right-auto sm:left-8"
       >
         <Bot className="h-5 w-5" />
         <span className="text-sm">創建專屬助手🦄</span>
@@ -1005,7 +1008,7 @@ export default function PIRLSQuestionCraftPage() {
         href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-50 flex items-center gap-2 h-12 px-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-yellow-400 transition-all duration-300 ease-in-out transform hover:scale-105"
+        className="fixed bottom-20 right-4 z-50 flex items-center gap-2 h-12 px-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-yellow-400 transition-all duration-300 ease-in-out transform hover:scale-105 sm:bottom-8 sm:right-8"
       >
         <Sparkles className="h-5 w-5" />
         <span className="text-sm">點『石』成金🐝(評語優化)</span>
@@ -1063,4 +1066,5 @@ export default function PIRLSQuestionCraftPage() {
     
 
     
+
 
