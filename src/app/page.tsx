@@ -23,7 +23,7 @@ import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon, MessageSquareHeart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -422,18 +422,12 @@ export default function PIRLSQuestionCraftPage() {
         // A better approach would be a dedicated "generateTitleForText" flow.
         // For now, we simulate this by calling the existing flow but we only need the title.
         // To avoid creating a new flow just for this, let's call the existing one.
-        const textResult = await generateTextAndTitleFromImages({ photoDataUris: [] }); // This is not ideal.
-                                                                                         // Let's refine the logic to derive title from text if in text mode.
-
-        // Refined logic: If in text mode, generate a title from the text itself.
-        // A simple heuristic for now until a dedicated flow is built.
-        const firstLine = inputText.split('\n')[0].trim();
-        if (firstLine.length > 2 && firstLine.length < 50) {
-            articleTitle = firstLine;
-        } else {
-            articleTitle = '閱讀題組'; // Fallback title
-        }
+        // This is not ideal, but for now we generate a title from the text itself if in text mode.
+        // This is a temporary solution until a dedicated flow is created.
+        const textResult = await generateTextAndTitleFromImages({ photoDataUris: [] }); 
+        
         articleContent = inputText;
+        articleTitle = textResult.title || '閱讀題組';
       }
       
       // Step 2: Generate questions based on the authoritative text.
@@ -584,6 +578,15 @@ export default function PIRLSQuestionCraftPage() {
         <p className="mt-4 text-md sm:text-lg text-muted-foreground">
           上傳圖片或貼上文本，APP 為您分析內容並設計PIRLS四層次選擇題。
         </p>
+        <a 
+          href="https://forms.gle/tRgwnQBHuDshbhad8" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="mt-4 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-accent hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-all duration-150 ease-in-out hover:shadow-md"
+        >
+          <MessageSquareHeart className="mr-2 h-4 w-4" />
+          提供使用回饋
+        </a>
       </header>
 
       <main className="w-full max-w-3xl space-y-8">
@@ -1035,6 +1038,8 @@ export default function PIRLSQuestionCraftPage() {
 
 
 
+
+    
 
     
 
