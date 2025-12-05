@@ -13,8 +13,8 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import type { GeneratePirlsQuestionsOutput } from './generate-pirls-questions';
 
-// Re-export the shared output type
-export type { GeneratePirlsQuestionsOutput } from './generate-pirls-questions';
+// Re-exporting the type directly is not allowed in 'use server' files.
+// Components that need the type will import it from the source file.
 
 const GeneratePirlsQuestionsFromTextInputSchema = z.object({
   text: z.string().describe("The text content to be used for generating questions."),
