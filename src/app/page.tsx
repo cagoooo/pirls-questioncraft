@@ -18,6 +18,7 @@ import { QuizView } from '@/components/QuizView';
 import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import { generateTextAndTitleFromImages } from '@/ai/flows/generate-text-and-title-from-images';
+import { generateTextAndTitleFromText } from '@/ai/flows/generate-text-and-title-from-text';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
@@ -391,78 +392,74 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleDownloadPaGamOQuizGroup = async () => {
     if (!generatedQuestionsOutput) {
-      toast({ title: '無法下載題組', description: '請先生成題目。', variant: 'destructive' });
-      return;
+        toast({ title: '無法下載題組', description: '請先生成題目。', variant: 'destructive' });
+        return;
     }
-    
+
     setIsGeneratingPaGamOQuizGroup(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在準備 PaGamO 題組檔案...');
     setTimeout(() => {
-      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
-    
+
     try {
-      let articleContent = '';
-      let articleTitle = '';
+        let articleContent = '';
+        let articleTitle = '';
 
-      if (inputMode === 'image') {
-        if (imageFiles.length === 0) {
-          throw new Error('請先上傳圖片以生成題組。');
-        }
-        setFileGenerationMessage('AI 正在從圖片辨識與重組文章...');
+        setFileGenerationMessage('AI 正在準備文章與標題...');
         setFileGenerationProgress(25);
-        const textResult = await generateTextAndTitleFromImages({
-          photoDataUris: await Promise.all(imageFiles.map(file => resizeImage(file))),
-        });
-
-        if (!textResult || !textResult.articleContent) {
-          throw new Error('AI 無法從您的圖片中成功辨識出文字。');
+        
+        let textResult;
+        if (inputMode === 'image') {
+            if (imageFiles.length === 0) throw new Error('請先上傳圖片以生成題組。');
+            textResult = await generateTextAndTitleFromImages({
+                photoDataUris: await Promise.all(imageFiles.map(file => resizeImage(file))),
+            });
+        } else {
+            if (inputText.trim().length === 0) throw new Error('文字內容為空，無法生成題組。');
+            textResult = await generateTextAndTitleFromText({ text: inputText });
         }
+        
+        if (!textResult || !textResult.articleContent) {
+            throw new Error('AI 無法成功處理您的內容以生成文章。');
+        }
+
         articleContent = textResult.articleContent;
         articleTitle = textResult.title;
+
+        // Update UI state with the processed text
         setInputText(articleContent);
-      } else {
-        if (inputText.trim().length === 0) {
-            throw new Error('文字內容為空，無法生成題組。');
-        }
-        setFileGenerationMessage('AI 正在為您的文字產生標題...');
-        setFileGenerationProgress(25);
-        
-        const textResult = await generateTextAndTitleFromImages({ photoDataUris: [] }); 
-        
-        articleContent = inputText;
-        articleTitle = textResult.title || '閱讀題組';
-      }
-      
-      setFileGenerationMessage('AI 正在根據文章設計題目...');
-      setFileGenerationProgress(50);
-      const questionsResult = await generatePirlsQuestionsFromText({
-        text: articleContent,
-        questionMode,
-        languageMode,
-      });
 
-      if (!questionsResult || !questionsResult.questions) {
-          throw new Error('AI 未能根據文章內容成功生成題目。');
-      }
+        setFileGenerationMessage('AI 正在根據文章設計題目...');
+        setFileGenerationProgress(50);
 
-      setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
-      setFileGenerationProgress(75);
-      await exportPIRLStoPaGamOQuizGroup(questionsResult, articleContent, articleTitle, toast, fileProgressCallback);
+        // The `generatedQuestionsOutput` state is already based on the authoritative text from the main generation flow
+        // We can directly use it as it should be in sync.
+        
+        setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
+        setFileGenerationProgress(75);
+
+        await exportPIRLStoPaGamOQuizGroup(
+            generatedQuestionsOutput, 
+            articleContent, 
+            articleTitle, 
+            toast, 
+            fileProgressCallback
+        );
 
     } catch (paGamOError: any) {
-      console.error("PaGamO 題組檔案生成失敗:", paGamOError);
-      toast({
-        title: 'PaGamO 題組檔案生成失敗',
-        description: paGamOError.message || '無法生成檔案，請稍後再試。',
-        variant: 'destructive',
-      });
-      setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
-      setFileGenerationProgress(0);
+        console.error("PaGamO 題組檔案生成失敗:", paGamOError);
+        toast({
+            title: 'PaGamO 題組檔案生成失敗',
+            description: paGamOError.message || '無法生成檔案，請稍後再試。',
+            variant: 'destructive',
+        });
+        setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
+        setFileGenerationProgress(0);
     } finally {
-      setIsGeneratingPaGamOQuizGroup(false);
-      setInputMode('text');
+        setIsGeneratingPaGamOQuizGroup(false);
+        setInputMode('text');
     }
   };
 
@@ -1068,3 +1065,8 @@ export default function PIRLSQuestionCraftPage() {
     
 
 
+
+
+
+
+    
