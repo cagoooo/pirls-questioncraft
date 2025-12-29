@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
@@ -22,7 +23,7 @@ import { generateTextAndTitleFromText } from '@/ai/flows/generate-text-and-title
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
-import { exportPIRLStoPaGamOQuizGroup } from '@/lib/generatePaGamOQuizGroupExcel';
+import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon, MessageSquareHeart } from 'lucide-react';
@@ -111,6 +112,7 @@ export default function PIRLSQuestionCraftPage() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isSharingQuiz, setIsSharingQuiz] = useState(false);
   const [currentShareLink, setCurrentShareLink] = useState('');
+  const [preparedPaGamOData, setPreparedPaGamOData] = useState<PaGamOQuizGroupData | null>(null);
 
 
   const { toast } = useToast();
@@ -411,7 +413,7 @@ export default function PIRLSQuestionCraftPage() {
         setFileGenerationProgress(25);
         
         let textResult;
-        if (inputMode === 'image') {
+        if (inputMode === 'image' && imageFiles.length > 0) {
             if (imageFiles.length === 0) throw new Error('請先上傳圖片以生成題組。');
             textResult = await generateTextAndTitleFromImages({
                 photoDataUris: await Promise.all(imageFiles.map(file => resizeImage(file))),
@@ -428,25 +430,31 @@ export default function PIRLSQuestionCraftPage() {
         articleContent = textResult.articleContent;
         articleTitle = textResult.title;
 
-        // Update UI state with the processed text
         setInputText(articleContent);
 
         setFileGenerationMessage('AI 正在根據文章設計題目...');
         setFileGenerationProgress(50);
-
-        // The `generatedQuestionsOutput` state is already based on the authoritative text from the main generation flow
-        // We can directly use it as it should be in sync.
         
-        setFileGenerationMessage('正在生成 PaGamO 題組 Excel...');
+        const questionsResult = await generatePirlsQuestionsFromText({
+            text: articleContent,
+            questionMode,
+            languageMode,
+        });
+
+        if (!questionsResult || !questionsResult.questions) {
+            throw new Error('AI 未能成功為更新後的文章生成題目。');
+        }
+        
+        setGeneratedQuestionsOutput(questionsResult);
+        
+        setFileGenerationMessage('資料準備完成，準備下載...');
         setFileGenerationProgress(75);
 
-        await exportPIRLStoPaGamOQuizGroup(
-            generatedQuestionsOutput, 
-            articleContent, 
-            articleTitle, 
-            toast, 
-            fileProgressCallback
-        );
+        setPreparedPaGamOData({
+            questionsOutput: questionsResult,
+            articleContent,
+            articleTitle,
+        });
 
     } catch (paGamOError: any) {
         console.error("PaGamO 題組檔案生成失敗:", paGamOError);
@@ -457,11 +465,20 @@ export default function PIRLSQuestionCraftPage() {
         });
         setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
         setFileGenerationProgress(0);
-    } finally {
         setIsGeneratingPaGamOQuizGroup(false);
-        setInputMode('text');
     }
   };
+
+  useEffect(() => {
+    if (preparedPaGamOData) {
+      exportPIRLStoPaGamOQuizGroup(preparedPaGamOData, toast, fileProgressCallback);
+      setInputMode('text');
+      setPreparedPaGamOData(null); 
+      setIsGeneratingPaGamOQuizGroup(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preparedPaGamOData]);
+
 
   const handleStartQuiz = () => {
     if (generatedQuestionsOutput && (imageFiles.length > 0 || inputText.trim().length > 0)) {

@@ -7,15 +7,20 @@ import type { Toast } from '@/hooks/use-toast';
 
 type ProgressCallback = (progress: number, message: string) => void;
 
-export async function exportPIRLStoPaGamOQuizGroup(
-  questionsOutput: GeneratePirlsQuestionsOutput,
-  articleContent: string,
-  articleTitle: string,
+export interface PaGamOQuizGroupData {
+  questionsOutput: GeneratePirlsQuestionsOutput;
+  articleContent: string;
+  articleTitle: string;
+}
+
+export function exportPIRLStoPaGamOQuizGroup(
+  data: PaGamOQuizGroupData,
   showToast: typeof Toast,
   updateProgressCallback: ProgressCallback
 ) {
   try {
-    updateProgressCallback(0, '開始準備 PaGamO 題組資料...');
+    const { questionsOutput, articleContent, articleTitle } = data;
+    updateProgressCallback(80, '正在生成 PaGamO 題組 Excel...');
 
     const optionLabels = ['A', 'B', 'C', 'D'];
 
@@ -34,8 +39,6 @@ export async function exportPIRLStoPaGamOQuizGroup(
 
     // Subsequent Rows: The individual questions
     questionsOutput.questions.forEach((q, index) => {
-      updateProgressCallback(10 + Math.round(((index + 1) / questionsOutput.questions.length) * 80), `處理題組題目 ${index + 1} / ${questionsOutput.questions.length}`);
-      
       const row: (string | number | null)[] = new Array(25).fill(null);
       
       row[0] = `1_${index + 1}`;                     // A: 編號 (e.g., 1_1, 1_2)
