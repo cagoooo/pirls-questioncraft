@@ -112,9 +112,7 @@ export default function PIRLSQuestionCraftPage() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isSharingQuiz, setIsSharingQuiz] = useState(false);
   const [currentShareLink, setCurrentShareLink] = useState('');
-  const [preparedPaGamOData, setPreparedPaGamOData] = useState<PaGamOQuizGroupData | null>(null);
-
-
+  
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
@@ -430,6 +428,7 @@ export default function PIRLSQuestionCraftPage() {
         articleContent = textResult.articleContent;
         articleTitle = textResult.title;
 
+        // Ensure the inputText state is updated with the authoritative content
         setInputText(articleContent);
 
         setFileGenerationMessage('AI 正在根據文章設計題目...');
@@ -450,11 +449,13 @@ export default function PIRLSQuestionCraftPage() {
         setFileGenerationMessage('資料準備完成，準備下載...');
         setFileGenerationProgress(75);
 
-        setPreparedPaGamOData({
+        const dataForExport: PaGamOQuizGroupData = {
             questionsOutput: questionsResult,
             articleContent,
             articleTitle,
-        });
+        };
+        
+        await exportPIRLStoPaGamOQuizGroup(dataForExport, toast, fileProgressCallback);
 
     } catch (paGamOError: any) {
         console.error("PaGamO 題組檔案生成失敗:", paGamOError);
@@ -465,20 +466,12 @@ export default function PIRLSQuestionCraftPage() {
         });
         setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
         setFileGenerationProgress(0);
+    } finally {
+        // Automatically switch to text tab to show the generated article
+        setInputMode('text');
         setIsGeneratingPaGamOQuizGroup(false);
     }
   };
-
-  useEffect(() => {
-    if (preparedPaGamOData) {
-      exportPIRLStoPaGamOQuizGroup(preparedPaGamOData, toast, fileProgressCallback);
-      setInputMode('text');
-      setPreparedPaGamOData(null); 
-      setIsGeneratingPaGamOQuizGroup(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preparedPaGamOData]);
-
 
   const handleStartQuiz = () => {
     if (generatedQuestionsOutput && (imageFiles.length > 0 || inputText.trim().length > 0)) {
