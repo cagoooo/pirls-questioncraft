@@ -13,7 +13,7 @@ export interface PaGamOQuizGroupData {
   articleTitle: string;
 }
 
-export async function exportPIRLStoPaGamOQuizGroup(
+export function exportPIRLStoPaGamOQuizGroup(
   data: PaGamOQuizGroupData,
   showToast: typeof Toast,
   updateProgressCallback: ProgressCallback

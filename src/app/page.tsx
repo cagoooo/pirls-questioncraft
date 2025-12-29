@@ -120,6 +120,9 @@ export default function PIRLSQuestionCraftPage() {
   const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
   const textInputAreaRef = useRef<HTMLDivElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
+  
+  // State for handling PaGamO Quiz Group export
+  const [preparedPaGamOData, setPreparedPaGamOData] = useState<PaGamOQuizGroupData | null>(null);
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -151,6 +154,29 @@ export default function PIRLSQuestionCraftPage() {
       return () => clearTimeout(timer);
     }
   }, [inputMode]);
+  
+  // Effect to trigger PaGamO Quiz Group download when data is ready
+  useEffect(() => {
+    if (preparedPaGamOData) {
+      try {
+        exportPIRLStoPaGamOQuizGroup(preparedPaGamOData, toast, fileProgressCallback);
+      } catch (e: any) {
+        console.error("PaGamO 題組檔案生成失敗:", e);
+        toast({
+          title: 'PaGamO 題組檔案生成失敗',
+          description: e.message || '無法生成檔案，請稍後再試。',
+          variant: 'destructive',
+        });
+        setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${e.message || '未知錯誤'}`);
+        setFileGenerationProgress(0);
+      } finally {
+        setPreparedPaGamOData(null); // Reset the state
+        setIsGeneratingPaGamOQuizGroup(false);
+        setInputMode('text');
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preparedPaGamOData, toast]);
 
   const handleModeChange = (newMode: InputMode) => {
     setInputMode(newMode);
@@ -398,7 +424,7 @@ export default function PIRLSQuestionCraftPage() {
 
     setIsGeneratingPaGamOQuizGroup(true);
     setFileGenerationProgress(0);
-    setFileGenerationMessage('正在準備 PaGamO 題組檔案...');
+    setFileGenerationMessage('正在準備 PaGamO 題組資料...');
     setTimeout(() => {
         fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
@@ -427,8 +453,6 @@ export default function PIRLSQuestionCraftPage() {
 
         articleContent = textResult.articleContent;
         articleTitle = textResult.title;
-
-        // Ensure the inputText state is updated with the authoritative content
         setInputText(articleContent);
 
         setFileGenerationMessage('AI 正在根據文章設計題目...');
@@ -446,7 +470,7 @@ export default function PIRLSQuestionCraftPage() {
         
         setGeneratedQuestionsOutput(questionsResult);
         
-        setFileGenerationMessage('資料準備完成，準備下載...');
+        setFileGenerationMessage('資料準備完成，等待下載觸發...');
         setFileGenerationProgress(75);
 
         const dataForExport: PaGamOQuizGroupData = {
@@ -455,20 +479,18 @@ export default function PIRLSQuestionCraftPage() {
             articleTitle,
         };
         
-        await exportPIRLStoPaGamOQuizGroup(dataForExport, toast, fileProgressCallback);
+        // Set state to trigger the useEffect for download
+        setPreparedPaGamOData(dataForExport);
 
     } catch (paGamOError: any) {
-        console.error("PaGamO 題組檔案生成失敗:", paGamOError);
+        console.error("PaGamO 題組資料準備失敗:", paGamOError);
         toast({
-            title: 'PaGamO 題組檔案生成失敗',
-            description: paGamOError.message || '無法生成檔案，請稍後再試。',
+            title: 'PaGamO 題組資料準備失敗',
+            description: paGamOError.message || '無法準備檔案資料，請稍後再試。',
             variant: 'destructive',
         });
-        setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
+        setFileGenerationMessage(`PaGamO 題組資料準備失敗: ${paGamOError.message || '未知錯誤'}`);
         setFileGenerationProgress(0);
-    } finally {
-        // Automatically switch to text tab to show the generated article
-        setInputMode('text');
         setIsGeneratingPaGamOQuizGroup(false);
     }
   };
