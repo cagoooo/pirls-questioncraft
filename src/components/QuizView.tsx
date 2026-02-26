@@ -545,9 +545,7 @@ export function QuizView({
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">閱讀文本：</h3>
                 <ScrollArea className="h-[200px] sm:h-[300px] w-full rounded-md border p-4 bg-muted/30 dark:bg-muted/10">
-                  {hasText ? (
-                    <p className="text-base whitespace-pre-wrap">{inputText}</p>
-                  ) : (
+                  {hasImages ? (
                     <div className="space-y-4">
                       {imagePreviews.map((src, index) => (
                         <DialogTrigger asChild key={index}>
@@ -571,7 +569,9 @@ export function QuizView({
                         </DialogTrigger>
                       ))}
                     </div>
-                  )}
+                  ) : hasText ? (
+                    <p className="text-base whitespace-pre-wrap">{inputText}</p>
+                  ) : null}
                   <ScrollBar orientation="vertical" />
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
