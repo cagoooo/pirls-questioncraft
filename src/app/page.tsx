@@ -16,10 +16,9 @@ import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
+import { generatePirlsQuestions } from '@/ai/flows/generate-pirls-questions';
 import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
-import { generateTextAndTitleFromImages } from '@/ai/flows/generate-text-and-title-from-images';
-import { generateTextAndTitleFromText } from '@/ai/flows/generate-text-and-title-from-text';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
@@ -172,7 +171,7 @@ export default function PIRLSQuestionCraftPage() {
       } finally {
         setPreparedPaGamOData(null); // Reset the state
         setIsGeneratingPaGamOQuizGroup(false);
-        setInputMode('text');
+        // Do not reset inputMode here to allow multiple exports
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,34 +246,38 @@ export default function PIRLSQuestionCraftPage() {
     updateDisplayProgress(10, '準備開始處理...');
 
     try {
-      let authoritativeText = '';
+      let result: GeneratePirlsQuestionsOutput | null = null;
+
       if (inputMode === 'image') {
         updateDisplayProgress(20, '正在壓縮與處理圖片...');
         const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
         if (photoDataUris.length === 0) {
           throw new Error('無法處理圖片，請確認檔案是否正確。');
         }
-        updateDisplayProgress(30, 'AI 正在從圖片辨識與重組文章...');
-        const textResult = await generateTextAndTitleFromImages({ photoDataUris });
-        if (!textResult || !textResult.articleContent) {
-          throw new Error('AI 無法從圖片中成功辨識出文字。');
+        
+        updateDisplayProgress(40, 'AI 正在從圖片辨識文章、生成題目...');
+        result = await generatePirlsQuestions({
+            photoDataUris,
+            questionMode,
+            languageMode,
+        });
+
+        if (result?.articleContent) {
+            setInputText(result.articleContent); // Update textarea for user visibility
         }
-        authoritativeText = textResult.articleContent;
-        setInputText(authoritativeText); // Also update the textarea for user visibility
-      } else {
-        authoritativeText = inputText;
+
+      } else { // Text input mode
+        updateDisplayProgress(40, 'AI 正在根據文章內容設計題目...');
+        result = await generatePirlsQuestionsFromText({
+            text: inputText,
+            questionMode,
+            languageMode,
+        });
       }
 
-      updateDisplayProgress(60, 'AI 正在根據文章內容設計題目...');
-      const questionsResult = await generatePirlsQuestionsFromText({
-        text: authoritativeText,
-        questionMode,
-        languageMode,
-      });
-
-      if (questionsResult && questionsResult.questions) {
+      if (result && result.questions && result.questions.length > 0) {
         updateDisplayProgress(100, '題目已成功生成！');
-        setGeneratedQuestionsOutput(questionsResult);
+        setGeneratedQuestionsOutput(result);
         toast({
           title: '成功！',
           description: 'PIRLS 題目已生成。',
@@ -285,7 +288,7 @@ export default function PIRLSQuestionCraftPage() {
           resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
       } else {
-        throw new Error('APP未能成功生成題目。');
+        throw new Error('APP未能成功生成題目或有效內容。');
       }
     } catch (err: any) {
       console.error("生成題目時發生錯誤:", err.message, err.stack);
@@ -416,9 +419,9 @@ export default function PIRLSQuestionCraftPage() {
     }
   };
 
-  const handleDownloadPaGamOQuizGroup = async () => {
-    if (!generatedQuestionsOutput) {
-        toast({ title: '無法下載題組', description: '請先生成題目。', variant: 'destructive' });
+  const handleDownloadPaGamOQuizGroup = () => {
+    if (!generatedQuestionsOutput || !generatedQuestionsOutput.title || !generatedQuestionsOutput.articleContent) {
+        toast({ title: '無法下載題組', description: '請先生成題目。生成的結果似乎不完整。', variant: 'destructive' });
         return;
     }
 
@@ -430,53 +433,13 @@ export default function PIRLSQuestionCraftPage() {
     }, 0);
 
     try {
-        let articleContent = '';
-        let articleTitle = '';
-
-        setFileGenerationMessage('AI 正在準備文章與標題...');
-        setFileGenerationProgress(25);
-        
-        let textResult;
-        if (inputMode === 'image' && imageFiles.length > 0) {
-            if (imageFiles.length === 0) throw new Error('請先上傳圖片以生成題組。');
-            textResult = await generateTextAndTitleFromImages({
-                photoDataUris: await Promise.all(imageFiles.map(file => resizeImage(file))),
-            });
-        } else {
-            if (inputText.trim().length === 0) throw new Error('文字內容為空，無法生成題組。');
-            textResult = await generateTextAndTitleFromText({ text: inputText });
-        }
-        
-        if (!textResult || !textResult.articleContent) {
-            throw new Error('AI 無法成功處理您的內容以生成文章。');
-        }
-
-        articleContent = textResult.articleContent;
-        articleTitle = textResult.title;
-        setInputText(articleContent);
-
-        setFileGenerationMessage('AI 正在根據文章設計題目...');
-        setFileGenerationProgress(50);
-        
-        const questionsResult = await generatePirlsQuestionsFromText({
-            text: articleContent,
-            questionMode,
-            languageMode,
-        });
-
-        if (!questionsResult || !questionsResult.questions) {
-            throw new Error('AI 未能成功為更新後的文章生成題目。');
-        }
-        
-        setGeneratedQuestionsOutput(questionsResult);
-        
         setFileGenerationMessage('資料準備完成，等待下載觸發...');
         setFileGenerationProgress(75);
 
         const dataForExport: PaGamOQuizGroupData = {
-            questionsOutput: questionsResult,
-            articleContent,
-            articleTitle,
+            questionsOutput: generatedQuestionsOutput,
+            articleContent: generatedQuestionsOutput.articleContent,
+            articleTitle: generatedQuestionsOutput.title,
         };
         
         // Set state to trigger the useEffect for download

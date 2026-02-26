@@ -1,10 +1,11 @@
-
 // src/ai/flows/generate-pirls-questions.ts
 'use server';
 
 /**
- * @fileOverview This file is DEPRECATED. Question generation is now handled by generate-pirls-questions-from-text.
- * It is kept for potential reference but is no longer used in the main application flow.
+ * @fileOverview Generates PIRLS questions, article text, and a title from a set of images.
+ * - generatePirlsQuestions - A function that performs OCR on images and generates questions.
+ * - GeneratePirlsQuestionsInput - The input type for the function.
+ * - GeneratePirlsQuestionsOutput - The output type for the function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -39,70 +40,68 @@ const PirlsQuestionSchema = z.object({
 type PirlsQuestion = z.infer<typeof PirlsQuestionSchema>;
 
 const GeneratePirlsQuestionsOutputSchema = z.object({
+  title: z.string().describe('根據提取出的文章內容，生成一個簡潔貼切的標題。'),
+  articleContent: z.string().describe('從圖片中完整提取出的所有文字內容，並已重組成一篇通順、流暢、且已分段的文章。'),
   questions: z.array(PirlsQuestionSchema).describe('一個PIRLS風格的選擇題陣列。'),
 });
 export type GeneratePirlsQuestionsOutput = z.infer<typeof GeneratePirlsQuestionsOutputSchema>;
 
-// This function is deprecated and should not be used directly.
-// It remains for potential compatibility or reference.
+
 export async function generatePirlsQuestions(
   input: GeneratePirlsQuestionsInput
 ): Promise<GeneratePirlsQuestionsOutput> {
-  console.warn('DEPRECATED: generatePirlsQuestions is called. Use generatePirlsQuestionsFromText instead.');
   return generatePirlsQuestionsFlow(input);
 }
 
 const prompt = ai.definePrompt({
-  name: 'generatePirlsQuestionsPrompt_DEPRECATED',
+  name: 'generatePirlsQuestionsFromImagesPrompt',
   model: 'googleai/gemini-2.0-flash-lite',
   input: {schema: GeneratePirlsQuestionsInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
-  prompt: `您是一位資深的課程設計師與評量專家，專精於為 PIRLS（國際閱讀素養進展研究）閱讀理解評估設計高品質的題目。
+  prompt: `您是一位資深的課程設計師、專業編輯與評量專家，專精於將圖片中的文字轉換為高品質的 PIRLS 閱讀評量。
 
-您的核心任務是根據**「所有」**提供的圖片內容，生成深刻且貼切的選擇題。**所有問題的答案都必須且只能從提供的圖片內容中找到或推斷出來。**
+您的核心任務有三個，請嚴格依序執行：
 
-{{#if is10QuestionMode}}
-您必須根據以下分佈生成 **十個** 問題：
-- **訊息提取與檢索 (Locate and Retrieve)**: 3 題
-- **直接推論 (Make Straightforward Inferences)**: 3 題
-- **詮釋與整合 (Interpret and Integrate)**: 2 題
-- **評估與批判 (Evaluate and Critique)**: 2 題
-總共十題。
-{{else}}
-您必須為每个PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
-{{/if}}
+1.  **文字提取與文章重組**：
+    *   仔細辨識**「所有」**提供的圖片，完整提取所有文字。
+    *   根據上下文語意，校正錯字、連接斷句，並將文字重組成一篇**分段清晰、通順連貫的完整文章**。輸出的 \`articleContent\` 必須是高品質的成品。
+
+2.  **標題生成**：
+    *   根據您最終完成的文章內容，生成一個最能代表文章主旨的「標題」。
+
+3.  **PIRLS 題目生成**：
+    *   根據您重組的文章，生成深刻且貼切的選擇題。**所有問題的答案都必須且只能從文章內容中找到或推斷。**
+    *   {{#if is10QuestionMode}}
+      您必須根據以下分佈生成 **十個** 問題：訊息提取(3), 直接推論(3), 詮釋整合(2), 評估批判(2)。
+      {{else}}
+      您必須為每个PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
+      {{/if}}
 
 **語言模式指令 (Language Mode Instruction):**
 {{#if isEnglishMode}}
-- **題目和選項語言 (Question and Options Language)**: 您必須以**「英文」**撰寫所有的 "question" 和 "options" 欄位。
-- **解題引導語言 (Explanation Language)**: "explanation" 欄位**「必須」**使用**「繁體中文（台灣常用語彙）」**撰寫。
+- **題目和選項語言**: 以**「英文」**撰寫 "question" 和 "options"。
+- **解題引導語言**: "explanation" 欄位**「必須」**使用**「繁體中文（台灣常用語彙）」**撰寫。
 {{else}}
-- **所有欄位語言 (All Fields Language)**: 所有欄位，包括 "question", "options", 和 "explanation"，都必須使用**「繁體中文（台灣常用語彙）」**撰寫。
+- **所有欄位語言**: 全部使用**「繁體中文（台灣常用語彙）」**撰寫。
 {{/if}}
 
-
 **重要指令：**
-1.  **內容整合**：當提供多張圖片時，請將它們視為一個**連續、完整的文本**。您生成的題組必須全面涵蓋**所有圖片**的內容，避免只專注於其中一兩張。請確保各層次的問題能適當地分佈在整個文本脈絡中。
-2.  **題幹品質**：問題設計需專業，緊密圍繞圖片的核心資訊、細節、主題或觀點。
-3.  **選項設計**：每個問題必須有四個答案選項，其中只有一個是正確的。**就算是「評估與批判」類型的題目，也必須設計出一個最合理的、能從文本支持的答案作為唯一正確答案，而不是開放性或主觀性問題。**
-4.  **解題引導（explanation 欄位）**：
-    -   請以**完全繁體中文（台灣常用語彙）**撰寫。
-    -   **「絕對不可」**直接或間接透露正確答案，也不可解釋任何選項的對錯。
-    -   唯一目的：清晰地**引導使用者**在文本的「哪一個具體段落、句子範圍、圖表或特定區域」可以找到解題線索。
-    -   除了引導位置，也需簡要說明此問題的提問方式如何符合其對應的 PIRLS 層次要求。
-
-每個問題還必須標明其PIRLS層次（pirlsLevel）。
+- **選項設計**：就算是「評估與批判」類型的題目，也必須設計出一個最合理的、能從文本支持的答案作為唯一正確答案。
+- **解題引導（explanation 欄位）**：
+    -   以**繁體中文（台灣常用語彙）**撰寫。
+    -   **「絕對不可」**透露正確答案。
+    -   清晰地**引導使用者**在文本的「哪一個具體段落或區域」可以找到解題線索，並說明問題如何符合其 PIRLS 層次。
 
 提供的圖片內容如下：
 {{#each photoDataUris}}{{media url=this}}{{/each}}
 
-請確保輸出的結果是一個有效的JSON物件，且其結構需符合指定的輸出結構描述。
+請確保輸出的結果是一個有效的JSON物件，且其結構需符合指定的輸出結構描述，包含 \`title\`, \`articleContent\`, 和 \`questions\`。
   `,
 });
 
 const generatePirlsQuestionsFlow = ai.defineFlow(
   {
-    name: 'generatePirlsQuestionsFlow_DEPRECATED',
+    name: 'generatePirlsQuestionsFromImagesFlow',
     inputSchema: GeneratePirlsQuestionsInputSchema,
     outputSchema: GeneratePirlsQuestionsOutputSchema,
   },
@@ -130,5 +129,3 @@ const generatePirlsQuestionsFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    
