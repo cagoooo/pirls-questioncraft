@@ -34,7 +34,7 @@ export async function generateTextAndTitleFromImages(
 
 const prompt = ai.definePrompt({
   name: 'generateTextAndTitleFromImagesPrompt',
-  model: 'googleai/gemini-2.0-flash-lite',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: GenerateTextAndTitleFromImagesInputSchema},
   output: {schema: GenerateTextAndTitleFromImagesOutputSchema},
   prompt: `您是一位資深的國文老師與專業編輯，專長是將圖片中的文字轉換成一篇高品質、結構完整的閱讀測驗文章。
