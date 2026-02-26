@@ -32,7 +32,7 @@ export async function generateTextAndTitleFromText(
 
 const prompt = ai.definePrompt({
   name: 'generateTextAndTitleFromTextPrompt',
-  model: 'googleai/gemini-1.5-flash-latest',
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: GenerateTextAndTitleFromTextInputSchema},
   output: {schema: GenerateTextAndTitleFromTextOutputSchema},
   prompt: `您是一位專業的編輯，專長是為文章下一個最精準的標題。
