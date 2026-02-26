@@ -1,8 +1,7 @@
-
 // src/lib/generatePdf.ts
 'use client';
 
-import jsPDF from 'jspdf';
+import type { jsPDF } from 'jspdf';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import type { Toast } from '@/hooks/use-toast';
 
@@ -51,7 +50,7 @@ const themeColors = {
 
 
 async function loadAndRegisterFont(
-  doc: jsPDF,
+  doc: jsPDF, 
   fontFileName: string, 
   fontFamilyNameInPdf: string, 
   fontStyleInPdf: string, 
@@ -130,6 +129,7 @@ export async function exportPIRLStoPDF({
   updateProgressCallback
 }: PdfExportOptions) {
   updateProgressCallback(0, '開始準備 PDF...');
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF({
     orientation: 'p',
     unit: 'mm',

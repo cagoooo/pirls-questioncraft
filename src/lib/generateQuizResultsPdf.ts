@@ -1,8 +1,7 @@
-
 // src/lib/generateQuizResultsPdf.ts
 'use client';
 
-import jsPDF from 'jspdf';
+import type { jsPDF } from 'jspdf';
 import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
 import type { Toast } from '@/hooks/use-toast';
 
@@ -114,6 +113,7 @@ export async function exportQuizResultsToPDF(
   updateProgressCallback: ProgressCallback
 ) {
   updateProgressCallback(0, '開始準備測驗結果 PDF...');
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
   await loadAllRequiredFonts(doc, showToast, updateProgressCallback); // Progress from 0-5%
 
