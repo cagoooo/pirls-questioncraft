@@ -55,7 +55,7 @@ export async function generatePirlsQuestions(
 
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsFromImagesPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-1.5-pro',
   input: {schema: GeneratePirlsQuestionsInputSchema},
   output: {schema: GeneratePirlsQuestionsOutputSchema},
   prompt: `您是一位資深的課程設計師、專業編輯與評量專家，專精於將圖片中的文字轉換為高品質的 PIRLS 閱讀評量。
