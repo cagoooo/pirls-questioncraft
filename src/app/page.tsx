@@ -39,6 +39,59 @@ type ProgressCallback = (progress: number, message: string) => void;
 type InputMode = 'image' | 'text';
 
 /**
+ * 模擬 AI 出題進度條（因為 model 不會回報進度）。
+ * - ease-out 曲線：前段快、後段慢（符合使用者直覺）
+ * - 7 段任務訊息輪播：讓使用者感覺 AI 一直在做不同的事
+ * - 上限 96%（最後 4% 由真實完成事件填滿）
+ * 回傳 cancel 函式，呼叫即停止。
+ */
+function simulateProgress(
+  fromPercent: number,
+  updateProgress: (progress: number, message: string) => void,
+  isImageMode: boolean
+): () => void {
+  const stages = isImageMode
+    ? [
+        { until: 50, msg: '🔍 AI 正在辨識圖片中的文字...' },
+        { until: 62, msg: '📝 AI 正在校正錯字、重組成完整文章...' },
+        { until: 72, msg: '💭 AI 正在理解文章主旨與脈絡...' },
+        { until: 82, msg: '🎯 AI 正在設計 PIRLS 四層次題目...' },
+        { until: 90, msg: '✏️ AI 正在撰寫干擾選項與解題引導...' },
+        { until: 95, msg: '⚖️ AI 正在校對題目層次平衡...' },
+        { until: 96, msg: '✨ 即將完成，最後潤飾中...' },
+      ]
+    : [
+        { until: 55, msg: '💭 AI 正在閱讀並理解文章...' },
+        { until: 68, msg: '🧠 AI 正在分析 PIRLS 四層次架構...' },
+        { until: 78, msg: '🎯 AI 正在設計選擇題與選項...' },
+        { until: 86, msg: '✏️ AI 正在撰寫干擾選項與解題引導...' },
+        { until: 92, msg: '⚖️ AI 正在校對題目層次平衡...' },
+        { until: 95, msg: '✨ 即將完成，最後潤飾中...' },
+        { until: 96, msg: '✨ 即將完成，最後潤飾中...' },
+      ];
+
+  // 預估 22 秒（觀察值：8 題約 15-25 秒）
+  // 用 ease-out：前段衝得快、後段慢慢逼近 96%
+  const totalDurationMs = 22000;
+  const start = Date.now();
+  let lastShown = fromPercent;
+
+  const id = setInterval(() => {
+    const elapsed = Date.now() - start;
+    const ratio = Math.min(elapsed / totalDurationMs, 1);
+    const eased = 1 - Math.pow(1 - ratio, 2.2); // ease-out quadratic
+    const progress = Math.min(fromPercent + (96 - fromPercent) * eased, 96);
+    if (progress > lastShown) {
+      lastShown = progress;
+      const stage = stages.find((s) => progress < s.until) ?? stages[stages.length - 1];
+      updateProgress(progress, stage.msg);
+    }
+  }, 200);
+
+  return () => clearInterval(id);
+}
+
+/**
  * Resizes an image file to a maximum dimension while maintaining aspect ratio
  * and converts it to a JPEG data URI for optimization.
  * @param file The image file to resize.
@@ -252,38 +305,56 @@ export default function PIRLSQuestionCraftPage() {
       setLoadingProgress(progress);
     };
 
-    updateDisplayProgress(10, '準備開始處理...');
+    updateDisplayProgress(8, '✨ 準備開始處理...');
 
+    let cancelSimProgress: (() => void) | null = null;
     try {
       let result: GeneratePirlsQuestionsOutput | null = null;
 
       if (inputMode === 'image') {
-        updateDisplayProgress(20, '正在壓縮與處理圖片...');
-        const photoDataUris = await Promise.all(imageFiles.map(file => resizeImage(file)));
+        // 階段 1：壓縮圖片（10% → 30%，分散到每張圖）
+        updateDisplayProgress(12, '📷 正在壓縮圖片以加速上傳...');
+        const photoDataUris: string[] = [];
+        for (let i = 0; i < imageFiles.length; i++) {
+          const uri = await resizeImage(imageFiles[i]);
+          photoDataUris.push(uri);
+          const pct = 12 + ((i + 1) / imageFiles.length) * 18; // 12% → 30%
+          updateDisplayProgress(pct, `📷 已處理 ${i + 1}/${imageFiles.length} 張圖片...`);
+        }
         if (photoDataUris.length === 0) {
           throw new Error('無法處理圖片，請確認檔案是否正確。');
         }
-        
-        updateDisplayProgress(40, 'AI 正在從圖片辨識文章、生成題目...');
+
+        // 階段 2：上傳 + AI 處理（30% → 96%，模擬進度）
+        updateDisplayProgress(32, '🚀 正在上傳圖片至 AI 伺服器...');
+        cancelSimProgress = simulateProgress(35, updateDisplayProgress, true);
         result = await generatePirlsQuestions({
             photoDataUris,
             questionMode,
             languageMode,
             turnstileToken,
         });
+        cancelSimProgress();
+        cancelSimProgress = null;
 
         if (result?.articleContent) {
             setInputText(result.articleContent); // Update textarea for user visibility
         }
 
       } else { // Text input mode
-        updateDisplayProgress(40, 'AI 正在根據文章內容設計題目...');
+        updateDisplayProgress(15, '📝 正在打包文章內容...');
+        // 短暫停讓使用者看到 15% 不會跳太快（200ms）
+        await new Promise((r) => setTimeout(r, 200));
+        updateDisplayProgress(30, '🚀 正在傳送至 AI 伺服器...');
+        cancelSimProgress = simulateProgress(32, updateDisplayProgress, false);
         result = await generatePirlsQuestionsFromText({
             text: inputText,
             questionMode,
             languageMode,
             turnstileToken,
         });
+        cancelSimProgress();
+        cancelSimProgress = null;
       }
 
       if (result && result.questions && result.questions.length > 0) {
@@ -316,6 +387,8 @@ export default function PIRLSQuestionCraftPage() {
       // B.4: 失敗時 reset Turnstile token（單次使用）
       setTurnstileResetSignal(s => s + 1);
     } finally {
+      // 確保模擬進度 interval 一定被清理（避免 leak）
+      if (cancelSimProgress) cancelSimProgress();
       setIsLoading(false);
     }
   }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, loadingProgress, turnstileToken]);

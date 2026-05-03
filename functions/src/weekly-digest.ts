@@ -217,7 +217,7 @@ function buildDigestCard(r: WeeklyDigestResult): CardSpec {
     fields,
     body,
     actions: [
-      { label: '📊 線上儀表板', uri: `${SITE_BASE_URL}/`, style: 'primary' },
+      { label: '📊 線上儀表板', uri: `${SITE_BASE_URL}/admin/`, style: 'primary' },
     ],
   };
 }
