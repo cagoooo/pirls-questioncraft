@@ -85,12 +85,13 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster />
-        {/* B.4: 預先載 Cloudflare Turnstile widget script，避免 React 19 + static export 下時序問題 */}
+        {/* B.4: Cloudflare Turnstile widget script
+            - render=explicit: 不要自動掃描 .cf-turnstile，由 TurnstileGate 元件用 turnstile.render() 主動掛載
+            - beforeInteractive: 在 React 元件 mount 前載入，避免時序競態
+        */}
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-          strategy="afterInteractive"
-          async
-          defer
+          strategy="beforeInteractive"
         />
       </body>
     </html>
