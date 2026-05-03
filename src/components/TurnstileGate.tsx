@@ -40,6 +40,9 @@ export function TurnstileGate({ onToken, resetSignal }: TurnstileGateProps) {
       <Turnstile
         ref={ref}
         siteKey={SITE_KEY}
+        // B.4: script 已在 layout.tsx 預先載入，告訴元件不要再 inject 一次
+        injectScript={false}
+        scriptOptions={{ async: true, defer: true }}
         options={{ theme: 'light', size: 'flexible' }}
         onSuccess={onToken}
         onExpire={() => onToken('')}

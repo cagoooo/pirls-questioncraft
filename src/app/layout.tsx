@@ -1,5 +1,6 @@
 
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
@@ -84,6 +85,13 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster />
+        {/* B.4: 預先載 Cloudflare Turnstile widget script，避免 React 19 + static export 下時序問題 */}
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          async
+          defer
+        />
       </body>
     </html>
   );
