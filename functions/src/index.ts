@@ -4,6 +4,7 @@
 //  - generateFromText     POST  純文字 → 題組（要 Turnstile + 限流）
 //  - createSharedQuiz     POST  存共享測驗到 Firestore（要限流，不需 Turnstile）
 //  - getSharedQuiz        GET   依 quizId 取共享測驗（不限流，學生端純讀）
+// 全部成功/失敗都會 LINE 推卡片給管理員（B.14）。
 
 import { onRequest, type Request } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2';
@@ -17,6 +18,7 @@ import { runGenerateFromImages } from './flows/generate-from-images';
 import { runGenerateFromText } from './flows/generate-from-text';
 import { checkRateLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
+import { notifyAdminCard } from './notify-line';
 
 initializeApp();
 const db = getFirestore();
@@ -33,7 +35,11 @@ setGlobalOptions({
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 // B.4: Cloudflare Turnstile secret。未設定時自動跳過驗證（功能尚未啟用 Turnstile）。
 const TURNSTILE_SECRET = defineSecret('TURNSTILE_SECRET');
+// B.14: LINE Bot 共用 Channel 的 Token + 管理員 userId（PIRLS_ 前綴與其他專案隔離）
+const PIRLS_LINE_CHANNEL_ACCESS_TOKEN = defineSecret('PIRLS_LINE_CHANNEL_ACCESS_TOKEN');
+const PIRLS_LINE_ADMIN_USER_ID = defineSecret('PIRLS_LINE_ADMIN_USER_ID');
 
+const APP_NAME = 'PIRLS 題組生成站';
 const COLLECTION = 'sharedQuizzes';
 const QUIZ_EXPIRY_MS = 60 * 60 * 1000;
 const MAX_PAYLOAD_BYTES = 900 * 1024;
@@ -66,7 +72,6 @@ function withProtection(
 ) {
   const { perMinute = 5, needTurnstile = true } = opts;
   return withCors(async (req, res) => {
-    // 1. IP 速率限制
     const ip = getClientIp(req);
     const limit = await checkRateLimit(ip, { perMinute });
     if (!limit.allowed) {
@@ -77,8 +82,6 @@ function withProtection(
       });
       return;
     }
-
-    // 2. Turnstile 人機驗證（secret 未設時自動跳過）
     if (needTurnstile) {
       const verify = await verifyTurnstile(req, process.env.TURNSTILE_SECRET, ip);
       if (!verify.ok) {
@@ -86,17 +89,20 @@ function withProtection(
         return;
       }
     }
-
     await handler(req, res);
   });
 }
 
+/** 取要監看的 secrets（給 onRequest 的 secrets 陣列用） */
+const LINE_SECRETS = [PIRLS_LINE_CHANNEL_ACCESS_TOKEN, PIRLS_LINE_ADMIN_USER_ID];
+
 // ---- AI flows ----
 
 export const generateFromImages = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET] },
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...LINE_SECRETS] },
   withProtection(
     async (req, res) => {
+      const t0 = Date.now();
       if (req.method !== 'POST') {
         res.status(405).json({ success: false, error: 'Use POST' });
         return;
@@ -106,17 +112,46 @@ export const generateFromImages = onRequest(
         res.status(400).json({ success: false, error: 'photoDataUris 不可為空。' });
         return;
       }
-      const result = await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
-      res.json({ success: true, data: result });
+      try {
+        const result = await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        notifyAdminCard({
+          status: 'success',
+          title: '有人剛完成圖片出題',
+          appName: APP_NAME,
+          fields: [
+            { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張` },
+            { icon: '📝', label: '標題', value: result.title },
+            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
+            { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
+          ],
+        });
+        res.json({ success: true, data: result });
+      } catch (e: any) {
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        notifyAdminCard({
+          status: 'failed',
+          title: '圖片出題失敗',
+          appName: APP_NAME,
+          fields: [
+            { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張` },
+            { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
+          ],
+          footerNote: `⏱️ ${elapsed}s`,
+        });
+        throw e;
+      }
     },
-    { perMinute: 5 } // 出題操作貴，每 IP 每分鐘最多 5 次
+    { perMinute: 5 }
   )
 );
 
 export const generateFromText = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET] },
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...LINE_SECRETS] },
   withProtection(
     async (req, res) => {
+      const t0 = Date.now();
       if (req.method !== 'POST') {
         res.status(405).json({ success: false, error: 'Use POST' });
         return;
@@ -126,8 +161,36 @@ export const generateFromText = onRequest(
         res.status(400).json({ success: false, error: 'text 不可為空。' });
         return;
       }
-      const result = await runGenerateFromText({ text, questionMode, languageMode });
-      res.json({ success: true, data: result });
+      try {
+        const result = await runGenerateFromText({ text, questionMode, languageMode });
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        notifyAdminCard({
+          status: 'success',
+          title: '有人剛完成文字出題',
+          appName: APP_NAME,
+          fields: [
+            { icon: '📝', label: '標題', value: result.title },
+            { icon: '📏', label: '字數', value: `${text.length}` },
+            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
+            { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
+          ],
+        });
+        res.json({ success: true, data: result });
+      } catch (e: any) {
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        notifyAdminCard({
+          status: 'failed',
+          title: '文字出題失敗',
+          appName: APP_NAME,
+          fields: [
+            { icon: '📏', label: '字數', value: `${text.length}` },
+            { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
+          ],
+          footerNote: `⏱️ ${elapsed}s`,
+        });
+        throw e;
+      }
     },
     { perMinute: 5 }
   )
@@ -136,7 +199,7 @@ export const generateFromText = onRequest(
 // ---- Shared quiz storage ----
 
 export const createSharedQuiz = onRequest(
-  { secrets: [TURNSTILE_SECRET] },
+  { secrets: [TURNSTILE_SECRET, ...LINE_SECRETS] },
   withProtection(
     async (req, res) => {
       if (req.method !== 'POST') {
@@ -168,10 +231,20 @@ export const createSharedQuiz = onRequest(
         createdAt: Timestamp.fromMillis(now),
         expiresAt: Timestamp.fromMillis(now + QUIZ_EXPIRY_MS),
       });
+      // 學生分享連結建立成功通知
+      notifyAdminCard({
+        status: 'success',
+        title: '老師剛產生了學生分享連結',
+        appName: APP_NAME,
+        fields: [
+          { icon: '🆔', label: 'Quiz ID', value: quizId },
+          { icon: '📝', label: '標題', value: (questionsOutput as any)?.title ?? '—' },
+          { icon: '🎯', label: '題數', value: `${(questionsOutput as any)?.questions?.length ?? 0} 題` },
+          { icon: '⏰', label: '有效期', value: '60 分鐘' },
+        ],
+      });
       res.json({ success: true, quizId });
     },
-    // 分享動作便宜，但仍要限流防腳本灌爆 Firestore
-    // 不要 Turnstile（已在出題階段驗過）
     { perMinute: 10, needTurnstile: false }
   )
 );

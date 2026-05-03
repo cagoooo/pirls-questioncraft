@@ -5,7 +5,7 @@
 //  2. 計數欄存到 rateLimits/{ip}_{minute}，doc TTL 自動清，不留垃圾
 //  3. 失敗時 fail-open（限流系統壞了寧可放行，不要擋住正常使用者）
 
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, type Transaction } from 'firebase-admin/firestore';
 
 const COLLECTION = 'rateLimits';
 const TTL_MINUTES = 5;
@@ -42,7 +42,7 @@ export async function checkRateLimit(
   const ref = db.collection(COLLECTION).doc(docId);
 
   try {
-    const result = await db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx: Transaction) => {
       const snap = await tx.get(ref);
       const current = (snap.exists && (snap.data() as any)?.count) || 0;
 
