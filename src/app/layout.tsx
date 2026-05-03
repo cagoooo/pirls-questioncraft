@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
+import { VersionUpdateBanner } from "@/components/VersionUpdateBanner"
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -85,6 +86,8 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster />
+        {/* B.18: SW 自動更新版本機制 */}
+        <VersionUpdateBanner />
         {/* B.4: Cloudflare Turnstile widget script
             - render=explicit: 不要自動掃描 .cf-turnstile，由 TurnstileGate 元件用 turnstile.render() 主動掛載
             - beforeInteractive: 在 React 元件 mount 前載入，避免時序競態

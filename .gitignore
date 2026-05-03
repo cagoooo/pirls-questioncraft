@@ -53,6 +53,9 @@ firestore-debug.log
 # claude code agent local cache
 .agents/
 
+# B.18: 自動產生的版本檔，由 npm prebuild 寫入
+public/version.json
+
 # functions build output
 functions/lib/
 functions/node_modules/

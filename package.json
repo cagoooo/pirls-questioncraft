@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
+    "prebuild": "node tools/generate-version.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -11,7 +12,8 @@
     "build:functions": "npm --prefix functions run build",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:firestore": "firebase deploy --only firestore",
-    "generate:assets": "node tools/generate-assets.mjs"
+    "generate:assets": "node tools/generate-assets.mjs",
+    "generate:version": "node tools/generate-version.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
