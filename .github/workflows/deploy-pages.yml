@@ -34,6 +34,8 @@ jobs:
           # 若以後掛自訂網域（CNAME 檔），把這行改成空字串：NEXT_PUBLIC_BASE_PATH: ""
           NEXT_PUBLIC_BASE_PATH: /pirls-questioncraft
           NEXT_PUBLIC_API_BASE: https://asia-east1-pirls-questioncraft.cloudfunctions.net
+          # B.4: Cloudflare Turnstile site key (public，可入 git)
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 0x4AAAAAADIPhhdOK3_0FrkR
         run: npm run build
 
       - name: Disable Jekyll on GitHub Pages
