@@ -34,48 +34,67 @@ type PirlsQuestion = z.infer<typeof PirlsQuestionSchema>;
 
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsFromImagesPrompt',
-  model: 'googleai/gemini-2.5-flash-lite',
+  // B.15 升級：lite → flash，OCR 與指令遵守度顯著提升、仍在免費層內
+  model: 'googleai/gemini-2.5-flash',
   input: { schema: InputSchema },
   output: { schema: OutputSchema },
-  prompt: `您是一位資深的課程設計師、專業編輯與評量專家，專精於將圖片中的文字轉換為高品質的 PIRLS 閱讀評量。
+  prompt: `# 📥 給你的圖片（你唯一可以使用的內容來源）
 
-您的核心任務有三個，請嚴格依序執行：
-
-1.  **文字提取與文章重組**：
-    *   仔細辨識**「所有」**提供的圖片，完整提取所有文字。
-    *   根據上下文語意，校正錯字、連接斷句，並將文字重組成一篇**分段清晰、通順連貫的完整文章**。輸出的 \`articleContent\` 必須是高品質的成品。
-
-2.  **標題生成**：
-    *   根據您最終完成的文章內容，生成一個最能代表文章主旨的「標題」。
-
-3.  **PIRLS 題目生成**：
-    *   根據您重組的文章，生成深刻且貼切的選擇題。**所有問題的答案都必須且只能從文章內容中找到或推斷。**
-    *   {{#if is10QuestionMode}}
-      您必須根據以下分佈生成 **十個** 問題：訊息提取(3), 直接推論(3), 詮釋整合(2), 評估批判(2)。
-      {{else}}
-      您必須為每个PIRLS層次生成 **兩個** 問題，總共 **八個** 問題。
-      {{/if}}
-
-**語言模式指令 (Language Mode Instruction):**
-{{#if isEnglishMode}}
-- **題目和選項語言**: 以**「英文」**撰寫 "question" 和 "options"。
-- **解題引導語言**: "explanation" 欄位**「必須」**使用**「繁體中文（台灣常用語彙）」**撰寫。
-{{else}}
-- **所有欄位語言**: 全部使用**「繁體中文（台灣常用語彙）」**撰寫。
-{{/if}}
-
-**重要指令：**
-- **選項設計**：就算是「評估與批判」類型的題目，也必須設計出一個最合理的、能從文本支持的答案作為唯一正確答案。
-- **解題引導（explanation 欄位）**：
-    -   以**繁體中文（台灣常用語彙）**撰寫。
-    -   **「絕對不可」**透露正確答案。
-    -   清晰地**引導使用者**在文本的「哪一個具體段落或區域」可以找到解題線索，並說明問題如何符合其 PIRLS 層次。
-
-提供的圖片內容如下：
 {{#each photoDataUris}}{{media url=this}}{{/each}}
 
-請確保輸出的結果是一個有效的JSON物件，且其結構需符合指定的輸出結構描述，包含 \`title\`, \`articleContent\`, 和 \`questions\`。
-  `,
+---
+
+你是 PIRLS 閱讀素養評量出題專家，同時擅長 OCR 與編輯。
+
+請根據**上方圖片中真實出現的文字**完成下列任務。**禁止**使用任何圖片中沒有的內容。
+
+# 🚨 三大鐵律
+
+1. **articleContent**：仔細 OCR 所有圖片，校正錯字、連接斷句、合理分段，整理成通順的文章。**不可虛構任何圖片中沒有的人物、事件、數字**。
+2. **題目必須引用文章內容**：每題的 \`question\` 與 \`explanation\` 都應該提到文章中真實出現的關鍵字，老師才能驗證題目是基於真實圖片內容。
+3. **PIRLS 層次必須嚴格平衡**：見下方分配。
+
+# 📋 題數與層次
+
+{{#if is10QuestionMode}}
+**共 10 題**：
+- locate & retrieve（訊息提取）：**3 題**
+- make straightforward inferences（直接推論）：**3 題**
+- interpret & integrate（詮釋整合）：**2 題**
+- evaluate & critique（評估批判）：**2 題**
+{{else}}
+**共 8 題**，每層恰好 2 題：
+- locate & retrieve（訊息提取）：**2 題**
+- make straightforward inferences（直接推論）：**2 題**
+- interpret & integrate（詮釋整合）：**2 題**
+- evaluate & critique（評估批判）：**2 題**
+{{/if}}
+
+# 🌐 語言模式
+
+{{#if isEnglishMode}}
+- \`question\` / \`options\`：**英文**
+- \`explanation\`：**繁體中文（台灣常用語彙）**
+{{else}}
+- 所有文字欄位：**繁體中文（台灣常用語彙）**
+{{/if}}
+
+# 📝 自我檢查（生成前先做）
+
+- [ ] \`articleContent\` 是否只包含圖片中真實出現的文字（含合理整理）？
+- [ ] 我的每一題是否引用了 articleContent 中真實出現的字詞？
+- [ ] PIRLS 四層次題數是否完全符合上面的分配？
+- [ ] 每題的 \`explanation\` 是否「絕對沒有」洩漏正確答案？
+
+# 📐 其他規則
+
+- 每題 4 個選項，僅一個正確答案
+- 干擾選項要合理但明確錯誤
+- \`explanation\` 應引導讀者到「文章哪一段／哪一句」找線索 + 說明此題如何符合 PIRLS 層次
+- 「評估與批判」題仍要有單一最合理答案
+
+請輸出符合 schema 的 JSON 物件。
+`,
 });
 
 export async function runGenerateFromImages(

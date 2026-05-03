@@ -16,6 +16,7 @@ import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
+import { TurnstileGate } from '@/components/TurnstileGate';
 import {
   generatePirlsQuestions,
   generatePirlsQuestionsFromText,
@@ -114,6 +115,10 @@ export default function PIRLSQuestionCraftPage() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isSharingQuiz, setIsSharingQuiz] = useState(false);
   const [currentShareLink, setCurrentShareLink] = useState('');
+
+  // B.4: Cloudflare Turnstile token；NEXT_PUBLIC_TURNSTILE_SITE_KEY 未設時為空字串，後端跳過驗證
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
@@ -263,6 +268,7 @@ export default function PIRLSQuestionCraftPage() {
             photoDataUris,
             questionMode,
             languageMode,
+            turnstileToken,
         });
 
         if (result?.articleContent) {
@@ -275,6 +281,7 @@ export default function PIRLSQuestionCraftPage() {
             text: inputText,
             questionMode,
             languageMode,
+            turnstileToken,
         });
       }
 
@@ -287,6 +294,8 @@ export default function PIRLSQuestionCraftPage() {
           variant: 'default',
           className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
         });
+        // B.4: token 用過即丟，再生成要重新驗證
+        setTurnstileResetSignal(s => s + 1);
         setTimeout(() => {
           resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -303,10 +312,12 @@ export default function PIRLSQuestionCraftPage() {
         variant: 'destructive',
       });
       updateDisplayProgress(loadingProgress, '處理時發生錯誤');
+      // B.4: 失敗時 reset Turnstile token（單次使用）
+      setTurnstileResetSignal(s => s + 1);
     } finally {
       setIsLoading(false);
     }
-  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, loadingProgress]);
+  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, loadingProgress, turnstileToken]);
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -706,6 +717,10 @@ export default function PIRLSQuestionCraftPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {!isQuizActive && (
+          <TurnstileGate onToken={setTurnstileToken} resetSignal={turnstileResetSignal} />
         )}
 
         {!isQuizActive && (

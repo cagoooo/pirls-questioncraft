@@ -74,12 +74,16 @@ export interface GenerateFromImagesArgs {
   photoDataUris: string[];
   questionMode: '8-questions' | '10-questions';
   languageMode: 'zh-TW' | 'en';
+  /** B.4: Cloudflare Turnstile token，由 <Turnstile> widget 產出 */
+  turnstileToken?: string;
 }
 
 export interface GenerateFromTextArgs {
   text: string;
   questionMode: '8-questions' | '10-questions';
   languageMode: 'zh-TW' | 'en';
+  /** B.4: Cloudflare Turnstile token */
+  turnstileToken?: string;
 }
 
 export async function generatePirlsQuestions(
@@ -98,6 +102,8 @@ export interface CreateSharedQuizArgs {
   questionsOutput: GeneratePirlsQuestionsOutput;
   imageFilesDataURIs?: string[];
   inputText?: string;
+  /** 為了未來 turnstile 也可選 */
+  turnstileToken?: string;
 }
 
 export async function createSharedQuiz(args: CreateSharedQuizArgs): Promise<{ quizId: string }> {
