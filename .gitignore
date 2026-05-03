@@ -45,6 +45,9 @@ next-env.d.ts
 serviceAccountKey*.json
 firebase-adminsdk-*.json
 
+# 暫存敏感資料檔（pipe 進 Firebase secret 用）
+.tmp_*
+
 # firebase
 firebase-debug.log
 firestore-debug.log

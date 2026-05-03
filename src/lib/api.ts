@@ -159,3 +159,48 @@ export async function getSubmissions(quizId: string): Promise<DashboardData> {
   const r = await getJSON<DashboardData>('getSubmissions', { quizId });
   return r as any;
 }
+
+// ---- B.26: Admin dashboard ----
+
+export interface AdminDailyStat {
+  date: string;
+  'generate-images'?: number;
+  'generate-text'?: number;
+  'generate-images-failed'?: number;
+  'generate-text-failed'?: number;
+  'share-quiz'?: number;
+  'submit-quiz'?: number;
+}
+
+export interface AdminPirlsBreakdown {
+  level: string;
+  accuracy: number;
+  total: number;
+}
+
+export interface AdminStats {
+  dailyStats: AdminDailyStat[];
+  totals: {
+    imageGen: number;
+    textGen: number;
+    imageGenFailed: number;
+    textGenFailed: number;
+    shares: number;
+    submits: number;
+  };
+  totalSubmissions: number;
+  avgAccuracy: number | null;
+  pirlsBreakdown: AdminPirlsBreakdown[];
+  generatedAt: number;
+}
+
+export async function getAdminStats(adminKey: string): Promise<AdminStats> {
+  const res = await fetch(`${API_BASE}/getAdminStats`, {
+    headers: { Authorization: `Bearer ${adminKey}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error ?? `HTTP ${res.status}`);
+  }
+  return json as AdminStats;
+}

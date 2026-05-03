@@ -20,7 +20,7 @@ import { runGenerateFromText } from './flows/generate-from-text';
 import { checkRateLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
-import { trackUsage } from './usage-tracker';
+import { trackUsage, getRecentUsage } from './usage-tracker';
 import { runWeeklyDigest } from './weekly-digest';
 
 initializeApp();
@@ -41,6 +41,8 @@ const TURNSTILE_SECRET = defineSecret('TURNSTILE_SECRET');
 // B.14: LINE Bot 共用 Channel 的 Token + 管理員 userId（PIRLS_ 前綴與其他專案隔離）
 const PIRLS_LINE_CHANNEL_ACCESS_TOKEN = defineSecret('PIRLS_LINE_CHANNEL_ACCESS_TOKEN');
 const PIRLS_LINE_ADMIN_USER_ID = defineSecret('PIRLS_LINE_ADMIN_USER_ID');
+// B.26: Admin dashboard 授權用 key（Bearer token 比對）
+const PIRLS_ADMIN_KEY = defineSecret('PIRLS_ADMIN_KEY');
 
 const APP_NAME = 'PIRLS 題組生成站';
 const SITE_BASE_URL = 'https://cagoooo.github.io/pirls-questioncraft';
@@ -506,6 +508,96 @@ export const weeklyDigest = onSchedule(
     const result = await runWeeklyDigest();
     console.log('[weeklyDigest] sent', JSON.stringify(result));
   }
+);
+
+// ---- B.26: 老師端 Admin Dashboard ----
+
+/** 從 Authorization: Bearer xxx 或 ?key=xxx 解析 admin key */
+function getAdminKey(req: Request): string | null {
+  const auth = (req.headers?.authorization ?? '') as string;
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  return ((req.query?.key ?? '') as string) || null;
+}
+
+function isAdminAuthorized(req: Request): boolean {
+  const key = getAdminKey(req);
+  const expected = process.env.PIRLS_ADMIN_KEY?.trim();
+  return Boolean(key && expected && key === expected);
+}
+
+/**
+ * 老師端 admin dashboard 資料 endpoint。
+ * Bearer token 授權，回傳過去 30 天聚合統計 + 班級層次答對率。
+ */
+export const getAdminStats = onRequest(
+  { secrets: [PIRLS_ADMIN_KEY] },
+  withCors(async (req, res) => {
+    if (!isAdminAuthorized(req)) {
+      res.status(403).json({ success: false, error: '未授權' });
+      return;
+    }
+
+    // 1. 過去 30 天每日 usage
+    const dailyStats = await getRecentUsage(30);
+
+    // 2. 全部 submissions 聚合（含已過期的，只要 doc 還在）
+    // 用單純 limit（無 orderBy）避免 collection-group index 需求；
+    // admin dashboard 只做聚合統計，不需排序順序。
+    const subsSnap = await db
+      .collectionGroup('students')
+      .limit(500)
+      .get();
+
+    let totalSubmissions = 0;
+    let totalAccuracy = 0;
+    let accuracyCount = 0;
+    const aggregatePirls: Record<string, { correct: number; total: number }> = {};
+
+    subsSnap.docs.forEach((d: QueryDocumentSnapshot) => {
+      const x = d.data() as any;
+      totalSubmissions += 1;
+      if (x.totalCount > 0) {
+        totalAccuracy += (x.correctCount / x.totalCount) * 100;
+        accuracyCount += 1;
+      }
+      Object.entries(x.pirlsLevelStats || {}).forEach(([level, s]: [string, any]) => {
+        const acc = aggregatePirls[level] ?? { correct: 0, total: 0 };
+        acc.correct += s.correct;
+        acc.total += s.total;
+        aggregatePirls[level] = acc;
+      });
+    });
+
+    const avgAccuracy = accuracyCount > 0 ? totalAccuracy / accuracyCount : null;
+    const pirlsBreakdown = Object.entries(aggregatePirls).map(([level, s]) => ({
+      level,
+      accuracy: s.total > 0 ? (s.correct / s.total) * 100 : 0,
+      total: s.total,
+    }));
+
+    // 3. 過去 30 天總計
+    const totals = dailyStats.reduce(
+      (acc: any, day: any) => ({
+        imageGen: acc.imageGen + (day['generate-images'] ?? 0),
+        textGen: acc.textGen + (day['generate-text'] ?? 0),
+        imageGenFailed: acc.imageGenFailed + (day['generate-images-failed'] ?? 0),
+        textGenFailed: acc.textGenFailed + (day['generate-text-failed'] ?? 0),
+        shares: acc.shares + (day['share-quiz'] ?? 0),
+        submits: acc.submits + (day['submit-quiz'] ?? 0),
+      }),
+      { imageGen: 0, textGen: 0, imageGenFailed: 0, textGenFailed: 0, shares: 0, submits: 0 }
+    );
+
+    res.json({
+      success: true,
+      dailyStats,
+      totals,
+      totalSubmissions,
+      avgAccuracy,
+      pirlsBreakdown,
+      generatedAt: Date.now(),
+    });
+  })
 );
 
 /**
