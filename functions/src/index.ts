@@ -532,6 +532,13 @@ function isAdminAuthorized(req: Request): boolean {
 export const getAdminStats = onRequest(
   { secrets: [PIRLS_ADMIN_KEY] },
   withCors(async (req, res) => {
+    // 速率限制：每 IP 每分鐘最多 5 次（即使 admin key 弱也擋暴力破解）
+    const ip = getClientIp(req);
+    const limit = await checkRateLimit(`admin-${ip}`, { perMinute: 5 });
+    if (!limit.allowed) {
+      res.status(429).json({ success: false, error: '嘗試過於頻繁，請稍候再試。' });
+      return;
+    }
     if (!isAdminAuthorized(req)) {
       res.status(403).json({ success: false, error: '未授權' });
       return;
