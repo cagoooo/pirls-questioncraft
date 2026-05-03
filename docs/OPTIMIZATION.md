@@ -285,19 +285,31 @@ npm install -D vitest @testing-library/react playwright
 2. Playwright e2e：上傳圖片 → 出題 → 下載 PDF 三條主線
 3. Functions emulator + supertest：4 個 endpoint 在 payload 過大 / 缺 secret 時的錯誤處理
 
-### B.25（新）Sentry 前後端錯誤監控（半天）
+### ~~B.25 Sentry 前後端錯誤監控~~ ❌ 決定不做（2026-05-03）
 
-目前出錯只能靠 LINE 卡片 + Cloud Logging，缺 stack trace 聚合。
+評估後發現：
+- 單人教學工具量太小，Sentry 5K errors/月 永遠用不完，配置成本不划算
+- 已有 LINE 即時通知（出錯立刻響）
+- Cloud Functions Logs 已可在 Firebase Console 搜尋
+- 改走更輕量替代方案：見 §B.27 LINE 週報
 
-```bash
-npm install @sentry/nextjs        # 前端
-npm install --prefix functions @sentry/node  # 後端
-```
+### B.27（新・取代 Sentry）LINE 週報摘要（1-2 小時）
+
+**痛點**：LINE 即時通知很方便但訊息很零散；缺一個「過去一週概況」的視角。
+
+**做法**：
+1. 新增 Cloud Function `weeklyDigest`（用 [skill `schedule`](.) 排 cron 每週日 21:00 觸發）
+2. 用 Cloud Logging API 撈過去 7 天 functions log，統計：
+   - 出題總次數（圖片 vs 文字）
+   - 失敗率 + 失敗原因 top 3
+   - 平均回應時間（看 Gemini 是不是慢了）
+   - 學生作答總數、班級平均
+3. 組成 LINE Flex 卡片推給管理員，標題「📊 PIRLS 本週摘要」
 
 **價值**：
-- 一週內所有 client error 聚合（哪些瀏覽器、哪些頁面常炸）
-- Source map 上傳後，stack trace 直接點進 source code
-- 與 LINE 通知互補：LINE 看即時、Sentry 看趨勢
+- 不用每天看 console，週日晚上一張卡片看完
+- 失敗率變高會立刻警覺（取代 Sentry trend 功能）
+- 比 Sentry 更貼合教學場景（有「學生作答數」這種教育指標）
 
 ### B.26（新）使用量統計 dashboard（1 天）
 
@@ -511,7 +523,7 @@ Week 3
 
 Week 4
 ├── B.11  圖片改 Firebase Storage（半天）
-├── B.25  Sentry 監控（半天）⭐
+├── B.27  LINE 週報摘要（1-2 hr）⭐ (取代 Sentry，更貼合教學場景)
 └── B.26  使用量統計 dashboard（1 天）⭐
 ```
 
