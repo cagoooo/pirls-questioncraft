@@ -7,10 +7,11 @@
 // 全部成功/失敗都會 LINE 推卡片給管理員（B.14）。
 
 import { onRequest, type Request } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
-import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { Timestamp, getFirestore, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import corsLib from 'cors';
 import type { Response } from 'express';
 
@@ -19,6 +20,8 @@ import { runGenerateFromText } from './flows/generate-from-text';
 import { checkRateLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
+import { trackUsage } from './usage-tracker';
+import { runWeeklyDigest } from './weekly-digest';
 
 initializeApp();
 const db = getFirestore();
@@ -141,6 +144,7 @@ export const generateFromImages = onRequest(
       try {
         const result = await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        trackUsage('generate-images');
         // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
         const estKB = Math.round(photoDataUris.reduce((sum, d) => sum + d.length, 0) * 0.75 / 1024);
         notifyAdminCard({
@@ -162,6 +166,7 @@ export const generateFromImages = onRequest(
         res.json({ success: true, data: result });
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        trackUsage('generate-images-failed');
         notifyAdminCard({
           status: 'failed',
           title: '圖片出題失敗',
@@ -198,6 +203,7 @@ export const generateFromText = onRequest(
       try {
         const result = await runGenerateFromText({ text, questionMode, languageMode });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        trackUsage('generate-text');
         notifyAdminCard({
           status: 'success',
           title: '有人剛完成文字出題',
@@ -216,6 +222,7 @@ export const generateFromText = onRequest(
         res.json({ success: true, data: result });
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        trackUsage('generate-text-failed');
         notifyAdminCard({
           status: 'failed',
           title: '文字出題失敗',
@@ -277,6 +284,7 @@ export const createSharedQuiz = onRequest(
         minute: '2-digit',
         hour12: false,
       }).format(new Date(expiresAtMs));
+      trackUsage('share-quiz');
       const studentUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
       const dashboardUrl = `${SITE_BASE_URL}/dashboard/?id=${quizId}`;
       // 學生分享連結建立成功通知（含 2 顆可點按鈕）
@@ -376,6 +384,7 @@ export const submitQuizAnswer = onRequest(
           submittedAt: Timestamp.now(),
           expiresAt: submissionExpiresAt,
         });
+      trackUsage('submit-quiz');
 
       // 讀取目前所有 submissions 計算班級即時統計
       const allSubsSnap = await db.collection(COLLECTION).doc(quizId)
@@ -383,10 +392,10 @@ export const submitQuizAnswer = onRequest(
       const totalSubs = allSubsSnap.size;
       let classAvgAccuracy = 0;
       const aggregatePirls: Record<string, { correct: number; total: number }> = {};
-      allSubsSnap.docs.forEach((d) => {
+      allSubsSnap.docs.forEach((d: QueryDocumentSnapshot) => {
         const x = d.data() as any;
         if (x.totalCount > 0) classAvgAccuracy += (x.correctCount / x.totalCount) * 100;
-        Object.entries(x.pirlsLevelStats || {}).forEach(([level, s]) => {
+        Object.entries(x.pirlsLevelStats || {}).forEach(([level, s]: [string, any]) => {
           const acc = aggregatePirls[level] ?? { correct: 0, total: 0 };
           acc.correct += (s as any).correct;
           acc.total += (s as any).total;
@@ -459,7 +468,7 @@ export const getSubmissions = onRequest(
       .orderBy('submittedAt', 'desc')
       .get();
 
-    const submissions = subsSnap.docs.map(d => {
+    const submissions = subsSnap.docs.map((d: QueryDocumentSnapshot) => {
       const x = d.data() as any;
       return {
         id: d.id,
@@ -478,5 +487,43 @@ export const getSubmissions = onRequest(
       questions: quizData?.questionsOutput?.questions ?? [],
       submissions,
     });
+  })
+);
+
+// ---- B.27: 每週日 21:00 LINE 週報 ----
+
+/**
+ * Cloud Scheduler 自動觸發。每週日 21:00 Asia/Taipei 推 LINE 卡片給管理員。
+ */
+export const weeklyDigest = onSchedule(
+  {
+    schedule: '0 21 * * 0',
+    timeZone: 'Asia/Taipei',
+    region: 'asia-east1',
+    secrets: [...LINE_SECRETS],
+  },
+  async () => {
+    const result = await runWeeklyDigest();
+    console.log('[weeklyDigest] sent', JSON.stringify(result));
+  }
+);
+
+/**
+ * 手動觸發版（給管理員測試用）。
+ * 需帶 ?adminKey=xxx，與 PIRLS_LINE_ADMIN_USER_ID 比對（沿用既有 secret 簡單授權）。
+ *
+ * 範例：curl 'https://...cloudfunctions.net/triggerWeeklyDigestNow?adminKey=U183cf...'
+ */
+export const triggerWeeklyDigestNow = onRequest(
+  { secrets: [...LINE_SECRETS] },
+  withCors(async (req, res) => {
+    const provided = (req.query?.adminKey ?? '') as string;
+    const expected = process.env.PIRLS_LINE_ADMIN_USER_ID?.trim() ?? '';
+    if (!provided || provided !== expected) {
+      res.status(403).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+    const result = await runWeeklyDigest();
+    res.json({ success: true, result });
   })
 );
