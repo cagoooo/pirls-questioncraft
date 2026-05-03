@@ -39,7 +39,20 @@ next-env.d.ts
 
 .genkit/*
 .env*
+!.env.example
+
+# firebase admin service account（**永遠不要 commit**）
+serviceAccountKey*.json
+firebase-adminsdk-*.json
 
 # firebase
 firebase-debug.log
 firestore-debug.log
+.firebase/
+
+# claude code agent local cache
+.agents/
+
+# functions build output
+functions/lib/
+functions/node_modules/

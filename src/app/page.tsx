@@ -16,9 +16,12 @@ import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
-import { generatePirlsQuestions } from '@/ai/flows/generate-pirls-questions';
-import { generatePirlsQuestionsFromText } from '@/ai/flows/generate-pirls-questions-from-text';
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import {
+  generatePirlsQuestions,
+  generatePirlsQuestionsFromText,
+  createSharedQuiz,
+} from '@/lib/api';
+import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
@@ -497,26 +500,18 @@ export default function PIRLSQuestionCraftPage() {
 
     try {
       const imageFilesDataURIs = inputMode === 'image' ? await Promise.all(imageFiles.map(file => resizeImage(file))) : [];
-      const bodyPayload = {
+      const { quizId } = await createSharedQuiz({
         questionsOutput: generatedQuestionsOutput,
         imageFilesDataURIs,
         inputText: inputMode === 'text' ? inputText : '',
-      };
-
-      const response = await fetch('/api/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload),
       });
-      const data = await response.json();
-
-      if (response.ok && data.success && data.quizId) {
-        const newShareLink = `${window.location.origin}/quiz/${data.quizId}`;
-        setCurrentShareLink(newShareLink);
-        toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white' });
-      } else {
-        throw new Error(data.error || '無法生成分享連結');
-      }
+      // 路線 B：靜態網站 + query string
+      // 在 GitHub Pages 子路徑下會是 https://cagoooo.github.io/pirls-questioncraft/quiz/?id=xxx
+      // 自訂網域則是 https://your-domain/quiz/?id=xxx
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+      const newShareLink = `${window.location.origin}${basePath}/quiz/?id=${quizId}`;
+      setCurrentShareLink(newShareLink);
+      toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white' });
     } catch (shareError: any) {
       console.error("分享測驗失敗:", shareError);
       setCurrentShareLink('');

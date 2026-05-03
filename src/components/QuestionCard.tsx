@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import type { VariantProps } from 'class-variance-authority';

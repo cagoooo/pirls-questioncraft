@@ -2,7 +2,7 @@
 'use client';
 
 import * as XLSX from 'xlsx';
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import type { Toast } from '@/hooks/use-toast';
 
 type ProgressCallback = (progress: number, message: string) => void;

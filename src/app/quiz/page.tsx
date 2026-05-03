@@ -1,11 +1,12 @@
-
-// src/app/quiz/[quizId]/page.tsx
+// src/app/quiz/page.tsx
+// 路線 B：原本動態路由 /quiz/[quizId] 改成 /quiz?id=xxx 的 query string 版本，
+// 因為 GitHub Pages 純靜態主機不支援動態路由 deep link。
 "use client";
 
-import React, { useEffect, useState, FormEvent } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState, FormEvent, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { QuizView } from '@/components/QuizView';
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -16,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { getSharedQuiz } from '@/lib/api';
 
 interface QuizData {
   questionsOutput: GeneratePirlsQuestionsOutput;
@@ -23,7 +25,7 @@ interface QuizData {
   inputText?: string;
 }
 
-export interface StudentInfo { // Exporting StudentInfo for use in QuizView and SharedQuizPage
+export interface StudentInfo {
   class: string;
   seatNumber: string;
   name: string;
@@ -31,17 +33,14 @@ export interface StudentInfo { // Exporting StudentInfo for use in QuizView and 
 
 type ProgressCallback = (progress: number, message: string) => void;
 
-export default function SharedQuizPage() {
-  console.log('SharedQuizPage: Component rendering started');
-  const params = useParams();
-  const router = useRouter();
-  const quizId = params?.quizId as string | undefined;
-  console.log('SharedQuizPage: quizId from params:', quizId);
+function SharedQuizPageInner() {
+  const searchParams = useSearchParams();
+  const quizId = searchParams?.get('id') ?? undefined;
 
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [studentClass, setStudentClass] = useState('');
   const [studentSeatNumber, setStudentSeatNumber] = useState('');
   const [studentName, setStudentName] = useState('');
@@ -51,44 +50,34 @@ export default function SharedQuizPage() {
   const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log('SharedQuizPage: useEffect triggered. quizId:', quizId);
-    if (quizId) {
-      const fetchQuizData = async () => {
-        console.log('SharedQuizPage: fetchQuizData called for quizId:', quizId);
-        setIsLoading(true);
-        setError(null);
-        setQuizData(null); // Reset quizData before fetching
-        try {
-          const response = await fetch(`/api/share?quizId=${quizId}`);
-          console.log('SharedQuizPage: API response status:', response.status);
-          const data = await response.json();
-          console.log('SharedQuizPage: API response data:', data);
-
-          if (response.ok && data.success && data.quizData) {
-            console.log('SharedQuizPage: Quiz data fetched successfully');
-            setQuizData(data.quizData);
-          } else {
-            console.error('SharedQuizPage: Failed to fetch quiz data or data invalid. Response OK:', response.ok, 'Data Success:', data.success, 'QuizData present:', !!data.quizData);
-            throw new Error(data.error || '無法載入測驗，連結可能已失效或不存在。');
-          }
-        } catch (err: any) {
-          console.error("SharedQuizPage: 載入分享測驗失敗:", err);
-          setError(err.message || '發生未知錯誤，無法載入測驗。');
-        } finally {
-          console.log('SharedQuizPage: fetchQuizData finally block. Setting isLoading to false.');
-          setIsLoading(false);
-        }
-      };
-      fetchQuizData();
-    } else {
-      console.log('SharedQuizPage: quizId is missing. Setting error.');
-      setError('無效的測驗連結。');
+    if (!quizId) {
+      setError('無效的測驗連結（缺少 id 參數）。');
       setIsLoading(false);
+      return;
     }
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      setQuizData(null);
+      try {
+        const data = await getSharedQuiz(quizId);
+        if (cancelled) return;
+        setQuizData(data);
+      } catch (err: any) {
+        if (cancelled) return;
+        setError(err?.message ?? '無法載入測驗，連結可能已失效或不存在。');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [quizId]);
 
   const handleStudentInfoSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -104,7 +93,6 @@ export default function SharedQuizPage() {
       return;
     }
     setIsStudentInfoSubmitted(true);
-    console.log('SharedQuizPage: Student info submitted:', { studentClass, studentSeatNumber, studentName });
   };
 
   const handleShowQuizResultsPdfProgress = (show: boolean) => {
@@ -112,14 +100,11 @@ export default function SharedQuizPage() {
   };
 
   const handleUpdateQuizResultsPdfProgress: ProgressCallback = (progress, message) => {
-     setFileGenerationProgress(progress);
-     setFileGenerationMessage(message);
+    setFileGenerationProgress(progress);
+    setFileGenerationMessage(message);
   };
 
-  console.log('SharedQuizPage: Rendering. isLoading:', isLoading, 'error:', error, 'quizData is null:', quizData === null, 'isStudentInfoSubmitted:', isStudentInfoSubmitted);
-
   if (isLoading) {
-    console.log('SharedQuizPage: Rendering loading state');
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -136,7 +121,6 @@ export default function SharedQuizPage() {
   }
 
   if (error) {
-    console.log('SharedQuizPage: Rendering error state:', error);
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -159,7 +143,6 @@ export default function SharedQuizPage() {
   }
 
   if (quizData && !isStudentInfoSubmitted) {
-    console.log('SharedQuizPage: Rendering student info form');
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <PirlsLogo className="mx-auto mb-6 h-20 w-auto sm:h-24" />
@@ -171,36 +154,15 @@ export default function SharedQuizPage() {
             <form onSubmit={handleStudentInfoSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="studentClass" className="text-sm sm:text-md">班級</Label>
-                <Input
-                  id="studentClass"
-                  value={studentClass}
-                  onChange={(e) => setStudentClass(e.target.value)}
-                  placeholder="例如：三年一班"
-                  className="text-sm sm:text-base"
-                  required
-                />
+                <Input id="studentClass" value={studentClass} onChange={(e) => setStudentClass(e.target.value)} placeholder="例如：三年一班" className="text-sm sm:text-base" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="studentSeatNumber" className="text-sm sm:text-md">座號</Label>
-                <Input
-                  id="studentSeatNumber"
-                  value={studentSeatNumber}
-                  onChange={(e) => setStudentSeatNumber(e.target.value)}
-                  placeholder="例如：01"
-                  className="text-sm sm:text-base"
-                  required
-                />
+                <Input id="studentSeatNumber" value={studentSeatNumber} onChange={(e) => setStudentSeatNumber(e.target.value)} placeholder="例如：01" className="text-sm sm:text-base" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="studentName" className="text-sm sm:text-md">姓名</Label>
-                <Input
-                  id="studentName"
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="例如：王小明"
-                  className="text-sm sm:text-base"
-                  required
-                />
+                <Input id="studentName" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="例如：王小明" className="text-sm sm:text-base" required />
               </div>
               {formError && (
                 <Alert variant="destructive" className="mt-4">
@@ -209,9 +171,7 @@ export default function SharedQuizPage() {
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
-              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg">
-                開始測驗
-              </Button>
+              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg">開始測驗</Button>
             </form>
           </CardContent>
         </Card>
@@ -220,7 +180,6 @@ export default function SharedQuizPage() {
   }
 
   if (quizData && isStudentInfoSubmitted) {
-    console.log('SharedQuizPage: Rendering QuizView with quizData and studentInfo');
     const studentInfo: StudentInfo = {
       class: studentClass,
       seatNumber: studentSeatNumber,
@@ -228,13 +187,15 @@ export default function SharedQuizPage() {
     };
     return (
       <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
-         <header className="my-4 sm:my-8 text-center">
-            <PirlsLogo className="mx-auto mb-4 h-12 w-auto sm:h-16" />
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">學生：{studentInfo.class} {studentInfo.seatNumber}號 {studentInfo.name}</p>
+        <header className="my-4 sm:my-8 text-center">
+          <PirlsLogo className="mx-auto mb-4 h-12 w-auto sm:h-16" />
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            學生：{studentInfo.class} {studentInfo.seatNumber}號 {studentInfo.name}
+          </p>
         </header>
         <main className="w-full max-w-3xl">
-          {(isGeneratingQuizResultsPdf) && (
+          {isGeneratingQuizResultsPdf && (
             <Card className="w-full shadow-md mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center text-lg sm:text-xl font-semibold">
@@ -257,9 +218,7 @@ export default function SharedQuizPage() {
             inputText={quizData.inputText}
             studentInfo={studentInfo}
             onExitQuiz={() => {
-                toast({ title: "測驗已結束", description: "感謝您的參與！您可以關閉此頁面。" });
-                // Optionally, redirect or offer a way to go back to the main page
-                // router.push('/'); 
+              toast({ title: '測驗已結束', description: '感謝您的參與！您可以關閉此頁面。' });
             }}
             toast={toast}
             showFileGenerationProgress={handleShowQuizResultsPdfProgress}
@@ -270,14 +229,28 @@ export default function SharedQuizPage() {
       </div>
     );
   }
-  
-  console.log('SharedQuizPage: Rendering fallback state (unknown state)');
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <p className="text-muted-foreground mb-4">無法載入測驗內容，請確認連結是否正確或稍後再試。</p>
-         <Button asChild className="mt-4">
-            <Link href="/">返回首頁</Link>
-        </Button>
+      <p className="text-muted-foreground mb-4">無法載入測驗內容，請確認連結是否正確或稍後再試。</p>
+      <Button asChild className="mt-4">
+        <Link href="/">返回首頁</Link>
+      </Button>
     </div>
+  );
+}
+
+export default function SharedQuizPage() {
+  // useSearchParams 在 static export 必須包 Suspense
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-background">
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        </div>
+      }
+    >
+      <SharedQuizPageInner />
+    </Suspense>
   );
 }

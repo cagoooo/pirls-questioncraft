@@ -2,7 +2,7 @@
 'use client';
 
 import type { jsPDF } from 'jspdf';
-import type { GeneratePirlsQuestionsOutput } from '@/ai/flows/generate-pirls-questions';
+import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import type { Toast } from '@/hooks/use-toast';
 
 type PirlsQuestionOriginal = GeneratePirlsQuestionsOutput['questions'][0];
