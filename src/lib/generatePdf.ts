@@ -57,7 +57,7 @@ async function loadAndRegisterFont(
   showToast: typeof Toast
 ) {
   try {
-    const fontUrl = `/fonts/${fontFileName}`;
+    const fontUrl = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/fonts/${fontFileName}`;
     const response = await fetch(fontUrl);
     if (!response.ok) {
       throw new Error(`字型檔案 ${fontFileName} 下載失敗: ${response.statusText} (請確認 public/fonts/${fontFileName} 存在)`);

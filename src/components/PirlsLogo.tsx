@@ -10,10 +10,10 @@ export function PirlsLogo({ className, ...props }: PirlsLogoProps) {
   return (
     <div className={className} {...props}>
       <Image
-        src="/images/logo.png" // Updated to use the local image
-        alt="Shih Men Elementary School Logo" // Updated alt text
-        width={150} // Adjusted width for better display, original image is 800x786
-        height={147} // Adjusted height maintaining aspect ratio
+        src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/images/logo.png`}
+        alt="Shih Men Elementary School Logo"
+        width={150}
+        height={147}
         className="object-contain h-full w-full"
         priority
         data-ai-hint="logo school"
