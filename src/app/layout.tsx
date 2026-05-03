@@ -19,8 +19,14 @@ const siteDescription = '上傳圖片或直接貼上截圖，APP 為您分析內
 
 // GitHub Pages 子路徑（如 /pirls-questioncraft）；自訂網域時設成空字串。
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-const socialPreviewImageUrl = `${basePath}/images/social-preview.png`;
-const faviconUrl = `${basePath}/images/logo.png`;
+
+// metadataBase 已含 basePath，OG/Twitter 圖路徑用「相對於 metadataBase」即可，**不要再加 basePath**。
+const socialPreviewImageUrl = '/images/social-preview.png';
+
+// link rel=icon 等是直接掛到 site root 的 <link> 標籤，metadataBase 不適用，要手動加 basePath。
+const faviconSvgUrl = `${basePath}/icons/favicon.svg`;
+const favicon32Url = `${basePath}/icons/favicon-32.png`;
+const appleTouchIconUrl = `${basePath}/icons/apple-touch-icon.png`;
 
 // 站點正式網址；可用 NEXT_PUBLIC_SITE_URL 覆蓋
 const productionDomain =
@@ -34,7 +40,11 @@ export const metadata: Metadata = {
   title: siteTitle,
   description: siteDescription,
   icons: {
-    icon: faviconUrl,
+    icon: [
+      { url: faviconSvgUrl, type: 'image/svg+xml' },
+      { url: favicon32Url, sizes: '32x32', type: 'image/png' },
+    ],
+    apple: appleTouchIconUrl,
   },
   openGraph: {
     title: siteTitle,

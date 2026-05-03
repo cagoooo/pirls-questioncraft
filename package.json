@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "build:functions": "npm --prefix functions run build",
     "deploy:functions": "firebase deploy --only functions",
-    "deploy:firestore": "firebase deploy --only firestore"
+    "deploy:firestore": "firebase deploy --only firestore",
+    "generate:assets": "node tools/generate-assets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
@@ -53,6 +54,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^0.1.100",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
