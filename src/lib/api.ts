@@ -123,3 +123,39 @@ export async function getSharedQuiz(quizId: string): Promise<SharedQuizData> {
   const r = await getJSON<{ quizData: SharedQuizData }>('getSharedQuiz', { quizId });
   return (r as any).quizData;
 }
+
+// ---- B.16: 學生作答儀表板 ----
+
+export interface StudentAnswerSubmission {
+  quizId: string;
+  studentInfo: { class: string; seatNumber: string; name: string };
+  answers: (number | null)[];
+  correctCount: number;
+  totalCount: number;
+  pirlsLevelStats: Record<string, { correct: number; total: number }>;
+}
+
+export async function submitQuizAnswer(args: StudentAnswerSubmission): Promise<{ submissionId: string }> {
+  return postJSON<{ submissionId: string }>('submitQuizAnswer', args) as any;
+}
+
+export interface SubmissionRecord {
+  id: string;
+  studentInfo: { class: string; seatNumber: string; name: string };
+  answers: (number | null)[];
+  correctCount: number;
+  totalCount: number;
+  pirlsLevelStats: Record<string, { correct: number; total: number }>;
+  submittedAt: number | null;
+}
+
+export interface DashboardData {
+  quizTitle: string | null;
+  questions: PirlsQuestion[];
+  submissions: SubmissionRecord[];
+}
+
+export async function getSubmissions(quizId: string): Promise<DashboardData> {
+  const r = await getJSON<DashboardData>('getSubmissions', { quizId });
+  return r as any;
+}

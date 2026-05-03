@@ -24,7 +24,8 @@ import {
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
 import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
-import type { StudentInfo } from '@/app/quiz/[quizId]/page';
+import { submitQuizAnswer } from '@/lib/api';
+import type { StudentInfo } from '@/app/quiz/page';
 
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
@@ -36,6 +37,8 @@ interface QuizViewProps {
   imageFilesDataURIs?: string[];
   inputText?: string;
   studentInfo?: StudentInfo;
+  /** B.16: 從共享連結進入時帶 quizId，交卷會寫進 submissions/{quizId}/students */
+  quizId?: string;
   onExitQuiz: () => void;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
@@ -74,6 +77,7 @@ export function QuizView({
   imageFilesDataURIs,
   inputText,
   studentInfo,
+  quizId,
   onExitQuiz,
   toast,
   showFileGenerationProgress,
@@ -278,6 +282,30 @@ export function QuizView({
     });
     setQuizResults(results);
     setQuizState('results');
+
+    // B.16: 從共享連結進入且有 studentInfo → 寫一筆 submission，best-effort（失敗不擋學生看結果）
+    if (quizId && studentInfo) {
+      const correctCount = results.filter(r => r.isCorrect).length;
+      const totalCount = results.length;
+      const pirlsLevelStats: Record<string, { correct: number; total: number }> = {};
+      results.forEach(r => {
+        const stat = pirlsLevelStats[r.pirlsLevel] ?? { correct: 0, total: 0 };
+        stat.total += 1;
+        if (r.isCorrect) stat.correct += 1;
+        pirlsLevelStats[r.pirlsLevel] = stat;
+      });
+      submitQuizAnswer({
+        quizId,
+        studentInfo,
+        answers: selectedAnswers,
+        correctCount,
+        totalCount,
+        pirlsLevelStats,
+      }).catch(err => {
+        // 純 log，不打擾學生
+        console.warn('submitQuizAnswer failed:', err?.message);
+      });
+    }
   };
 
   const handleFinishQuiz = () => {

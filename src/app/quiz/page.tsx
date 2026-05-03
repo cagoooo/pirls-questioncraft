@@ -217,6 +217,7 @@ function SharedQuizPageInner() {
             imageFilesDataURIs={quizData.imageFilesDataURIs}
             inputText={quizData.inputText}
             studentInfo={studentInfo}
+            quizId={quizId}
             onExitQuiz={() => {
               toast({ title: '測驗已結束', description: '感謝您的參與！您可以關閉此頁面。' });
             }}

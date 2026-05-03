@@ -17,6 +17,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
 import { TurnstileGate } from '@/components/TurnstileGate';
+import { ShareDialog } from '@/components/ShareDialog';
 import {
   generatePirlsQuestions,
   generatePirlsQuestionsFromText,
@@ -29,7 +30,7 @@ import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon, MessageSquareHeart } from 'lucide-react';
+import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon, MessageSquareHeart, BarChart3, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -811,74 +812,15 @@ export default function PIRLSQuestionCraftPage() {
                         <ClipboardCheck className="mr-2 h-4 w-4" />
                         開始測驗
                     </Button>
-                     <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            onClick={handleShareQuiz}
-                            disabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
-                            variant="outline"
-                            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
-                          >
-                            {isSharingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
-                            {isSharingQuiz ? "處理中..." : "分享測驗"}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>分享您的測驗</DialogTitle>
-                            <DialogDesc>
-                              透過以下臨時連結或QR Code分享此測驗給學生。
-                            </DialogDesc>
-                          </DialogHeader>
-                          <div className="space-y-4 py-2">
-                            {isSharingQuiz && (
-                               <div className="flex items-center justify-center p-4">
-                                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                                <p className="ml-2 text-muted-foreground">正在生成臨時分享連結...</p>
-                               </div>
-                            )}
-                            {!isSharingQuiz && currentShareLink && (
-                              <>
-                                <div className="space-y-1">
-                                  <label htmlFor="share-link" className="text-sm font-medium">
-                                    臨時分享連結
-                                  </label>
-                                  <div className="flex items-center space-x-2">
-                                    <Input id="share-link" value={currentShareLink} readOnly className="flex-1" />
-                                    <Button type="button" size="sm" onClick={handleCopyShareLink}>
-                                      <Copy className="h-4 w-4 sm:mr-2" />
-                                      <span className="hidden sm:inline">複製</span>
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-sm font-medium">QR Code</label>
-                                  <div className="flex items-center justify-center p-4 border rounded-md bg-muted">
-                                    <QRCodeSVG value={currentShareLink} size={192} bgColor={"#ffffff"} fgColor={"#000000"} level={"L"} includeMargin={false} />
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                            {!isSharingQuiz && !currentShareLink && (
-                                 <p className="text-sm text-muted-foreground text-center py-2">點擊「分享測驗」按鈕以生成連結和QR Code。</p>
-                            )}
-                             <Alert variant="default" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
-                              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                              <AlertTitle className="text-yellow-700 dark:text-yellow-300">重要提示：臨時分享</AlertTitle>
-                              <AlertDescription className="text-sm text-yellow-600 dark:text-yellow-500">
-                                此分享連結是**臨時性的**，內容儲存在伺服器記憶體中。連結約在 **1 小時後或伺服器重啟/更新時失效**。
-                                不適用於永久保存或非同步測驗。學生需在連結有效期內完成測驗。
-                                在正式生產環境 (例如 Vercel)，此臨時分享的穩定性可能受限。
-                              </AlertDescription>
-                            </Alert>
-                          </div>
-                          <DialogFooter className="sm:justify-end">
-                            <Button type="button" variant="outline" onClick={() => setIsShareDialogOpen(false)} disabled={isSharingQuiz}>
-                              關閉
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
+                     <ShareDialog
+                        open={isShareDialogOpen}
+                        onOpenChange={setIsShareDialogOpen}
+                        onShareClick={handleShareQuiz}
+                        onCopyClick={handleCopyShareLink}
+                        triggerDisabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
+                        isSharingQuiz={isSharingQuiz}
+                        currentShareLink={currentShareLink}
+                      />
                     <Button
                         onClick={handleDownloadPdf}
                         disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}

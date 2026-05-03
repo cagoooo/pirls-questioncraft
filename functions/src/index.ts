@@ -280,3 +280,107 @@ export const getSharedQuiz = onRequest(
     });
   })
 );
+
+// ---- B.16: 學生作答儀表板 ----
+
+const SUBMISSIONS_COLLECTION = 'submissions';
+
+/**
+ * 學生交卷時呼叫。寫一筆紀錄到 submissions/{quizId}/students/{autoId}
+ * 不要 Turnstile（學生量大），但加限流防一個學生灌爆
+ */
+export const submitQuizAnswer = onRequest(
+  { secrets: [...LINE_SECRETS] },
+  withProtection(
+    async (req, res) => {
+      if (req.method !== 'POST') {
+        res.status(405).json({ success: false, error: 'Use POST' });
+        return;
+      }
+      const { quizId, studentInfo, answers, correctCount, totalCount, pirlsLevelStats } = req.body ?? {};
+      if (!quizId || !studentInfo || !Array.isArray(answers)) {
+        res.status(400).json({ success: false, error: '缺少必要欄位 quizId / studentInfo / answers。' });
+        return;
+      }
+      // 確認該 quiz 還沒過期才接受作答（避免污染舊資料）
+      const quizSnap = await db.collection(COLLECTION).doc(quizId).get();
+      if (!quizSnap.exists) {
+        res.status(404).json({ success: false, error: '測驗不存在或已過期。' });
+        return;
+      }
+      const quizData = quizSnap.data() as any;
+      const quizExpiresAt = quizData.expiresAt?.toMillis?.() ?? 0;
+      // 作答 doc TTL：跟測驗 + 7 天（讓老師事後也能看 dashboard）
+      const submissionExpiresAt = Timestamp.fromMillis(quizExpiresAt + 7 * 24 * 60 * 60 * 1000);
+
+      const ref = await db.collection(COLLECTION).doc(quizId)
+        .collection('students').add({
+          studentInfo,
+          answers,
+          correctCount: correctCount ?? 0,
+          totalCount: totalCount ?? 0,
+          pirlsLevelStats: pirlsLevelStats ?? {},
+          submittedAt: Timestamp.now(),
+          expiresAt: submissionExpiresAt,
+        });
+
+      // LINE 通知老師有學生交卷
+      const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+      notifyAdminCard({
+        status: 'success',
+        title: '有學生剛交卷',
+        appName: APP_NAME,
+        fields: [
+          { icon: '👤', label: '學生', value: `${studentInfo.class} ${studentInfo.seatNumber}號 ${studentInfo.name}` },
+          { icon: '📝', label: '答對', value: `${correctCount} / ${totalCount}（${accuracy}%）` },
+          { icon: '🆔', label: 'Quiz', value: quizId },
+        ],
+      });
+
+      res.json({ success: true, submissionId: ref.id });
+    },
+    { perMinute: 5, needTurnstile: false }
+  )
+);
+
+/**
+ * 老師端讀取某 quiz 的所有學生作答（聚合資料）。
+ * 純讀，不限流（老師可能 reload 看即時數字）。
+ */
+export const getSubmissions = onRequest(
+  withCors(async (req, res) => {
+    const quizId = (req.query?.quizId ?? req.query?.id) as string | undefined;
+    if (!quizId) {
+      res.status(400).json({ success: false, error: '缺少 quizId 參數。' });
+      return;
+    }
+    // 確認 quiz 仍存在
+    const quizSnap = await db.collection(COLLECTION).doc(quizId).get();
+    const quizData = quizSnap.exists ? (quizSnap.data() as any) : null;
+
+    const subsSnap = await db.collection(COLLECTION).doc(quizId)
+      .collection('students')
+      .orderBy('submittedAt', 'desc')
+      .get();
+
+    const submissions = subsSnap.docs.map(d => {
+      const x = d.data() as any;
+      return {
+        id: d.id,
+        studentInfo: x.studentInfo,
+        answers: x.answers,
+        correctCount: x.correctCount,
+        totalCount: x.totalCount,
+        pirlsLevelStats: x.pirlsLevelStats,
+        submittedAt: x.submittedAt?.toMillis?.() ?? null,
+      };
+    });
+
+    res.json({
+      success: true,
+      quizTitle: quizData?.questionsOutput?.title ?? null,
+      questions: quizData?.questionsOutput?.questions ?? [],
+      submissions,
+    });
+  })
+);
