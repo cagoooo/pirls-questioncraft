@@ -17,11 +17,24 @@ const CARD_THEMES = {
   warning: { headerBg: '#F59E0B', headerSubColor: '#FEF3C7', icon: '⚠️' },
 } as const;
 
+export type CardAction = {
+  /** 按鈕文字（≤ 12 字才不會擠） */
+  label: string;
+  /** 點擊後開的 URL（必須 https） */
+  uri: string;
+  /** 視覺：primary（主按鈕，深色填滿）／secondary（次要，邊框） */
+  style?: 'primary' | 'secondary';
+};
+
 export type CardSpec = {
   status: keyof typeof CARD_THEMES;
   title: string;
   appName?: string;
   fields: Array<{ icon?: string; label: string; value: string }>;
+  /** 額外段落（在 fields 與 footer 之間，例如貼文章摘要） */
+  body?: string;
+  /** 底部 CTA 按鈕（最多 3 顆，會渲染成 footer block） */
+  actions?: CardAction[];
   footerNote?: string;
 };
 
@@ -115,6 +128,72 @@ function buildFlexBubble(card: CardSpec) {
     });
   }
 
+  // body：欄位 + 可選的長文字段落
+  const bodyContents: any[] = card.fields.map((f) => ({
+    type: 'box',
+    layout: 'horizontal',
+    spacing: 'sm',
+    contents: [
+      {
+        type: 'text',
+        text: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
+        color: '#888888',
+        size: 'sm',
+        flex: 3,
+      },
+      {
+        type: 'text',
+        text: f.value || '—',
+        color: '#1E293B',
+        size: 'sm',
+        flex: 7,
+        wrap: true,
+      },
+    ],
+  }));
+  if (card.body) {
+    bodyContents.push({
+      type: 'separator',
+      margin: 'md',
+      color: '#E5E7EB',
+    });
+    bodyContents.push({
+      type: 'text',
+      text: card.body,
+      color: '#475569',
+      size: 'xs',
+      wrap: true,
+      margin: 'md',
+    });
+  }
+
+  // footer：時間戳 + 可選的 action buttons
+  const footerContents: any[] = [
+    {
+      type: 'text',
+      text: card.footerNote ? `${now} · ${card.footerNote}` : now,
+      color: '#94A3B8',
+      size: 'xxs',
+      align: 'end',
+      wrap: true,
+    },
+  ];
+  if (card.actions?.length) {
+    footerContents.unshift(
+      ...card.actions.slice(0, 3).map((a) => ({
+        type: 'button',
+        style: a.style === 'primary' ? 'primary' : 'secondary',
+        height: 'sm',
+        action: {
+          type: 'uri',
+          label: a.label.slice(0, 12),
+          uri: a.uri,
+        },
+        margin: 'sm',
+      })),
+    );
+  }
+
   return {
     type: 'bubble',
     size: 'kilo',
@@ -130,43 +209,14 @@ function buildFlexBubble(card: CardSpec) {
       layout: 'vertical',
       spacing: 'md',
       paddingAll: '16px',
-      contents: card.fields.map((f) => ({
-        type: 'box',
-        layout: 'horizontal',
-        spacing: 'sm',
-        contents: [
-          {
-            type: 'text',
-            text: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
-            color: '#888888',
-            size: 'sm',
-            flex: 3,
-          },
-          {
-            type: 'text',
-            text: f.value || '—',
-            color: '#1E293B',
-            size: 'sm',
-            flex: 7,
-            wrap: true,
-          },
-        ],
-      })),
+      contents: bodyContents,
     },
     footer: {
       type: 'box',
       layout: 'vertical',
       paddingAll: '12px',
-      contents: [
-        {
-          type: 'text',
-          text: card.footerNote ? `${now} · ${card.footerNote}` : now,
-          color: '#94A3B8',
-          size: 'xxs',
-          align: 'end',
-          wrap: true,
-        },
-      ],
+      spacing: 'sm',
+      contents: footerContents,
     },
   };
 }

@@ -40,9 +40,34 @@ const PIRLS_LINE_CHANNEL_ACCESS_TOKEN = defineSecret('PIRLS_LINE_CHANNEL_ACCESS_
 const PIRLS_LINE_ADMIN_USER_ID = defineSecret('PIRLS_LINE_ADMIN_USER_ID');
 
 const APP_NAME = 'PIRLS 題組生成站';
+const SITE_BASE_URL = 'https://cagoooo.github.io/pirls-questioncraft';
 const COLLECTION = 'sharedQuizzes';
 const QUIZ_EXPIRY_MS = 60 * 60 * 1000;
 const MAX_PAYLOAD_BYTES = 900 * 1024;
+
+const PIRLS_LEVEL_LABEL: Record<string, string> = {
+  'locate & retrieve': '訊息提取',
+  'make straightforward inferences': '直接推論',
+  'interpret & integrate': '詮釋整合',
+  'evaluate & critique': '評估批判',
+};
+
+/** 統計題目分布成「訊息2 直接2 詮釋2 評估2」格式 */
+function summarizePirlsDistribution(questions: Array<{ pirlsLevel: string }>): string {
+  const counts: Record<string, number> = {};
+  questions.forEach((q) => {
+    counts[q.pirlsLevel] = (counts[q.pirlsLevel] ?? 0) + 1;
+  });
+  return Object.entries(PIRLS_LEVEL_LABEL)
+    .map(([key, label]) => `${label}${counts[key] ?? 0}`)
+    .join('・');
+}
+
+/** 取文字摘要（前 N 字 + 省略號） */
+function summarizeText(text: string, maxLen = 80): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  return cleaned.length > maxLen ? cleaned.slice(0, maxLen) + '...' : cleaned;
+}
 
 function generateUniqueId(): string {
   return Math.random().toString(36).substring(2, 12) + Date.now().toString(36).substring(4);
@@ -103,6 +128,7 @@ export const generateFromImages = onRequest(
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
+      const ip = getClientIp(req);
       if (req.method !== 'POST') {
         res.status(405).json({ success: false, error: 'Use POST' });
         return;
@@ -115,17 +141,23 @@ export const generateFromImages = onRequest(
       try {
         const result = await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
+        const estKB = Math.round(photoDataUris.reduce((sum, d) => sum + d.length, 0) * 0.75 / 1024);
         notifyAdminCard({
           status: 'success',
           title: '有人剛完成圖片出題',
           appName: APP_NAME,
           fields: [
-            { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張` },
+            { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張（${estKB} KB）` },
             { icon: '📝', label: '標題', value: result.title },
+            { icon: '📏', label: '文章', value: `${result.articleContent.length} 字` },
             { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
+            { icon: '🌍', label: '來源', value: ip },
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
+          body: `📖 文章摘要\n${summarizeText(result.articleContent, 100)}`,
         });
         res.json({ success: true, data: result });
       } catch (e: any) {
@@ -136,6 +168,7 @@ export const generateFromImages = onRequest(
           appName: APP_NAME,
           fields: [
             { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張` },
+            { icon: '🌍', label: '來源', value: ip },
             { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
           ],
           footerNote: `⏱️ ${elapsed}s`,
@@ -152,6 +185,7 @@ export const generateFromText = onRequest(
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
+      const ip = getClientIp(req);
       if (req.method !== 'POST') {
         res.status(405).json({ success: false, error: 'Use POST' });
         return;
@@ -172,9 +206,12 @@ export const generateFromText = onRequest(
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '字數', value: `${text.length}` },
             { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
+            { icon: '🌍', label: '來源', value: ip },
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
+          body: `📖 文章摘要\n${summarizeText(text, 100)}`,
         });
         res.json({ success: true, data: result });
       } catch (e: any) {
@@ -185,6 +222,7 @@ export const generateFromText = onRequest(
           appName: APP_NAME,
           fields: [
             { icon: '📏', label: '字數', value: `${text.length}` },
+            { icon: '🌍', label: '來源', value: ip },
             { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
           ],
           footerNote: `⏱️ ${elapsed}s`,
@@ -224,23 +262,38 @@ export const createSharedQuiz = onRequest(
       }
       const quizId = generateUniqueId();
       const now = Date.now();
+      const expiresAtMs = now + QUIZ_EXPIRY_MS;
       await db.collection(COLLECTION).doc(quizId).set({
         questionsOutput,
         imageFilesDataURIs: imageFilesDataURIs ?? [],
         inputText: inputText ?? '',
         createdAt: Timestamp.fromMillis(now),
-        expiresAt: Timestamp.fromMillis(now + QUIZ_EXPIRY_MS),
+        expiresAt: Timestamp.fromMillis(expiresAtMs),
       });
-      // 學生分享連結建立成功通知
+      // 失效時間（HH:mm 格式）
+      const expiresHHMM = new Intl.DateTimeFormat('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date(expiresAtMs));
+      const studentUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
+      const dashboardUrl = `${SITE_BASE_URL}/dashboard/?id=${quizId}`;
+      // 學生分享連結建立成功通知（含 2 顆可點按鈕）
       notifyAdminCard({
         status: 'success',
         title: '老師剛產生了學生分享連結',
         appName: APP_NAME,
         fields: [
-          { icon: '🆔', label: 'Quiz ID', value: quizId },
           { icon: '📝', label: '標題', value: (questionsOutput as any)?.title ?? '—' },
           { icon: '🎯', label: '題數', value: `${(questionsOutput as any)?.questions?.length ?? 0} 題` },
-          { icon: '⏰', label: '有效期', value: '60 分鐘' },
+          { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution((questionsOutput as any)?.questions ?? []) },
+          { icon: '🆔', label: 'Quiz ID', value: quizId },
+          { icon: '⏰', label: '失效於', value: `今天 ${expiresHHMM}（60 分鐘）` },
+        ],
+        actions: [
+          { label: '👨‍🎓 開學生連結', uri: studentUrl, style: 'primary' },
+          { label: '📊 老師儀表板', uri: dashboardUrl, style: 'secondary' },
         ],
       });
       res.json({ success: true, quizId });
@@ -324,16 +377,59 @@ export const submitQuizAnswer = onRequest(
           expiresAt: submissionExpiresAt,
         });
 
-      // LINE 通知老師有學生交卷
+      // 讀取目前所有 submissions 計算班級即時統計
+      const allSubsSnap = await db.collection(COLLECTION).doc(quizId)
+        .collection('students').get();
+      const totalSubs = allSubsSnap.size;
+      let classAvgAccuracy = 0;
+      const aggregatePirls: Record<string, { correct: number; total: number }> = {};
+      allSubsSnap.docs.forEach((d) => {
+        const x = d.data() as any;
+        if (x.totalCount > 0) classAvgAccuracy += (x.correctCount / x.totalCount) * 100;
+        Object.entries(x.pirlsLevelStats || {}).forEach(([level, s]) => {
+          const acc = aggregatePirls[level] ?? { correct: 0, total: 0 };
+          acc.correct += (s as any).correct;
+          acc.total += (s as any).total;
+          aggregatePirls[level] = acc;
+        });
+      });
+      classAvgAccuracy = totalSubs > 0 ? classAvgAccuracy / totalSubs : 0;
+
+      // 找班級弱項層次（答對率最低）
+      const levelAccuracies = Object.entries(aggregatePirls)
+        .filter(([_, s]) => s.total > 0)
+        .map(([level, s]) => ({ level, accuracy: (s.correct / s.total) * 100 }));
+      const weakest = levelAccuracies.sort((a, b) => a.accuracy - b.accuracy)[0];
+
+      // 學生個人弱項
+      const studentLevels = Object.entries(pirlsLevelStats ?? {})
+        .filter(([_, s]) => (s as any).total > 0)
+        .map(([level, s]) => ({ level, accuracy: ((s as any).correct / (s as any).total) * 100 }));
+      const studentWeakest = studentLevels.sort((a, b) => a.accuracy - b.accuracy)[0];
+
       const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+      const accIcon = accuracy >= 80 ? '🎉' : accuracy >= 60 ? '👍' : '📚';
+      const dashboardUrl = `${SITE_BASE_URL}/dashboard/?id=${quizId}`;
+      const quizTitle = (await db.collection(COLLECTION).doc(quizId).get()).data()?.questionsOutput?.title ?? '—';
+
       notifyAdminCard({
         status: 'success',
-        title: '有學生剛交卷',
+        title: `${accIcon} 第 ${totalSubs} 位學生剛交卷`,
         appName: APP_NAME,
         fields: [
+          { icon: '📝', label: '測驗', value: quizTitle },
           { icon: '👤', label: '學生', value: `${studentInfo.class} ${studentInfo.seatNumber}號 ${studentInfo.name}` },
-          { icon: '📝', label: '答對', value: `${correctCount} / ${totalCount}（${accuracy}%）` },
-          { icon: '🆔', label: 'Quiz', value: quizId },
+          { icon: '✅', label: '答對', value: `${correctCount} / ${totalCount}（${accuracy}%）` },
+          ...(studentWeakest
+            ? [{ icon: '⚠️', label: '個人弱項', value: `${PIRLS_LEVEL_LABEL[studentWeakest.level] ?? studentWeakest.level}（${Math.round(studentWeakest.accuracy)}%）` }]
+            : []),
+          { icon: '🏫', label: '班級平均', value: `${classAvgAccuracy.toFixed(1)}%（${totalSubs} 人）` },
+          ...(weakest
+            ? [{ icon: '🎯', label: '班級弱項', value: `${PIRLS_LEVEL_LABEL[weakest.level] ?? weakest.level}（${Math.round(weakest.accuracy)}%）` }]
+            : []),
+        ],
+        actions: [
+          { label: '📊 看完整儀表板', uri: dashboardUrl, style: 'primary' },
         ],
       });
 
