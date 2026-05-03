@@ -139,6 +139,17 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
+              {/* a11y: 隱形 username 欄滿足瀏覽器密碼管理器規範 */}
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                value="admin"
+                readOnly
+                aria-hidden="true"
+                tabIndex={-1}
+                style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
+              />
               <div className="space-y-2">
                 <Label htmlFor="key">Admin Key</Label>
                 <Input
@@ -146,7 +157,7 @@ export default function AdminPage() {
                   type="password"
                   value={adminKey}
                   onChange={(e) => setAdminKey(e.target.value)}
-                  placeholder="pirls-admin-..."
+                  placeholder="輸入管理員密碼"
                   autoComplete="current-password"
                   required
                 />
