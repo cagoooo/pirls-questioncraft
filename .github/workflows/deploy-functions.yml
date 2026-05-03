@@ -1,14 +1,9 @@
 name: Deploy Cloud Functions
 
+# 預設只手動觸發（Repo → Actions → 此 workflow → Run workflow）。
+# 啟用 push 自動部署前，要先在 GitHub Secrets 設定 FIREBASE_SERVICE_ACCOUNT_PIRLS：
+#   詳見 docs/OPTIMIZATION.md §A.1
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - 'functions/**'
-      - 'firebase.json'
-      - 'firestore.rules'
-      - 'firestore.indexes.json'
-      - '.github/workflows/deploy-functions.yml'
   workflow_dispatch:
 
 jobs:
