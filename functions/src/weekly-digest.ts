@@ -13,7 +13,7 @@ import { getFirestore, Timestamp, type QueryDocumentSnapshot } from 'firebase-ad
 import { getRecentUsage } from './usage-tracker';
 import { notifyAdminCard, type CardSpec } from './notify-line';
 
-const APP_NAME = 'PIRLS 題組生成站';
+const APP_NAME = 'PIRLS閱讀理解生成站 PRO';
 const SITE_BASE_URL = 'https://cagoooo.github.io/pirls-questioncraft';
 
 const PIRLS_LEVEL_LABEL: Record<string, string> = {

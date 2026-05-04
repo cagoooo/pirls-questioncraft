@@ -44,7 +44,7 @@ const PIRLS_LINE_ADMIN_USER_ID = defineSecret('PIRLS_LINE_ADMIN_USER_ID');
 // B.26: Admin dashboard 授權用 key（Bearer token 比對）
 const PIRLS_ADMIN_KEY = defineSecret('PIRLS_ADMIN_KEY');
 
-const APP_NAME = 'PIRLS 題組生成站';
+const APP_NAME = 'PIRLS閱讀理解生成站 PRO';
 const SITE_BASE_URL = 'https://cagoooo.github.io/pirls-questioncraft';
 const COLLECTION = 'sharedQuizzes';
 const QUIZ_EXPIRY_MS = 60 * 60 * 1000;
