@@ -27,6 +27,7 @@ jobs:
         run: npm run build
 
       - name: Auth to GCP
+        id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PIRLS }}
