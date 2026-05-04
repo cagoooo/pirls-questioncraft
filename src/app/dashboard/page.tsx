@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3, ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { getSubmissions, type DashboardData, type SubmissionRecord } from '@/lib/api';
 import {
@@ -32,6 +33,34 @@ const PIRLS_LEVEL_COLOR: Record<string, string> = {
   'evaluate & critique': '#A387D9',
 };
 
+type SortKey = 'submittedAt' | 'class' | 'seatNumber' | 'name' | 'correct' | 'accuracy';
+
+function SortHeader({
+  label, sortKey, currentKey, dir, onClick, align, className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey;
+  dir: 'asc' | 'desc';
+  onClick: (k: SortKey) => void;
+  align?: 'left' | 'center';
+  className?: string;
+}) {
+  const active = sortKey === currentKey;
+  const Icon = !active ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={`py-2 px-2 cursor-pointer select-none hover:bg-muted/40 transition ${align === 'center' ? 'text-center' : ''} ${className ?? ''}`}
+      onClick={() => onClick(sortKey)}
+    >
+      <span className={`inline-flex items-center gap-1 ${active ? 'text-primary font-bold' : ''}`}>
+        {label}
+        <Icon className={`h-3 w-3 ${active ? 'opacity-100' : 'opacity-40'}`} />
+      </span>
+    </th>
+  );
+}
+
 function DashboardInner() {
   const searchParams = useSearchParams();
   const quizId = searchParams?.get('id') ?? '';
@@ -40,6 +69,11 @@ function DashboardInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadSignal, setReloadSignal] = useState(0);
+
+  const [sortKey, setSortKey] = useState<SortKey>('submittedAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [filterMode, setFilterMode] = useState<'all' | 'attention' | 'top'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (!quizId) {
@@ -74,10 +108,14 @@ function DashboardInner() {
     const high = Math.max(...accuracies);
     const low = Math.min(...accuracies);
 
-    // 2. 各題答對率
+    // 2. 各題答對率 + 選項分布（迷思分析）
     const perQuestion = qs.map((q, idx) => {
       const correctCount = subs.filter(s => s.answers[idx] === q.correctAnswerIndex).length;
       const total = subs.length;
+      const optionCounts = q.options.map((_, optIdx) =>
+        subs.filter(s => s.answers[idx] === optIdx).length
+      );
+      const skippedCount = subs.filter(s => s.answers[idx] == null).length;
       return {
         idx: idx + 1,
         question: q.question.length > 30 ? q.question.slice(0, 28) + '…' : q.question,
@@ -87,6 +125,10 @@ function DashboardInner() {
         total,
         accuracy: total > 0 ? Math.round((correctCount / total) * 100) : 0,
         color: PIRLS_LEVEL_COLOR[q.pirlsLevel] ?? '#888',
+        options: q.options,
+        correctAnswerIndex: q.correctAnswerIndex,
+        optionCounts,
+        skippedCount,
       };
     });
 
@@ -109,10 +151,85 @@ function DashboardInner() {
     return { avg, high, low, perQuestion, radarData, levelStats };
   }, [data]);
 
+  const displayedSubmissions = useMemo(() => {
+    if (!data) return [];
+    let list = [...data.submissions];
+
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      list = list.filter(s =>
+        String(s.studentInfo.name).toLowerCase().includes(q) ||
+        String(s.studentInfo.seatNumber).toLowerCase().includes(q) ||
+        String(s.studentInfo.class).toLowerCase().includes(q)
+      );
+    }
+    if (filterMode === 'attention') {
+      list = list.filter(s => {
+        const acc = s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0;
+        return acc < 60;
+      });
+    } else if (filterMode === 'top') {
+      list = list.filter(s => {
+        const acc = s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0;
+        return acc >= 80;
+      });
+    }
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'submittedAt':
+          cmp = (a.submittedAt ?? 0) - (b.submittedAt ?? 0);
+          break;
+        case 'class':
+          cmp = String(a.studentInfo.class).localeCompare(String(b.studentInfo.class), 'zh-Hant');
+          break;
+        case 'seatNumber': {
+          const na = parseInt(String(a.studentInfo.seatNumber), 10);
+          const nb = parseInt(String(b.studentInfo.seatNumber), 10);
+          if (Number.isFinite(na) && Number.isFinite(nb)) cmp = na - nb;
+          else cmp = String(a.studentInfo.seatNumber).localeCompare(String(b.studentInfo.seatNumber));
+          break;
+        }
+        case 'name':
+          cmp = String(a.studentInfo.name).localeCompare(String(b.studentInfo.name), 'zh-Hant');
+          break;
+        case 'correct':
+          cmp = a.correctCount - b.correctCount;
+          break;
+        case 'accuracy': {
+          const accA = a.totalCount > 0 ? a.correctCount / a.totalCount : 0;
+          const accB = b.totalCount > 0 ? b.correctCount / b.totalCount : 0;
+          cmp = accA - accB;
+          break;
+        }
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [data, sortKey, sortDir, filterMode, searchTerm]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'name' || key === 'class' || key === 'seatNumber' ? 'asc' : 'desc');
+    }
+  };
+
+  // CSV cell：含 CSV injection 防護（=,+,-,@,Tab,CR 開頭加單引號 prefix）
+  const csvCell = (v: any): string => {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+
   const downloadCSV = () => {
     if (!data) return;
     const rows: string[] = [];
-    rows.push(['班級', '座號', '姓名', '答對', '總題數', '答對率%', '訊息提取', '直接推論', '詮釋整合', '評估批判', '交卷時間'].join(','));
+    rows.push(['班級', '座號', '姓名', '答對', '總題數', '答對率%', '訊息提取', '直接推論', '詮釋整合', '評估批判', '交卷時間']
+      .map(csvCell).join(','));
     data.submissions.forEach(s => {
       const ts = s.submittedAt ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
       const acc = s.totalCount > 0 ? Math.round((s.correctCount / s.totalCount) * 100) : 0;
@@ -127,7 +244,7 @@ function DashboardInner() {
         fmt('locate & retrieve'), fmt('make straightforward inferences'),
         fmt('interpret & integrate'), fmt('evaluate & critique'),
         ts,
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+      ].map(csvCell).join(','));
     });
     const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -293,44 +410,160 @@ function DashboardInner() {
             </CardContent>
           </Card>
 
+          {/* 逐題選項分布（迷思分析） */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>逐題選項分布（迷思分析）</CardTitle>
+              <CardDescription>
+                看出學生卡在哪個誘答選項。
+                <span className="inline-block ml-1 align-middle">
+                  <span className="inline-block w-3 h-3 bg-green-500 rounded-sm mr-1" />正解
+                  <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm mx-1" />干擾選項
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {stats!.perQuestion.map((q) => (
+                <div key={q.idx} className="border-b pb-4 last:border-b-0 last:pb-0">
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm">第 {q.idx} 題</span>
+                      <Badge variant="outline" style={{ borderColor: q.color, color: q.color }}>
+                        {PIRLS_LEVEL_LABEL[q.pirlsLevel] ?? q.pirlsLevel}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        答對率 <span className="font-bold" style={{ color: q.color }}>{q.accuracy}%</span> · {q.correct}/{q.total}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground/80">{q.fullQuestion}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {q.options.map((optText, optIdx) => {
+                      const cnt = q.optionCounts[optIdx];
+                      const pct = q.total > 0 ? Math.round((cnt / q.total) * 100) : 0;
+                      const isCorrect = optIdx === q.correctAnswerIndex;
+                      return (
+                        <div key={optIdx} className="flex items-center gap-2 text-xs">
+                          <div className="w-7 shrink-0 font-medium flex items-center gap-0.5">
+                            {isCorrect && <span className="text-green-600" aria-label="正解">✓</span>}
+                            <span>{String.fromCharCode(65 + optIdx)}.</span>
+                          </div>
+                          <div className="flex-1 min-w-0 truncate" title={optText}>{optText}</div>
+                          <div className="w-24 sm:w-32 bg-gray-100 dark:bg-gray-800 rounded h-3 relative overflow-hidden shrink-0">
+                            <div
+                              className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-gray-400'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="w-16 text-right font-mono shrink-0 tabular-nums">
+                            {cnt} ({pct}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {q.skippedCount > 0 && (
+                      <div className="text-xs text-muted-foreground pl-9 italic">
+                        略過未答：{q.skippedCount} 人
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           {/* 學生成績表格 */}
           <Card>
             <CardHeader>
               <CardTitle>學生成績表</CardTitle>
-              <CardDescription>依交卷時間倒序，可按右上「匯出 CSV」帶回 Excel 整理</CardDescription>
+              <CardDescription>點欄位標題可排序；可搜尋、依需關注/優秀篩選；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-2 px-2">班級</th>
-                    <th className="py-2 px-2">座號</th>
-                    <th className="py-2 px-2">姓名</th>
-                    <th className="py-2 px-2 text-center">答對</th>
-                    <th className="py-2 px-2 text-center">答對率</th>
-                    <th className="py-2 px-2 text-xs">交卷時間</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data!.submissions.map((s) => {
-                    const acc = s.totalCount > 0 ? Math.round((s.correctCount / s.totalCount) * 100) : 0;
-                    const accColor = acc >= 80 ? 'text-green-600' : acc >= 60 ? 'text-orange-600' : 'text-red-600';
-                    const ts = s.submittedAt
-                      ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })
-                      : '—';
-                    return (
-                      <tr key={s.id} className="border-b hover:bg-muted/30">
-                        <td className="py-2 px-2">{s.studentInfo.class}</td>
-                        <td className="py-2 px-2">{s.studentInfo.seatNumber}</td>
-                        <td className="py-2 px-2 font-medium">{s.studentInfo.name}</td>
-                        <td className="py-2 px-2 text-center">{s.correctCount}/{s.totalCount}</td>
-                        <td className={`py-2 px-2 text-center font-bold ${accColor}`}>{acc}%</td>
-                        <td className="py-2 px-2 text-xs text-muted-foreground">{ts}</td>
+            <CardContent>
+              {/* 篩選工具列 */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="搜尋姓名/座號/班級…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-7 h-8 text-sm w-48"
+                  />
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={filterMode === 'all' ? 'default' : 'outline'}
+                    onClick={() => setFilterMode('all')}
+                    className="h-8"
+                  >
+                    全部
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={filterMode === 'attention' ? 'default' : 'outline'}
+                    onClick={() => setFilterMode('attention')}
+                    className="h-8"
+                  >
+                    ⚠ 需關注 (&lt;60%)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={filterMode === 'top' ? 'default' : 'outline'}
+                    onClick={() => setFilterMode('top')}
+                    className="h-8"
+                  >
+                    ⭐ 優秀 (≥80%)
+                  </Button>
+                </div>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  顯示 <span className="font-bold text-foreground">{displayedSubmissions.length}</span> / {data!.submissions.length} 位
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <SortHeader label="班級"     sortKey="class"        currentKey={sortKey} dir={sortDir} onClick={handleSort} />
+                      <SortHeader label="座號"     sortKey="seatNumber"   currentKey={sortKey} dir={sortDir} onClick={handleSort} />
+                      <SortHeader label="姓名"     sortKey="name"         currentKey={sortKey} dir={sortDir} onClick={handleSort} />
+                      <SortHeader label="答對"     sortKey="correct"      currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
+                      <SortHeader label="答對率"   sortKey="accuracy"     currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
+                      <SortHeader label="交卷時間" sortKey="submittedAt"  currentKey={sortKey} dir={sortDir} onClick={handleSort} className="text-xs" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedSubmissions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-muted-foreground text-sm">
+                          {searchTerm || filterMode !== 'all' ? '沒有符合條件的學生' : '尚無資料'}
+                        </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ) : displayedSubmissions.map((s) => {
+                      const acc = s.totalCount > 0 ? Math.round((s.correctCount / s.totalCount) * 100) : 0;
+                      const accColor = acc >= 80 ? 'text-green-600' : acc >= 60 ? 'text-orange-600' : 'text-red-600';
+                      const accIcon = acc >= 80 ? '⭐' : acc >= 60 ? '' : '⚠';
+                      const ts = s.submittedAt
+                        ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })
+                        : '—';
+                      return (
+                        <tr key={s.id} className="border-b hover:bg-muted/30">
+                          <td className="py-2 px-2">{s.studentInfo.class}</td>
+                          <td className="py-2 px-2">{s.studentInfo.seatNumber}</td>
+                          <td className="py-2 px-2 font-medium">{s.studentInfo.name}</td>
+                          <td className="py-2 px-2 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
+                          <td className={`py-2 px-2 text-center font-bold tabular-nums ${accColor}`}>
+                            {accIcon && <span className="mr-0.5" aria-hidden>{accIcon}</span>}
+                            {acc}%
+                          </td>
+                          <td className="py-2 px-2 text-xs text-muted-foreground">{ts}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </>
