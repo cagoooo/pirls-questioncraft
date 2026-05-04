@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-const siteTitle = 'PIRLS 閱讀素養題組生成站';
+const siteTitle = 'PIRLS閱讀理解生成站 PRO';
 const siteDescription = '上傳圖片或直接貼上截圖，APP 為您分析內容並設計PIRLS四層次選擇題。支援圖片貼上、PDF及Excel匯出。專為教育工作者設計的AI輔助工具。';
 
 // GitHub Pages 子路徑（如 /pirls-questioncraft）；自訂網域時設成空字串。

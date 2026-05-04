@@ -649,7 +649,7 @@ export default function PIRLSQuestionCraftPage() {
           hover:shadow-xl hover:border-primary/50 hover:bg-primary/10 dark:hover:bg-primary/20
           cursor-default
         ">
-          PIRLS 閱讀素養題組生成站
+          PIRLS閱讀理解生成站 PRO
         </h1>
         <p className="mt-4 text-md sm:text-lg text-muted-foreground">
           上傳圖片或貼上文本，APP 為您分析內容並設計PIRLS四層次選擇題。

@@ -70,11 +70,35 @@ async function renderOGImage() {
   ctx.textBaseline = 'top';
   ctx.fillText('PIRLS · 國際閱讀素養評量', padL, padT);
 
-  // 主標題（兩行）
+  // 主標題：閱讀理解生成站 + PRO 徽章
   ctx.fillStyle = '#1E3A8A';
   ctx.font = 'bold 72px NotoSansTC-Black';
-  ctx.fillText('閱讀素養題組', padL, padT + 56);
-  ctx.fillText('生成站', padL, padT + 56 + 92);
+  ctx.fillText('PIRLS閱讀理解', padL, padT + 56);
+
+  // 第二行：「生成站」+ 金色 PRO 徽章
+  const line2Y = padT + 56 + 92;
+  ctx.fillText('生成站', padL, line2Y);
+  // 量測「生成站」寬度，把 PRO 徽章接在後面
+  const line2Width = ctx.measureText('生成站').width;
+  const proX = padL + line2Width + 18;
+  const proY = line2Y + 12;
+  // PRO 金色徽章背景
+  const badgeW = 120, badgeH = 56;
+  const grad2 = ctx.createLinearGradient(proX, proY, proX + badgeW, proY + badgeH);
+  grad2.addColorStop(0, '#F59E0B');
+  grad2.addColorStop(1, '#FBBF24');
+  ctx.fillStyle = grad2;
+  roundRect(ctx, proX, proY, badgeW, badgeH, 12);
+  ctx.fill();
+  // PRO 字
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 40px NotoSansTC-Black';
+  const proTextW = ctx.measureText('PRO').width;
+  ctx.fillText('PRO', proX + (badgeW - proTextW) / 2, proY + 6);
+
+  // 還原給副標題用
+  ctx.fillStyle = '#1E3A8A';
+  ctx.font = 'bold 72px NotoSansTC-Black';
 
   // 副標題
   ctx.fillStyle = '#475569';
