@@ -3,21 +3,39 @@
 // 顯示班級答題分布、各題答對率、PIRLS 四層次平均、學生成績表格 + CSV 匯出
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3, ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
+import {
+  Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3,
+  ArrowUpDown, ArrowUp, ArrowDown, Search, Printer, Copy, ExternalLink, Wifi, WifiOff,
+} from 'lucide-react';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { getSubmissions, type DashboardData, type SubmissionRecord } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
+
+const AUTO_REFRESH_INTERVAL_MS = 30_000;
+
+function formatRelative(ms: number | null, nowMs: number): string {
+  if (ms == null) return '';
+  const sec = Math.floor((nowMs - ms) / 1000);
+  if (sec < 5) return '剛才';
+  if (sec < 60) return `${sec} 秒前`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} 分鐘前`;
+  const hr = Math.floor(min / 60);
+  return `${hr} 小時前`;
+}
 
 const PIRLS_LEVEL_LABEL: Record<string, string> = {
   'locate & retrieve': '訊息提取',
@@ -67,13 +85,53 @@ function DashboardInner() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadSignal, setReloadSignal] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+  const [studentUrl, setStudentUrl] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('submittedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterMode, setFilterMode] = useState<'all' | 'attention' | 'top'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 學生作答 URL（client-only，避免 SSR window 錯誤）
+  useEffect(() => {
+    if (!quizId) { setStudentUrl(''); return; }
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+    setStudentUrl(`${window.location.origin}${basePath}/quiz/?id=${quizId}`);
+  }, [quizId]);
+
+  // 「上次更新 X 秒前」每 10 秒重新計算
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const fetchData = useCallback(async (mode: 'full' | 'background') => {
+    if (!quizId) return;
+    if (mode === 'full') {
+      setIsLoading(true);
+      setError(null);
+    } else {
+      setIsRefreshing(true);
+    }
+    try {
+      const d = await getSubmissions(quizId);
+      setData(d);
+      setLastUpdated(Date.now());
+      if (mode === 'background') setError(null);
+    } catch (err: any) {
+      if (mode === 'full') setError(err?.message ?? '無法讀取儀表板資料');
+      // 背景刷新失敗：靜默失敗，保留舊資料
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [quizId]);
 
   useEffect(() => {
     if (!quizId) {
@@ -81,21 +139,19 @@ function DashboardInner() {
       setIsLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const d = await getSubmissions(quizId);
-        if (!cancelled) setData(d);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message ?? '無法讀取儀表板資料');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [quizId, reloadSignal]);
+    fetchData('full');
+  }, [quizId, reloadSignal, fetchData]);
+
+  // 自動刷新（30 秒一次，分頁隱藏時暫停）
+  useEffect(() => {
+    if (!autoRefresh || !quizId || isLoading || error) return;
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData('background');
+    };
+    const id = setInterval(tick, AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [autoRefresh, quizId, isLoading, error, fetchData]);
 
   const stats = useMemo(() => {
     if (!data || !data.submissions.length || !data.questions.length) return null;
@@ -218,6 +274,20 @@ function DashboardInner() {
     }
   };
 
+  const copyStudentUrl = async () => {
+    if (!studentUrl) return;
+    try {
+      await navigator.clipboard.writeText(studentUrl);
+      toast({ title: '已複製學生作答連結', description: studentUrl });
+    } catch {
+      toast({ title: '複製失敗', description: '請手動長按連結複製', variant: 'destructive' });
+    }
+  };
+
+  const handlePrint = () => {
+    if (typeof window !== 'undefined') window.print();
+  };
+
   // CSV cell：含 CSV injection 防護（=,+,-,@,Tab,CR 開頭加單引號 prefix）
   const csvCell = (v: any): string => {
     let s = v == null ? '' : String(v);
@@ -290,6 +360,16 @@ function DashboardInner() {
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen">
+      {/* 列印樣式：藏掉互動 UI、避免 card 跨頁切半 */}
+      <style>{`
+        @media print {
+          body { background: white !important; }
+          .print\\:hidden { display: none !important; }
+          .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+          table { font-size: 11px !important; }
+        }
+      `}</style>
+
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <PirlsLogo className="mb-2 h-12 w-auto sm:h-16" />
@@ -300,15 +380,45 @@ function DashboardInner() {
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-1">Quiz ID: {quizId}</p>
+          {lastUpdated && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              {isRefreshing ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : autoRefresh ? (
+                <Wifi className="h-3 w-3 text-green-600" />
+              ) : (
+                <WifiOff className="h-3 w-3" />
+              )}
+              上次更新：{formatRelative(lastUpdated, now)}
+              {autoRefresh && <span className="text-green-700">· 自動更新中（每 30 秒）</span>}
+            </p>
+          )}
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" size="sm" onClick={() => setReloadSignal(s => s + 1)}>
-            <RefreshCw className="h-4 w-4 mr-1" /> 重新整理
+        <div className="flex flex-col sm:flex-row gap-2 print:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAutoRefresh(v => !v)}
+            title={autoRefresh ? '關閉自動更新' : '開啟自動更新'}
+          >
+            {autoRefresh ? (
+              <><Wifi className="h-4 w-4 mr-1 text-green-600" /> 自動更新中</>
+            ) : (
+              <><WifiOff className="h-4 w-4 mr-1" /> 自動更新關</>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setReloadSignal(s => s + 1)} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} /> 重新整理
           </Button>
           {!empty && (
-            <Button variant="outline" size="sm" onClick={downloadCSV}>
-              <Download className="h-4 w-4 mr-1" /> 匯出 CSV
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={downloadCSV}>
+                <Download className="h-4 w-4 mr-1" /> 匯出 CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-1" /> 列印 / 存 PDF
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="sm" asChild>
             <Link href="/"><ArrowLeft className="h-4 w-4 mr-1" /> 回首頁</Link>
@@ -322,13 +432,47 @@ function DashboardInner() {
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" /> 還沒有人交卷
             </CardTitle>
-            <CardDescription>學生作答後資料會即時出現，按右上角「重新整理」可更新。</CardDescription>
+            <CardDescription>
+              學生作答後資料會自動出現（每 30 秒刷新一次）。可以再投影一次學生作答 QR Code：
+            </CardDescription>
           </CardHeader>
+          <CardContent className="space-y-4">
+            {studentUrl ? (
+              <>
+                <div className="flex justify-center bg-white p-4 rounded-lg border">
+                  <QRCodeSVG
+                    value={studentUrl}
+                    size={220}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    level="L"
+                    includeMargin={false}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">學生作答連結</p>
+                  <div className="flex gap-2">
+                    <Input value={studentUrl} readOnly className="text-xs font-mono" />
+                    <Button size="sm" variant="outline" onClick={copyStudentUrl} title="複製連結">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" asChild title="另開新視窗">
+                      <a href={studentUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">學生作答連結載入中…</p>
+            )}
+          </CardContent>
         </Card>
       ) : (
         <>
           {/* KPI 卡片 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 print-avoid-break">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1 text-xs">
@@ -360,7 +504,7 @@ function DashboardInner() {
           </div>
 
           {/* 各題答對率 */}
-          <Card className="mb-6">
+          <Card className="mb-6 print-avoid-break">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" /> 各題答對率
@@ -391,7 +535,7 @@ function DashboardInner() {
           </Card>
 
           {/* PIRLS 四層次雷達圖 */}
-          <Card className="mb-6">
+          <Card className="mb-6 print-avoid-break">
             <CardHeader>
               <CardTitle>PIRLS 四層次班級平均答對率</CardTitle>
               <CardDescription>看出班上整體在哪個閱讀素養層次強、哪個層次需要加強</CardDescription>
@@ -411,7 +555,7 @@ function DashboardInner() {
           </Card>
 
           {/* 逐題選項分布（迷思分析） */}
-          <Card className="mb-6">
+          <Card className="mb-6 print-avoid-break">
             <CardHeader>
               <CardTitle>逐題選項分布（迷思分析）</CardTitle>
               <CardDescription>
@@ -473,14 +617,14 @@ function DashboardInner() {
           </Card>
 
           {/* 學生成績表格 */}
-          <Card>
+          <Card className="print-avoid-break">
             <CardHeader>
               <CardTitle>學生成績表</CardTitle>
               <CardDescription>點欄位標題可排序；可搜尋、依需關注/優秀篩選；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
             </CardHeader>
             <CardContent>
               {/* 篩選工具列 */}
-              <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-3 print:hidden">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                   <Input
