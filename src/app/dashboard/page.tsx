@@ -4,6 +4,7 @@
 "use client";
 
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
@@ -13,17 +14,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
-  Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3,
+  Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Printer, Copy, ExternalLink, Wifi, WifiOff,
   ChevronDown, ChevronRight, Info,
 } from 'lucide-react';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { getSubmissions, type DashboardData, type SubmissionRecord } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-} from 'recharts';
+import { PIRLS_LEVEL_LABEL, PIRLS_LEVEL_COLOR } from './constants';
+
+// 把 recharts 圖表 lazy-load，主 bundle 不再含 ~90KB 的 recharts
+const DashboardCharts = dynamic(() => import('./dashboard-charts'), {
+  ssr: false,
+  loading: () => (
+    <div className="mb-6 flex items-center justify-center py-12 text-sm text-muted-foreground">
+      <Loader2 className="h-5 w-5 animate-spin mr-2" /> 載入圖表中…
+    </div>
+  ),
+});
 
 const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
@@ -37,20 +45,6 @@ function formatRelative(ms: number | null, nowMs: number): string {
   const hr = Math.floor(min / 60);
   return `${hr} 小時前`;
 }
-
-const PIRLS_LEVEL_LABEL: Record<string, string> = {
-  'locate & retrieve': '訊息提取',
-  'make straightforward inferences': '直接推論',
-  'interpret & integrate': '詮釋整合',
-  'evaluate & critique': '評估批判',
-};
-
-const PIRLS_LEVEL_COLOR: Record<string, string> = {
-  'locate & retrieve': '#3B82F6',
-  'make straightforward inferences': '#10B981',
-  'interpret & integrate': '#F59E0B',
-  'evaluate & critique': '#A387D9',
-};
 
 type SortKey = 'submittedAt' | 'class' | 'seatNumber' | 'name' | 'correct' | 'accuracy';
 
@@ -650,88 +644,13 @@ function DashboardInner() {
             </Card>
           </div>
 
-          {/* 分數分布直方圖 */}
-          <Card className="mb-6 print-avoid-break">
-            <CardHeader>
-              <CardTitle>班級分數分布</CardTitle>
-              <CardDescription>看出班上是「集中在某個區間」（單峰）還是「兩極化」（M 型）。</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={stats!.scoreBins}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="range" />
-                  <YAxis allowDecimals={false} label={{ value: '人數', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip
-                    formatter={(value: any, _n: any, p: any) => [`${value} 人`, `分數 ${p.payload.range}`]}
-                    labelFormatter={() => ''}
-                  />
-                  <Bar dataKey="count" name="人數">
-                    {stats!.scoreBins.map((b, i) => <Cell key={i} fill={b.color} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* 各題答對率（題目資料缺失時隱藏） */}
-          {stats!.hasQuestions && (
-          <Card className="mb-6 print-avoid-break">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" /> 各題答對率
-              </CardTitle>
-              <CardDescription>
-                顏色對應 PIRLS 四層次（藍=訊息提取／綠=直接推論／橘=詮釋整合／紫=評估批判）。
-                <span className="block mt-0.5">答對率 = 答對人數 ÷ <strong>實際作答人數</strong>；hover 可看完成率。</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats!.perQuestion}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="idx" label={{ value: '題號', position: 'insideBottom', offset: -5 }} />
-                  <YAxis domain={[0, 100]} unit="%" />
-                  <Tooltip
-                    formatter={(value: any, _name: any, p: any) => {
-                      const q = p.payload;
-                      return [`${value}% (${q.correct}/${q.answered})  ·  完成率 ${q.completionRate}% (${q.answered}/${q.total})`, '答對率'];
-                    }}
-                    labelFormatter={(idx: any, payload: any) => {
-                      const q = payload?.[0]?.payload;
-                      return q ? `第 ${idx} 題 [${PIRLS_LEVEL_LABEL[q.pirlsLevel]}]\n${q.fullQuestion}` : `第 ${idx} 題`;
-                    }}
-                  />
-                  <Bar dataKey="accuracy" name="答對率">
-                    {stats!.perQuestion.map((q, i) => (
-                      <Cell key={i} fill={q.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          )}
-
-          {/* PIRLS 四層次雷達圖 */}
-          <Card className="mb-6 print-avoid-break">
-            <CardHeader>
-              <CardTitle>PIRLS 四層次班級平均答對率</CardTitle>
-              <CardDescription>看出班上整體在哪個閱讀素養層次強、哪個層次需要加強</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <RadarChart data={stats!.radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="level" />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                  <Radar name="班級平均" dataKey="accuracy" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.5} />
-                  <Tooltip formatter={(v: any) => `${v}%`} />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {/* 三張 recharts 圖表（lazy-loaded）：分數分布、各題答對率、PIRLS 雷達 */}
+          <DashboardCharts
+            scoreBins={stats!.scoreBins}
+            perQuestion={stats!.perQuestion}
+            radarData={stats!.radarData}
+            hasQuestions={stats!.hasQuestions}
+          />
 
           {/* 逐題選項分布（迷思分析）— 題目資料缺失時隱藏 */}
           {stats!.hasQuestions && (

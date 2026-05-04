@@ -483,6 +483,10 @@ export const getSubmissions = onRequest(
       };
     });
 
+    // 微快取：5 秒。前端 polling 30 秒，所以不影響自動更新；
+    // 但能擋掉「老師連按 5 下重新整理」「快速 reload」這類重複 Firestore 讀取。
+    // private = 不准 CDN 共用快取（含學生姓名等個資）。
+    res.set('Cache-Control', 'private, max-age=5');
     res.json({
       success: true,
       quizTitle: quizData?.questionsOutput?.title ?? null,
