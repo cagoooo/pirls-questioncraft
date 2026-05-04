@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import {
   Loader2, AlertCircle, RefreshCw, Download, ArrowLeft, Users, Target, BarChart3,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Printer, Copy, ExternalLink, Wifi, WifiOff,
+  ChevronDown, ChevronRight, Info,
 } from 'lucide-react';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { getSubmissions, type DashboardData, type SubmissionRecord } from '@/lib/api';
@@ -79,6 +80,80 @@ function SortHeader({
   );
 }
 
+/** 展開列：顯示該位學生的逐題對錯 grid + 個人 PIRLS 層次表現 */
+function ExpandedStudentDetail({
+  student, questions,
+}: {
+  student: SubmissionRecord;
+  questions: import('@/lib/api').PirlsQuestion[];
+}) {
+  const optionLabel = (i: number) => String.fromCharCode(65 + i);
+
+  return (
+    <div className="space-y-3">
+      {/* 個人 PIRLS 層次表現 */}
+      {student.pirlsLevelStats && Object.keys(student.pirlsLevelStats).length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <span className="text-muted-foreground font-medium">PIRLS 層次：</span>
+          {Object.entries(PIRLS_LEVEL_LABEL).map(([key, label]) => {
+            const stat = student.pirlsLevelStats?.[key];
+            if (!stat || stat.total === 0) return null;
+            const pct = Math.round((stat.correct / stat.total) * 100);
+            const color = PIRLS_LEVEL_COLOR[key] ?? '#888';
+            return (
+              <div key={key} className="flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />
+                <span>{label}</span>
+                <span className="font-bold tabular-nums" style={{ color }}>
+                  {stat.correct}/{stat.total} ({pct}%)
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 逐題對錯 grid */}
+      {questions.length > 0 ? (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1.5">
+            逐題對錯（hover 看題目與答案）：
+            <span className="inline-block w-2 h-2 bg-green-500 rounded-sm ml-2 mr-1" />答對
+            <span className="inline-block w-2 h-2 bg-red-400 rounded-sm ml-2 mr-1" />答錯
+            <span className="inline-block w-2 h-2 bg-gray-300 rounded-sm ml-2 mr-1" />略過
+          </div>
+          <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-15 gap-1.5">
+            {questions.map((q, idx) => {
+              const ans = student.answers[idx];
+              const isSkipped = ans == null;
+              const isCorrect = !isSkipped && ans === q.correctAnswerIndex;
+              const cellClass = isSkipped
+                ? 'bg-gray-200 text-gray-500 border-gray-300'
+                : isCorrect
+                  ? 'bg-green-100 text-green-700 border-green-400'
+                  : 'bg-red-100 text-red-700 border-red-400';
+              const tooltipText = isSkipped
+                ? `第 ${idx + 1} 題 [略過未答]\n題目：${q.question}\n正解：${optionLabel(q.correctAnswerIndex)}. ${q.options[q.correctAnswerIndex]}`
+                : `第 ${idx + 1} 題 [${isCorrect ? '✓ 答對' : '✗ 答錯'}]\n題目：${q.question}\n答：${optionLabel(ans)}. ${q.options[ans]}${isCorrect ? '' : `\n正解：${optionLabel(q.correctAnswerIndex)}. ${q.options[q.correctAnswerIndex]}`}`;
+              return (
+                <div
+                  key={idx}
+                  title={tooltipText}
+                  className={`${cellClass} border rounded text-xs text-center py-1.5 px-1 font-bold cursor-help select-none`}
+                >
+                  {idx + 1}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground italic">題目資料已刪除，無法呈現逐題對錯。</div>
+      )}
+    </div>
+  );
+}
+
 function DashboardInner() {
   const searchParams = useSearchParams();
   const quizId = searchParams?.get('id') ?? '';
@@ -97,6 +172,15 @@ function DashboardInner() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterMode, setFilterMode] = useState<'all' | 'attention' | 'top'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // 學生作答 URL（client-only，避免 SSR window 錯誤）
   useEffect(() => {
@@ -153,10 +237,26 @@ function DashboardInner() {
     return () => clearInterval(id);
   }, [autoRefresh, quizId, isLoading, error, fetchData]);
 
+  // #17 同學重複交卷去重：以 班級+座號+姓名 為 key，取 submittedAt 最新一筆
+  const { dedupedSubmissions, duplicateCount } = useMemo(() => {
+    if (!data) return { dedupedSubmissions: [] as SubmissionRecord[], duplicateCount: 0 };
+    const map = new Map<string, SubmissionRecord>();
+    for (const s of data.submissions) {
+      const key = `${s.studentInfo.class}|${s.studentInfo.seatNumber}|${s.studentInfo.name}`;
+      const existing = map.get(key);
+      if (!existing || (s.submittedAt ?? 0) > (existing.submittedAt ?? 0)) {
+        map.set(key, s);
+      }
+    }
+    const list = Array.from(map.values());
+    return { dedupedSubmissions: list, duplicateCount: data.submissions.length - list.length };
+  }, [data]);
+
   const stats = useMemo(() => {
-    if (!data || !data.submissions.length || !data.questions.length) return null;
-    const subs = data.submissions;
+    if (!data || !dedupedSubmissions.length) return null;
+    const subs = dedupedSubmissions;
     const qs = data.questions;
+    const hasQuestions = qs.length > 0;
 
     // 1. 班級總平均、最高、最低
     const accuracies = subs.map(s => s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0);
@@ -164,31 +264,52 @@ function DashboardInner() {
     const high = Math.max(...accuracies);
     const low = Math.min(...accuracies);
 
-    // 2. 各題答對率 + 選項分布（迷思分析）
-    const perQuestion = qs.map((q, idx) => {
-      const correctCount = subs.filter(s => s.answers[idx] === q.correctAnswerIndex).length;
+    // 2. 分數分布直方圖（5 個區間）
+    const binDefs = [
+      { range: '0–20%',   min: 0,  max: 20,  color: '#dc2626' },
+      { range: '20–40%',  min: 20, max: 40,  color: '#f97316' },
+      { range: '40–60%',  min: 40, max: 60,  color: '#f59e0b' },
+      { range: '60–80%',  min: 60, max: 80,  color: '#10b981' },
+      { range: '80–100%', min: 80, max: 100, color: '#16a34a' },
+    ];
+    const scoreBins = binDefs.map(b => ({ ...b, count: 0 }));
+    accuracies.forEach(acc => {
+      for (let i = 0; i < scoreBins.length; i++) {
+        const b = scoreBins[i];
+        const inRange = acc >= b.min && (i === scoreBins.length - 1 ? acc <= b.max : acc < b.max);
+        if (inRange) { b.count++; break; }
+      }
+    });
+
+    // 3. 各題答對率 + 完成率 + 選項分布
+    // P1 #8 修正：答對率分母改成「實際作答人數」(answered)，完成率單獨呈現
+    const perQuestion = hasQuestions ? qs.map((q, idx) => {
       const total = subs.length;
+      const answered = subs.filter(s => s.answers[idx] != null).length;
+      const correctCount = subs.filter(s => s.answers[idx] === q.correctAnswerIndex).length;
       const optionCounts = q.options.map((_, optIdx) =>
         subs.filter(s => s.answers[idx] === optIdx).length
       );
-      const skippedCount = subs.filter(s => s.answers[idx] == null).length;
+      const skippedCount = total - answered;
       return {
         idx: idx + 1,
         question: q.question.length > 30 ? q.question.slice(0, 28) + '…' : q.question,
         fullQuestion: q.question,
         pirlsLevel: q.pirlsLevel,
         correct: correctCount,
+        answered,
         total,
-        accuracy: total > 0 ? Math.round((correctCount / total) * 100) : 0,
+        accuracy: answered > 0 ? Math.round((correctCount / answered) * 100) : 0,
+        completionRate: total > 0 ? Math.round((answered / total) * 100) : 0,
         color: PIRLS_LEVEL_COLOR[q.pirlsLevel] ?? '#888',
         options: q.options,
         correctAnswerIndex: q.correctAnswerIndex,
         optionCounts,
         skippedCount,
       };
-    });
+    }) : [];
 
-    // 3. PIRLS 4 層次平均答對率
+    // 4. PIRLS 4 層次平均答對率（用每位學生已預先聚合的 pirlsLevelStats，不需 questions）
     const levelStats: Record<string, { correct: number; total: number }> = {};
     subs.forEach(s => {
       Object.entries(s.pirlsLevelStats || {}).forEach(([level, stat]) => {
@@ -204,12 +325,12 @@ function DashboardInner() {
       return { level: label, accuracy, fullMark: 100 };
     });
 
-    return { avg, high, low, perQuestion, radarData, levelStats };
-  }, [data]);
+    return { avg, high, low, scoreBins, perQuestion, radarData, levelStats, hasQuestions };
+  }, [data, dedupedSubmissions]);
 
   const displayedSubmissions = useMemo(() => {
     if (!data) return [];
-    let list = [...data.submissions];
+    let list = [...dedupedSubmissions];
 
     const q = searchTerm.trim().toLowerCase();
     if (q) {
@@ -263,7 +384,7 @@ function DashboardInner() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return list;
-  }, [data, sortKey, sortDir, filterMode, searchTerm]);
+  }, [data, dedupedSubmissions, sortKey, sortDir, filterMode, searchTerm]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -300,7 +421,7 @@ function DashboardInner() {
     const rows: string[] = [];
     rows.push(['班級', '座號', '姓名', '答對', '總題數', '答對率%', '訊息提取', '直接推論', '詮釋整合', '評估批判', '交卷時間']
       .map(csvCell).join(','));
-    data.submissions.forEach(s => {
+    dedupedSubmissions.forEach(s => {
       const ts = s.submittedAt ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
       const acc = s.totalCount > 0 ? Math.round((s.correctCount / s.totalCount) * 100) : 0;
       const ps = s.pirlsLevelStats || {};
@@ -356,7 +477,9 @@ function DashboardInner() {
     );
   }
 
-  const empty = !data || data.submissions.length === 0;
+  const empty = !data || dedupedSubmissions.length === 0;
+  // #18: 題目資料已被刪除但仍有學生作答紀錄 → 走「降級」模式（不渲染需要 questions 的卡片）
+  const questionsMissing = !!data && dedupedSubmissions.length > 0 && data.questions.length === 0;
 
   return (
     <div className="container mx-auto p-4 sm:p-8 min-h-screen">
@@ -471,6 +594,30 @@ function DashboardInner() {
         </Card>
       ) : (
         <>
+          {/* 提示橫幅：重複交卷去重 / 題目已刪除 */}
+          {(duplicateCount > 0 || questionsMissing) && (
+            <div className="mb-4 space-y-2">
+              {duplicateCount > 0 && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>已自動合併重複交卷</AlertTitle>
+                  <AlertDescription>
+                    偵測到 {duplicateCount} 筆重複交卷（同班級+座號+姓名），已取「最後一次交卷」作為計分依據。
+                  </AlertDescription>
+                </Alert>
+              )}
+              {questionsMissing && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>題目資料已刪除</AlertTitle>
+                  <AlertDescription>
+                    本測驗的題目資料已不存在（可能已過期或被清除），仍可看學生分數與 PIRLS 層次表現，但無法呈現「各題答對率」與「逐題選項分布」。
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
           {/* KPI 卡片 */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 print-avoid-break">
             <Card>
@@ -478,7 +625,7 @@ function DashboardInner() {
                 <CardDescription className="flex items-center gap-1 text-xs">
                   <Users className="h-3 w-3" /> 交卷人數
                 </CardDescription>
-                <CardTitle className="text-3xl text-primary">{data!.submissions.length}</CardTitle>
+                <CardTitle className="text-3xl text-primary">{dedupedSubmissions.length}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
@@ -503,13 +650,41 @@ function DashboardInner() {
             </Card>
           </div>
 
-          {/* 各題答對率 */}
+          {/* 分數分布直方圖 */}
+          <Card className="mb-6 print-avoid-break">
+            <CardHeader>
+              <CardTitle>班級分數分布</CardTitle>
+              <CardDescription>看出班上是「集中在某個區間」（單峰）還是「兩極化」（M 型）。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats!.scoreBins}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="range" />
+                  <YAxis allowDecimals={false} label={{ value: '人數', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip
+                    formatter={(value: any, _n: any, p: any) => [`${value} 人`, `分數 ${p.payload.range}`]}
+                    labelFormatter={() => ''}
+                  />
+                  <Bar dataKey="count" name="人數">
+                    {stats!.scoreBins.map((b, i) => <Cell key={i} fill={b.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* 各題答對率（題目資料缺失時隱藏） */}
+          {stats!.hasQuestions && (
           <Card className="mb-6 print-avoid-break">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" /> 各題答對率
               </CardTitle>
-              <CardDescription>顏色對應 PIRLS 四層次（藍=訊息提取／綠=直接推論／橘=詮釋整合／紫=評估批判）</CardDescription>
+              <CardDescription>
+                顏色對應 PIRLS 四層次（藍=訊息提取／綠=直接推論／橘=詮釋整合／紫=評估批判）。
+                <span className="block mt-0.5">答對率 = 答對人數 ÷ <strong>實際作答人數</strong>；hover 可看完成率。</span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -518,7 +693,10 @@ function DashboardInner() {
                   <XAxis dataKey="idx" label={{ value: '題號', position: 'insideBottom', offset: -5 }} />
                   <YAxis domain={[0, 100]} unit="%" />
                   <Tooltip
-                    formatter={(value: any, _name: any, p: any) => [`${value}% (${p.payload.correct}/${p.payload.total})`, '答對率']}
+                    formatter={(value: any, _name: any, p: any) => {
+                      const q = p.payload;
+                      return [`${value}% (${q.correct}/${q.answered})  ·  完成率 ${q.completionRate}% (${q.answered}/${q.total})`, '答對率'];
+                    }}
                     labelFormatter={(idx: any, payload: any) => {
                       const q = payload?.[0]?.payload;
                       return q ? `第 ${idx} 題 [${PIRLS_LEVEL_LABEL[q.pirlsLevel]}]\n${q.fullQuestion}` : `第 ${idx} 題`;
@@ -533,6 +711,7 @@ function DashboardInner() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+          )}
 
           {/* PIRLS 四層次雷達圖 */}
           <Card className="mb-6 print-avoid-break">
@@ -554,7 +733,8 @@ function DashboardInner() {
             </CardContent>
           </Card>
 
-          {/* 逐題選項分布（迷思分析） */}
+          {/* 逐題選項分布（迷思分析）— 題目資料缺失時隱藏 */}
+          {stats!.hasQuestions && (
           <Card className="mb-6 print-avoid-break">
             <CardHeader>
               <CardTitle>逐題選項分布（迷思分析）</CardTitle>
@@ -576,7 +756,8 @@ function DashboardInner() {
                         {PIRLS_LEVEL_LABEL[q.pirlsLevel] ?? q.pirlsLevel}
                       </Badge>
                       <span className="text-xs text-muted-foreground ml-auto">
-                        答對率 <span className="font-bold" style={{ color: q.color }}>{q.accuracy}%</span> · {q.correct}/{q.total}
+                        答對率 <span className="font-bold" style={{ color: q.color }}>{q.accuracy}%</span> · {q.correct}/{q.answered}
+                        {q.skippedCount > 0 && <span className="ml-1 text-orange-600">· 略過 {q.skippedCount}</span>}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-foreground/80">{q.fullQuestion}</p>
@@ -615,6 +796,7 @@ function DashboardInner() {
               ))}
             </CardContent>
           </Card>
+          )}
 
           {/* 學生成績表格 */}
           <Card className="print-avoid-break">
@@ -675,12 +857,13 @@ function DashboardInner() {
                       <SortHeader label="答對"     sortKey="correct"      currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
                       <SortHeader label="答對率"   sortKey="accuracy"     currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
                       <SortHeader label="交卷時間" sortKey="submittedAt"  currentKey={sortKey} dir={sortDir} onClick={handleSort} className="text-xs" />
+                      <th className="py-2 px-2 w-8 print:hidden" aria-label="展開"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayedSubmissions.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-muted-foreground text-sm">
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground text-sm">
                           {searchTerm || filterMode !== 'all' ? '沒有符合條件的學生' : '尚無資料'}
                         </td>
                       </tr>
@@ -691,18 +874,34 @@ function DashboardInner() {
                       const ts = s.submittedAt
                         ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })
                         : '—';
+                      const isExpanded = expandedIds.has(s.id);
                       return (
-                        <tr key={s.id} className="border-b hover:bg-muted/30">
-                          <td className="py-2 px-2">{s.studentInfo.class}</td>
-                          <td className="py-2 px-2">{s.studentInfo.seatNumber}</td>
-                          <td className="py-2 px-2 font-medium">{s.studentInfo.name}</td>
-                          <td className="py-2 px-2 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
-                          <td className={`py-2 px-2 text-center font-bold tabular-nums ${accColor}`}>
-                            {accIcon && <span className="mr-0.5" aria-hidden>{accIcon}</span>}
-                            {acc}%
-                          </td>
-                          <td className="py-2 px-2 text-xs text-muted-foreground">{ts}</td>
-                        </tr>
+                        <React.Fragment key={s.id}>
+                          <tr
+                            className={`border-b hover:bg-muted/30 cursor-pointer ${isExpanded ? 'bg-muted/30' : ''}`}
+                            onClick={() => toggleExpand(s.id)}
+                          >
+                            <td className="py-2 px-2">{s.studentInfo.class}</td>
+                            <td className="py-2 px-2">{s.studentInfo.seatNumber}</td>
+                            <td className="py-2 px-2 font-medium">{s.studentInfo.name}</td>
+                            <td className="py-2 px-2 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
+                            <td className={`py-2 px-2 text-center font-bold tabular-nums ${accColor}`}>
+                              {accIcon && <span className="mr-0.5" aria-hidden>{accIcon}</span>}
+                              {acc}%
+                            </td>
+                            <td className="py-2 px-2 text-xs text-muted-foreground">{ts}</td>
+                            <td className="py-2 px-2 text-muted-foreground print:hidden">
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="bg-muted/20 border-b print:hidden">
+                              <td colSpan={7} className="px-4 py-3">
+                                <ExpandedStudentDetail student={s} questions={data!.questions} />
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
