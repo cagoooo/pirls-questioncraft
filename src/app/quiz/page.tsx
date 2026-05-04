@@ -7,7 +7,7 @@ import React, { useEffect, useState, FormEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QuizView } from '@/components/QuizView';
 import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, BookOpen, Users, Hash, User, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,14 @@ function SharedQuizPageInner() {
   const [studentSeatNumber, setStudentSeatNumber] = useState('');
   const [studentName, setStudentName] = useState('');
   const [isStudentInfoSubmitted, setIsStudentInfoSubmitted] = useState(false);
+
+  // 從 localStorage 還原上次的班級（座號/姓名不記，同 iPad 給不同學生用避免誤帶）
+  useEffect(() => {
+    try {
+      const lastClass = localStorage.getItem('pirls_last_class');
+      if (lastClass) setStudentClass(lastClass);
+    } catch { /* localStorage 不可用就略過 */ }
+  }, []);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
@@ -92,6 +100,8 @@ function SharedQuizPageInner() {
       });
       return;
     }
+    // 把班級存起來，下次同班同學進來自動帶（座號/姓名不存）
+    try { localStorage.setItem('pirls_last_class', studentClass.trim()); } catch { /* ignore */ }
     setIsStudentInfoSubmitted(true);
   };
 
@@ -143,35 +153,105 @@ function SharedQuizPageInner() {
   }
 
   if (quizData && !isStudentInfoSubmitted) {
+    const quizTitle = quizData.questionsOutput?.title;
+    const questionCount = quizData.questionsOutput?.questions?.length ?? 0;
+    const hadRememberedClass = !!studentClass; // 進畫面前已從 localStorage 還原 → true
+
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <PirlsLogo className="mx-auto mb-6 h-20 w-auto sm:h-24" />
+        <PirlsLogo className="mx-auto mb-4 h-20 w-auto sm:h-24" />
         <Card className="w-full max-w-md shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-center text-xl sm:text-2xl font-bold text-primary">開始測驗前請輸入資訊</CardTitle>
+          <CardHeader className="space-y-3">
+            {/* 測驗標題預覽：讓學生知道進入哪份測驗 */}
+            {quizTitle && (
+              <div className="flex items-start gap-2 rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+                <BookOpen className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-primary/70">即將進行</p>
+                  <p className="font-bold text-primary truncate">{quizTitle}</p>
+                  {questionCount > 0 && (
+                    <p className="text-xs text-muted-foreground">共 {questionCount} 題</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <CardTitle className="text-center text-lg sm:text-xl font-bold">
+              請填寫你的身分資訊
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleStudentInfoSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="studentClass" className="text-sm sm:text-md">班級</Label>
-                <Input id="studentClass" value={studentClass} onChange={(e) => setStudentClass(e.target.value)} placeholder="例如：三年一班" className="text-sm sm:text-base" required />
+            <form onSubmit={handleStudentInfoSubmit} className="space-y-4">
+              {/* 班級 */}
+              <div className="space-y-1.5">
+                <Label htmlFor="studentClass" className="text-sm flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  班級
+                  {hadRememberedClass && (
+                    <span className="ml-auto text-[10px] text-green-600 font-normal">✓ 已記住上次的班級</span>
+                  )}
+                </Label>
+                <Input
+                  id="studentClass"
+                  value={studentClass}
+                  onChange={(e) => setStudentClass(e.target.value)}
+                  placeholder="例如：三年一班"
+                  className="text-sm sm:text-base"
+                  autoFocus={!hadRememberedClass}
+                  required
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="studentSeatNumber" className="text-sm sm:text-md">座號</Label>
-                <Input id="studentSeatNumber" value={studentSeatNumber} onChange={(e) => setStudentSeatNumber(e.target.value)} placeholder="例如：01" className="text-sm sm:text-base" required />
+
+              {/* 座號 + 姓名 同列（手機 sm 以下仍兩列堆疊） */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label htmlFor="studentSeatNumber" className="text-sm flex items-center gap-1.5">
+                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                    座號
+                  </Label>
+                  <Input
+                    id="studentSeatNumber"
+                    value={studentSeatNumber}
+                    onChange={(e) => setStudentSeatNumber(e.target.value)}
+                    placeholder="01"
+                    className="text-sm sm:text-base text-center tabular-nums"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={3}
+                    autoFocus={hadRememberedClass}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="studentName" className="text-sm flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    姓名
+                  </Label>
+                  <Input
+                    id="studentName"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="例如：王小明"
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="studentName" className="text-sm sm:text-md">姓名</Label>
-                <Input id="studentName" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="例如：王小明" className="text-sm sm:text-base" required />
-              </div>
+
               {formError && (
-                <Alert variant="destructive" className="mt-4">
+                <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>輸入錯誤</AlertTitle>
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
-              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg">開始測驗</Button>
+
+              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg group">
+                開始測驗
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                提示：你的姓名與分數會給老師看，不會公開
+              </p>
             </form>
           </CardContent>
         </Card>
@@ -187,12 +267,24 @@ function SharedQuizPageInner() {
     };
     return (
       <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
-        <header className="my-4 sm:my-8 text-center">
+        <header className="my-4 sm:my-8 text-center w-full max-w-3xl">
           <PirlsLogo className="mx-auto mb-4 h-12 w-auto sm:h-16" />
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            學生：{studentInfo.class} {studentInfo.seatNumber}號 {studentInfo.name}
-          </p>
+          {/* 學生身分卡：班級 / 座號 / 姓名 三欄式分類，一眼可辨識 */}
+          <div className="mt-3 inline-flex items-stretch rounded-lg border bg-muted/40 overflow-hidden text-sm shadow-sm">
+            <div className="px-3 py-1.5 flex items-center gap-1.5 border-r">
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">班級</span>
+              <span className="font-bold text-foreground">{studentInfo.class}</span>
+            </div>
+            <div className="px-3 py-1.5 flex items-center gap-1.5 border-r">
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">座號</span>
+              <span className="font-bold text-foreground tabular-nums">{studentInfo.seatNumber}</span>
+            </div>
+            <div className="px-3 py-1.5 flex items-center gap-1.5 bg-primary/10">
+              <span className="text-[10px] sm:text-xs text-primary/70 uppercase tracking-wider">姓名</span>
+              <span className="font-bold text-primary">{studentInfo.name}</span>
+            </div>
+          </div>
         </header>
         <main className="w-full max-w-3xl">
           {isGeneratingQuizResultsPdf && (
