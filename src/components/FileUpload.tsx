@@ -6,9 +6,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { XCircle, ImagePlus, UploadCloud, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { XCircle, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -338,134 +337,147 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             }
         }}
     >
-      <Card className="w-full bg-accent/10 dark:bg-accent/20">
-        <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
-          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-            <ImagePlus className="h-6 w-6 text-primary" />
-            上傳圖片
-          </CardTitle>
-          <CardDescription>請選擇 1 至 4 張圖片（建議使用 JPG, PNG, WEBP, HEIC），或直接貼上螢幕截圖。</CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">
-          <div className="space-y-6">
-            <div>
-              <label
-                htmlFor="imageUpload"
-                className={cn(
-                  "flex flex-col items-center justify-center w-full h-32 sm:h-40 p-4 rounded-lg border-2 border-dashed transition-colors",
-                  isLoading && "bg-muted/30 border-muted-foreground/20 text-muted-foreground cursor-not-allowed",
-                  !isLoading && !canUploadMore && "border-green-500/50 bg-green-500/5 text-green-700 cursor-default", // Full state
-                  !isLoading && canUploadMore && (
-                    isDraggingOver 
-                      ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2" // Dragging over
-                      : "cursor-pointer border-primary/50 bg-background hover:border-primary hover:bg-primary/5 text-foreground" // Default active, can drop
-                  )
-                )}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" />
-                    <p className="text-sm font-medium">處理中...</p>
-                  </>
-                ) : !canUploadMore ? (
-                   <>
-                    <CheckCircle2 className="w-10 h-10 text-green-600 mb-2" />
-                    <p className="text-sm font-medium text-green-700">已達圖片上傳上限 (4張)</p>
-                    <p className="text-xs text-muted-foreground mt-1">您可以清除部分圖片後再試</p>
-                  </>
-                ) : isDraggingOver ? (
-                  <>
-                    <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
-                    <p className="text-sm font-medium text-primary">放開以加入圖片</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      還可選 {4 - selectedFiles.length} 張圖片
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="w-10 h-10 text-primary/80 mb-2" />
-                    <p className="text-sm font-medium text-center">
-                      點擊此處或拖曳圖片至此上傳（或截圖貼上）
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      已選 {selectedFiles.length}/4 張圖片
-                    </p>
-                  </>
-                )}
-              </label>
-              <Input
-                id="imageUpload"
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-                multiple
-                onChange={handleFileChange}
-                disabled={isLoading || !canUploadMore}
-                className="sr-only"
-              />
-            </div>
-
-            {selectedFiles.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-base sm:text-md font-semibold text-foreground">已選圖片預覽：</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {imagePreviews.map((previewUrl, index) => (
-                    <DialogTrigger asChild key={previewUrl}>
-                      <div
-                        className="relative group aspect-square cursor-pointer"
-                        onClick={() => handleImagePreviewClick(previewUrl)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            handleImagePreviewClick(previewUrl);
-                          }
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        aria-label={`放大檢視圖片 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
-                      >
-                        <Image
-                          src={previewUrl}
-                          alt={`預覽 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
-                          fill={true}
-                          sizes="(max-width: 640px) 50vw, 25vw"
-                          className="rounded-md border object-cover"
-                          data-ai-hint="document scan"
-                        />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1.5 right-1.5 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10"
-                          onClick={(e) => {
-                            e.stopPropagation(); 
-                            removeImage(index);
-                          }}
-                          disabled={isLoading}
-                          aria-label={`移除圖片 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </DialogTrigger>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={clearAllImages}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  清除所有已選圖片
-                </Button>
+      {/* Neo-brutalist 拖放區 — 外層由 page.tsx 的 NeoCard 包，所以這裡不再用 <Card> 殼 */}
+      <div className="space-y-5">
+        <label
+          htmlFor="imageUpload"
+          className={cn(
+            "flex flex-col items-center justify-center w-full p-12 rounded-[22px] border-neo-dashed transition-colors text-center",
+            isLoading && "bg-muted/30 text-muted-foreground cursor-not-allowed",
+            !isLoading && !canUploadMore && "bg-sage/30 text-ink cursor-default",
+            !isLoading && canUploadMore && (
+              isDraggingOver
+                ? "bg-peach/40 cursor-copy"
+                : "bg-cream cursor-pointer hover:bg-cream-deep"
+            )
+          )}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-10 w-10 animate-spin mb-3" />
+              <p className="text-sm font-bold">處理中…</p>
+            </>
+          ) : !canUploadMore ? (
+            <>
+              <div className="w-[76px] h-[76px] rounded-full bg-sage border-[2px] border-ink flex items-center justify-center text-[38px] mb-4 shadow-neo-sm">
+                <CheckCircle2 className="h-9 w-9" />
               </div>
-            )}
+              <p className="text-[20px] font-extrabold mb-1">已達上限 (4 張)</p>
+              <p className="text-sm text-muted-foreground">您可以清除部分圖片後再試</p>
+            </>
+          ) : (
+            <>
+              <div className="w-[76px] h-[76px] rounded-full bg-peach border-[2px] border-ink flex items-center justify-center text-[38px] mb-4 shadow-neo-sm">
+                📷
+              </div>
+              <p className="text-[20px] font-extrabold mb-1">
+                {isDraggingOver ? '放開即可上傳' : '拖曳圖片到這裡'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                或點擊選擇 1–4 張（JPG · PNG · HEIC · WEBP）
+              </p>
+            </>
+          )}
+
+          {/* 4 格預覽（永遠顯示，未上傳時顯示 dashed 編號 1-4） */}
+          <div className="flex gap-3 justify-center mt-7 flex-wrap">
+            {[0, 1, 2, 3].map(i => {
+              const hasFile = !!selectedFiles[i];
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'w-16 h-16 rounded-[14px] flex items-center justify-center text-[11px] overflow-hidden relative bg-card',
+                    hasFile
+                      ? 'border-[1.5px] border-ink'
+                      : 'border-[1.5px] border-dashed border-ink text-muted-foreground'
+                  )}
+                >
+                  {hasFile ? (
+                    <Image
+                      src={imagePreviews[i]}
+                      alt={`預覽 ${selectedFiles[i].name}`}
+                      fill
+                      sizes="64px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="font-extrabold">{i + 1}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
+        </label>
+
+        <Input
+          id="imageUpload"
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          multiple
+          onChange={handleFileChange}
+          disabled={isLoading || !canUploadMore}
+          className="sr-only"
+        />
+
+        {/* 已上傳的大預覽（可放大、刪除） */}
+        {selectedFiles.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-ink">已選圖片預覽：</h3>
+              <span className="text-xs text-muted-foreground font-mono">{selectedFiles.length}/4</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {imagePreviews.map((previewUrl, index) => (
+                <DialogTrigger asChild key={previewUrl}>
+                  <div
+                    className="relative group aspect-square cursor-pointer rounded-[14px] overflow-hidden border-neo shadow-neo-sm hover:shadow-neo transition-all"
+                    onClick={() => handleImagePreviewClick(previewUrl)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') handleImagePreviewClick(previewUrl);
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`放大檢視圖片 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
+                  >
+                    <Image
+                      src={previewUrl}
+                      alt={`預覽 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover"
+                      data-ai-hint="document scan"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1.5 right-1.5 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10 border-[1.5px] border-ink"
+                      onClick={(e) => { e.stopPropagation(); removeImage(index); }}
+                      disabled={isLoading}
+                      aria-label={`移除圖片 ${selectedFiles[index]?.name || `圖片 ${index + 1}`}`}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </DialogTrigger>
+              ))}
+            </div>
+            <button
+              onClick={clearAllImages}
+              disabled={isLoading}
+              className="w-full inline-flex items-center justify-center gap-2 border-neo rounded-full px-4 py-2.5 text-sm font-bold bg-card hover:bg-cream-deep shadow-neo-sm hover:shadow-neo transition-all disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              清除所有已選圖片
+            </button>
+          </div>
+        )}
+      </div>
 
       <DialogContent 
         className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-auto p-2 bg-background/95 backdrop-blur-sm"

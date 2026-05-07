@@ -137,7 +137,7 @@ export function VersionUpdateBanner() {
   };
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-4">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-4">
       <div className="flex items-start gap-3">
         <Sparkles className="h-5 w-5 mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
@@ -149,7 +149,7 @@ export function VersionUpdateBanner() {
             <Button
               size="sm"
               onClick={handleUpdate}
-              className="bg-white text-blue-700 hover:bg-blue-50"
+              className="bg-background text-primary hover:bg-secondary"
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               立即更新

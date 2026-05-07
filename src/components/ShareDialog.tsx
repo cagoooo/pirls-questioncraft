@@ -55,7 +55,7 @@ export function ShareDialog({
           onClick={onShareClick}
           disabled={triggerDisabled}
           variant="outline"
-          className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-800"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground border-primary/30"
         >
           {isSharingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
           {isSharingQuiz ? '處理中...' : '分享測驗'}

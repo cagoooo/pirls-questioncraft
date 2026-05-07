@@ -1,96 +1,112 @@
-
 "use client";
 
 import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge, badgeVariants } from '@/components/ui/badge';
-import type { VariantProps } from 'class-variance-authority';
-import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileSearch, Lightbulb, Blocks, GraduationCap, CheckCircle2 } from 'lucide-react';
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import { AccordionContent, AccordionItem } from '@/components/ui/accordion';
+import { ChevronDown } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { PIRLS_LEVEL_META, type PirlsLevel } from '@/components/Neo';
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
 
-interface QuestionCardProps extends React.HTMLAttributes<HTMLDivElement> { // Accept HTMLDivAttributes
+interface QuestionCardProps extends React.HTMLAttributes<HTMLDivElement> {
   questionItem: PirlsQuestion;
   questionNumber: number;
 }
 
-const pirlsLevelDetails: Record<PirlsQuestion['pirlsLevel'], { label: string; icon: React.ElementType; badgeVariant: VariantProps<typeof badgeVariants>['variant'], borderColorClass: string }> = {
-  'locate & retrieve': { label: '訊息提取與檢索', icon: FileSearch, badgeVariant: 'pirlsLocate', borderColorClass: 'border-blue-500' },
-  'make straightforward inferences': { label: '直接推論', icon: Lightbulb, badgeVariant: 'pirlsInfer', borderColorClass: 'border-green-500' },
-  'interpret & integrate': { label: '詮釋與整合', icon: Blocks, badgeVariant: 'pirlsInterpret', borderColorClass: 'border-yellow-500' },
-  'evaluate & critique': { label: '評估與批判', icon: GraduationCap, badgeVariant: 'pirlsEvaluate', borderColorClass: 'border-purple-500' },
-};
-
 const optionLabels = ['A', 'B', 'C', 'D'];
 
 export function QuestionCard({ questionItem, questionNumber, className, style, ...props }: QuestionCardProps) {
-  const levelDetail = pirlsLevelDetails[questionItem.pirlsLevel];
-  const IconComponent = levelDetail.icon;
+  const meta = PIRLS_LEVEL_META[questionItem.pirlsLevel as PirlsLevel];
 
   return (
-    <AccordionItem 
-        value={`item-${questionNumber}`} 
-        className={cn("border-b-0", className)} // Combine with passed className
-        style={style} // Pass style
-        {...props} // Pass other HTMLDivAttributes
+    <AccordionItem
+      value={`item-${questionNumber}`}
+      className={cn('border-0 bg-card border-neo rounded-[22px] shadow-neo overflow-hidden', className)}
+      style={style}
+      {...props}
     >
-      <Card className={cn(
-        "mb-4 shadow-md hover:shadow-lg transition-shadow duration-200 border-l-4",
-        levelDetail.borderColorClass
-      )}>
-        <AccordionTrigger className="hover:no-underline p-4">
-          <div className="flex flex-row justify-between items-start w-full">
-            <div>
-              <CardTitle className="text-lg mb-1 text-left">題目 {questionNumber}: {questionItem.question}</CardTitle>
-              <Badge variant={levelDetail.badgeVariant} className="text-xs font-semibold">
-                <IconComponent className="h-3 w-3 mr-1.5" />
-                {levelDetail.label}
-              </Badge>
+      <AccordionPrimitive.Header className="flex">
+        <AccordionPrimitive.Trigger
+          className={cn(
+            'group flex flex-1 items-start gap-4 p-5 text-left',
+            'hover:bg-cream/40 transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+          )}
+        >
+          {/* 左側彩色編號 */}
+          <div
+            className={cn(
+              'shrink-0 w-11 h-11 rounded-xl border-neo flex flex-col items-center justify-center font-mono font-extrabold',
+              meta.bg
+            )}
+          >
+            <div className="text-[9px] opacity-70 leading-none">Q</div>
+            <div className="text-[17px] leading-none mt-0.5">{questionNumber}</div>
+          </div>
+
+          {/* 中段：層次徽章 + 題幹 */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className={cn('inline-flex items-center gap-1 border-neo rounded-full px-2.5 py-0.5 text-[11px] font-extrabold', meta.bg)}>
+                <span>{meta.emoji}</span> {meta.label}
+              </span>
+              <span className="font-mono text-[11px] text-muted-foreground border border-line rounded-full px-2 py-0.5">
+                PIRLS · {meta.short}
+              </span>
+            </div>
+            <div className="text-[15px] sm:text-base leading-[1.55] font-semibold text-ink">
+              {questionItem.question}
             </div>
           </div>
-        </AccordionTrigger>
-        <AccordionContent>
-          <CardContent className="p-4 pt-0">
-            <div className="space-y-3">
-              <p className="font-semibold text-sm text-muted-foreground">答案選項：</p>
-              <ul className="space-y-2">
-                {questionItem.options.map((option, index) => (
-                  <li
-                    key={index}
-                    className={`flex items-start p-3 rounded-md border ${
-                      index === questionItem.correctAnswerIndex
-                        ? 'border-green-500 bg-green-500/10'
-                        : 'border-border'
-                    }`}
-                  >
-                    {index === questionItem.correctAnswerIndex ? (
-                      <CheckCircle2 className="h-5 w-5 mr-2 text-green-600 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <span className="mr-2 text-muted-foreground font-medium w-5 text-center flex-shrink-0 mt-0.5">{optionLabels[index]}.</span>
-                    )}
-                    <span className="text-sm">{option}</span>
-                  </li>
-                ))}
-              </ul>
-              <div>
-                <p className="font-semibold text-sm mt-4 mb-1">
-                  正確答案：
-                  <Badge variant="default" className="ml-2 bg-green-600 hover:bg-green-700">
-                    {optionLabels[questionItem.correctAnswerIndex]}
-                  </Badge>
-                </p>
-                <CardDescription className="text-sm whitespace-pre-wrap p-3 bg-muted/50 rounded-md">
-                  <span className="font-semibold">說明：</span>
-                  {questionItem.explanation}
-                </CardDescription>
+
+          {/* 右側收合箭頭 — 開啟時旋轉 */}
+          <div className="shrink-0 w-8 h-8 rounded-full bg-cream border-neo flex items-center justify-center text-sm font-extrabold transition-transform duration-200 group-data-[state=open]:rotate-180">
+            <ChevronDown className="h-4 w-4" />
+          </div>
+        </AccordionPrimitive.Trigger>
+      </AccordionPrimitive.Header>
+
+      <AccordionContent className="px-5 sm:pl-[82px] pb-5 sm:pr-5 pt-0">
+        {/* 選項 */}
+        <div className="flex flex-col gap-2 mb-4">
+          {questionItem.options.map((option, i) => {
+            const isCorrect = i === questionItem.correctAnswerIndex;
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'flex items-start gap-3 px-3.5 py-3 rounded-[14px] text-sm leading-[1.55]',
+                  isCorrect
+                    ? 'bg-sage/30 border-[2px] border-sage-deep'
+                    : 'bg-cream border-[1.5px] border-line'
+                )}
+              >
+                <div
+                  className={cn(
+                    'shrink-0 w-[26px] h-[26px] rounded-full border-neo flex items-center justify-center font-extrabold text-xs',
+                    isCorrect ? 'bg-sage-deep text-white' : 'bg-card text-ink'
+                  )}
+                >
+                  {isCorrect ? '✓' : optionLabels[i]}
+                </div>
+                <div className="flex-1 text-ink">{option}</div>
               </div>
-            </div>
-          </CardContent>
-        </AccordionContent>
-      </Card>
+            );
+          })}
+        </div>
+
+        {/* 黃色解析框 */}
+        <div className="bg-lemon/55 border-neo rounded-[14px] px-4 py-3.5">
+          <div className="text-xs font-extrabold mb-1 flex items-center gap-1.5">
+            <span>💡</span> 解析說明
+          </div>
+          <div className="text-sm leading-[1.7] text-ink-soft whitespace-pre-wrap">
+            {questionItem.explanation}
+          </div>
+        </div>
+      </AccordionContent>
     </AccordionItem>
   );
 }

@@ -116,13 +116,15 @@ function SharedQuizPageInner() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-md shadow-lg">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Card className="w-full max-w-md border-neo shadow-neo-lg rounded-[24px]">
           <CardHeader>
-            <CardTitle className="text-center text-xl font-semibold">載入測驗中...</CardTitle>
+            <CardTitle className="text-center text-xl font-extrabold">載入測驗中…</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center space-y-4 py-8">
-            <Loader2 className="h-12 w-12 text-primary animate-spin" />
+            <div className="w-14 h-14 rounded-2xl bg-lemon border-neo flex items-center justify-center text-2xl shadow-neo-sm animate-pirls-spin">
+              🧠
+            </div>
             <p className="text-muted-foreground">請稍候，正在為您準備測驗內容。</p>
           </CardContent>
         </Card>
@@ -132,18 +134,18 @@ function SharedQuizPageInner() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-md shadow-lg">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Card className="w-full max-w-md border-neo shadow-neo-lg rounded-[24px]">
           <CardHeader>
-            <CardTitle className="text-center text-xl font-semibold text-destructive">載入失敗</CardTitle>
+            <CardTitle className="text-center text-xl font-extrabold text-destructive">載入失敗</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="border-neo rounded-[14px]">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>錯誤</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-            <Button asChild className="w-full">
+            <Button asChild className="w-full border-neo rounded-full bg-coral text-white shadow-neo-sm hover:shadow-neo">
               <Link href="/">返回首頁</Link>
             </Button>
           </CardContent>
@@ -158,24 +160,26 @@ function SharedQuizPageInner() {
     const hadRememberedClass = !!studentClass; // 進畫面前已從 localStorage 還原 → true
 
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <PirlsLogo className="mx-auto mb-4 h-20 w-auto sm:h-24" />
-        <Card className="w-full max-w-md shadow-lg">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="w-14 h-14 mb-4 rounded-2xl bg-cream border-neo flex items-center justify-center p-1.5 shadow-neo-sm">
+          <PirlsLogo className="w-full h-full" />
+        </div>
+        <Card className="w-full max-w-md border-neo shadow-neo-lg rounded-[24px]">
           <CardHeader className="space-y-3">
             {/* 測驗標題預覽：讓學生知道進入哪份測驗 */}
             {quizTitle && (
-              <div className="flex items-start gap-2 rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
-                <BookOpen className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2 rounded-[14px] bg-cream border-neo px-3 py-2.5 text-sm shadow-neo-sm">
+                <BookOpen className="h-4 w-4 text-ink mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-primary/70">即將進行</p>
-                  <p className="font-bold text-primary truncate">{quizTitle}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">即將進行</p>
+                  <p className="font-extrabold text-ink truncate">{quizTitle}</p>
                   {questionCount > 0 && (
                     <p className="text-xs text-muted-foreground">共 {questionCount} 題</p>
                   )}
                 </div>
               </div>
             )}
-            <CardTitle className="text-center text-lg sm:text-xl font-bold">
+            <CardTitle className="text-center text-lg sm:text-xl font-extrabold">
               請填寫你的身分資訊
             </CardTitle>
           </CardHeader>
@@ -245,7 +249,8 @@ function SharedQuizPageInner() {
                 </Alert>
               )}
 
-              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg group">
+              <Button type="submit" className="w-full py-3 sm:py-4 text-base sm:text-lg group border-neo rounded-full bg-coral hover:bg-coral text-white font-extrabold shadow-neo-sm hover:shadow-neo hover:-translate-y-px transition-all">
+                <span className="text-xl mr-1">🚀</span>
                 開始測驗
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Button>
@@ -268,35 +273,39 @@ function SharedQuizPageInner() {
     return (
       <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
         <header className="my-4 sm:my-8 text-center w-full max-w-3xl">
-          <PirlsLogo className="mx-auto mb-4 h-12 w-auto sm:h-16" />
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">PIRLS 線上測驗</h1>
+          <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-3 rounded-2xl bg-cream border-neo flex items-center justify-center p-1.5 shadow-neo-sm">
+            <PirlsLogo className="w-full h-full" />
+          </div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-ink">PIRLS 線上測驗</h1>
           {/* 學生身分卡：班級 / 座號 / 姓名 三欄式分類，一眼可辨識 */}
-          <div className="mt-3 inline-flex items-stretch rounded-lg border bg-muted/40 overflow-hidden text-sm shadow-sm">
-            <div className="px-3 py-1.5 flex items-center gap-1.5 border-r">
-              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">班級</span>
-              <span className="font-bold text-foreground">{studentInfo.class}</span>
+          <div className="mt-3 inline-flex items-stretch rounded-full border-neo bg-card overflow-hidden text-sm shadow-neo-sm">
+            <div className="px-3.5 py-2 flex items-center gap-1.5 border-r-[1.5px] border-ink bg-sky">
+              <span className="text-[10px] sm:text-xs text-ink/70 uppercase tracking-wider font-bold">班級</span>
+              <span className="font-extrabold text-ink">{studentInfo.class}</span>
             </div>
-            <div className="px-3 py-1.5 flex items-center gap-1.5 border-r">
-              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">座號</span>
-              <span className="font-bold text-foreground tabular-nums">{studentInfo.seatNumber}</span>
+            <div className="px-3.5 py-2 flex items-center gap-1.5 border-r-[1.5px] border-ink bg-sage">
+              <span className="text-[10px] sm:text-xs text-ink/70 uppercase tracking-wider font-bold">座號</span>
+              <span className="font-extrabold text-ink tabular-nums">{studentInfo.seatNumber}</span>
             </div>
-            <div className="px-3 py-1.5 flex items-center gap-1.5 bg-primary/10">
-              <span className="text-[10px] sm:text-xs text-primary/70 uppercase tracking-wider">姓名</span>
-              <span className="font-bold text-primary">{studentInfo.name}</span>
+            <div className="px-3.5 py-2 flex items-center gap-1.5 bg-peach">
+              <span className="text-[10px] sm:text-xs text-ink/70 uppercase tracking-wider font-bold">姓名</span>
+              <span className="font-extrabold text-ink">{studentInfo.name}</span>
             </div>
           </div>
         </header>
         <main className="w-full max-w-3xl">
           {isGeneratingQuizResultsPdf && (
-            <Card className="w-full shadow-md mb-6">
+            <Card className="w-full border-neo shadow-neo rounded-[20px] mb-6">
               <CardHeader>
-                <CardTitle className="flex items-center text-lg sm:text-xl font-semibold">
-                  <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                  結果PDF處理中...
+                <CardTitle className="flex items-center text-lg sm:text-xl font-extrabold">
+                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                  結果PDF處理中…
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pt-2">
-                <Progress value={fileGenerationProgress} className="w-full h-3" />
+                <div className="h-3 bg-cream border-neo rounded-full overflow-hidden">
+                  <div className="h-full bg-coral transition-[width] duration-300" style={{ width: `${fileGenerationProgress}%` }} />
+                </div>
                 <p className="text-xs sm:text-sm text-muted-foreground text-center">
                   {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
                 </p>

@@ -1,23 +1,16 @@
-
-
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Accordion } from '@/components/ui/accordion';
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PirlsLogo } from '@/components/PirlsLogo';
 import { FileUpload } from '@/components/FileUpload';
 import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
 import { TurnstileGate } from '@/components/TurnstileGate';
 import { ShareDialog } from '@/components/ShareDialog';
+import { NeoCard, PillBtn, Star, Squiggle, Spark, PIRLS_LEVEL_META, type PirlsLevel } from '@/components/Neo';
 import {
   generatePirlsQuestions,
   generatePirlsQuestionsFromText,
@@ -29,22 +22,13 @@ import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
-import { QRCodeSVG } from 'qrcode.react';
-import { AlertCircle, CheckSquare, Brain, Loader2, Download, Sheet as SheetIcon, ClipboardCheck, Share2, Copy, AlertTriangle, Sparkles, Blocks, Bot, Languages, FileText, Image as ImageIcon, MessageSquareHeart, BarChart3, ExternalLink } from 'lucide-react';
+import { AlertCircle, Loader2, MessageSquareHeart, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 
 type ProgressCallback = (progress: number, message: string) => void;
 type InputMode = 'image' | 'text';
 
-/**
- * 模擬 AI 出題進度條（因為 model 不會回報進度）。
- * - ease-out 曲線：前段快、後段慢（符合使用者直覺）
- * - 7 段任務訊息輪播：讓使用者感覺 AI 一直在做不同的事
- * - 上限 96%（最後 4% 由真實完成事件填滿）
- * 回傳 cancel 函式，呼叫即停止。
- */
+/** 模擬 AI 出題進度條 — 邏輯與原本相同 */
 function simulateProgress(
   fromPercent: number,
   updateProgress: (progress: number, message: string) => void,
@@ -70,8 +54,6 @@ function simulateProgress(
         { until: 96, msg: '✨ 即將完成，最後潤飾中...' },
       ];
 
-  // 預估 22 秒（觀察值：8 題約 15-25 秒）
-  // 用 ease-out：前段衝得快、後段慢慢逼近 96%
   const totalDurationMs = 22000;
   const start = Date.now();
   let lastShown = fromPercent;
@@ -79,7 +61,7 @@ function simulateProgress(
   const id = setInterval(() => {
     const elapsed = Date.now() - start;
     const ratio = Math.min(elapsed / totalDurationMs, 1);
-    const eased = 1 - Math.pow(1 - ratio, 2.2); // ease-out quadratic
+    const eased = 1 - Math.pow(1 - ratio, 2.2);
     const progress = Math.min(fromPercent + (96 - fromPercent) * eased, 96);
     if (progress > lastShown) {
       lastShown = progress;
@@ -91,13 +73,6 @@ function simulateProgress(
   return () => clearInterval(id);
 }
 
-/**
- * Resizes an image file to a maximum dimension while maintaining aspect ratio
- * and converts it to a JPEG data URI for optimization.
- * @param file The image file to resize.
- * @param maxSize The maximum width or height of the image.
- * @returns A promise that resolves with the data URI of the resized image.
- */
 const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -109,31 +84,16 @@ const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let { width, height } = img;
-
-        // Calculate the new dimensions
         if (width > height) {
-          if (width > maxSize) {
-            height *= maxSize / width;
-            width = maxSize;
-          }
+          if (width > maxSize) { height *= maxSize / width; width = maxSize; }
         } else {
-          if (height > maxSize) {
-            width *= maxSize / height;
-            height = maxSize;
-          }
+          if (height > maxSize) { width *= maxSize / height; height = maxSize; }
         }
-        
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          return reject(new Error('Failed to get canvas 2D context.'));
-        }
-        
+        if (!ctx) return reject(new Error('Failed to get canvas 2D context.'));
         ctx.drawImage(img, 0, 0, width, height);
-
-        // Convert canvas to JPEG data URI for better compression
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.onerror = (err) => reject(err);
@@ -143,7 +103,6 @@ const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
     reader.readAsDataURL(file);
   });
 };
-
 
 export default function PIRLSQuestionCraftPage() {
   const [inputMode, setInputMode] = useState<InputMode>('image');
@@ -161,52 +120,48 @@ export default function PIRLSQuestionCraftPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
   const [isQuizActive, setIsQuizActive] = useState(false);
-  
+
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isSharingQuiz, setIsSharingQuiz] = useState(false);
   const [currentShareLink, setCurrentShareLink] = useState('');
 
-  // B.4: Cloudflare Turnstile token；NEXT_PUBLIC_TURNSTILE_SITE_KEY 未設時為空字串，後端跳過驗證
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
-  
+
   const { toast } = useToast();
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
-  const fileProgressSectionRef = useRef<HTMLDivElement>(null); 
+  const fileProgressSectionRef = useRef<HTMLDivElement>(null);
   const textInputAreaRef = useRef<HTMLDivElement>(null);
   const [currentYear, setCurrentYear] = useState<number | null>(null);
-  
-  // State for handling PaGamO Quiz Group export
+
   const [preparedPaGamOData, setPreparedPaGamOData] = useState<PaGamOQuizGroupData | null>(null);
 
-  useEffect(() => {
-    setCurrentYear(new Date().getFullYear());
-  }, []);
+  useEffect(() => { setCurrentYear(new Date().getFullYear()); }, []);
 
   useEffect(() => {
     if ((isGeneratingPdf || isGeneratingExcel || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup) && fileProgressSectionRef.current) {
       const timer = setTimeout(() => {
         fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100); 
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isGeneratingPdf, isGeneratingExcel, isGeneratingPaGamO, isGeneratingPaGamOQuizGroup]);
 
   useEffect(() => {
     if (isGeneratingQuizResultsPdf && fileProgressSectionRef.current) {
-        const timer = setTimeout(() => {
-            fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-        return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isGeneratingQuizResultsPdf]);
-  
+
   useEffect(() => {
     if (inputMode === 'text' && textInputAreaRef.current) {
       const timer = setTimeout(() => {
@@ -215,14 +170,12 @@ export default function PIRLSQuestionCraftPage() {
       return () => clearTimeout(timer);
     }
   }, [inputMode]);
-  
-  // Effect to trigger PaGamO Quiz Group download when data is ready
+
   useEffect(() => {
     if (preparedPaGamOData) {
       try {
         exportPIRLStoPaGamOQuizGroup(preparedPaGamOData, toast, fileProgressCallback);
       } catch (e: any) {
-        console.error("PaGamO 題組檔案生成失敗:", e);
         toast({
           title: 'PaGamO 題組檔案生成失敗',
           description: e.message || '無法生成檔案，請稍後再試。',
@@ -231,9 +184,8 @@ export default function PIRLSQuestionCraftPage() {
         setFileGenerationMessage(`PaGamO 題組檔案生成失敗: ${e.message || '未知錯誤'}`);
         setFileGenerationProgress(0);
       } finally {
-        setPreparedPaGamOData(null); // Reset the state
+        setPreparedPaGamOData(null);
         setIsGeneratingPaGamOQuizGroup(false);
-        // Do not reset inputMode here to allow multiple exports
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,12 +193,7 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleModeChange = (newMode: InputMode) => {
     setInputMode(newMode);
-    if (newMode === 'image') {
-      setInputText('');
-    } else {
-      setImageFiles([]);
-    }
-    // Reset results when changing mode
+    if (newMode === 'image') setInputText(''); else setImageFiles([]);
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
@@ -255,7 +202,7 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleImageFilesChange = useCallback((files: File[]) => {
     setImageFiles(files);
-    setInputText(''); // Clear text input
+    setInputText('');
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
@@ -267,20 +214,18 @@ export default function PIRLSQuestionCraftPage() {
       return () => clearTimeout(timer);
     }
   }, []);
-  
+
   const handleInputTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
-    setImageFiles([]); // Clear image files
+    setImageFiles([]);
     setGeneratedQuestionsOutput(null);
     setError(null);
     setIsQuizActive(false);
     setCurrentShareLink('');
   }, []);
 
-
   const handleGenerateQuestions = useCallback(async () => {
     const isReady = (inputMode === 'image' && imageFiles.length > 0) || (inputMode === 'text' && inputText.trim().length > 0);
-
     if (!isReady) {
       toast({
         title: inputMode === 'image' ? '沒有圖片' : '沒有文字',
@@ -289,13 +234,11 @@ export default function PIRLSQuestionCraftPage() {
       });
       return;
     }
-
     setIsLoading(true);
     setError(null);
     setGeneratedQuestionsOutput(null);
     setIsQuizActive(false);
     setCurrentShareLink('');
-
     setTimeout(() => {
       loadingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
@@ -306,53 +249,31 @@ export default function PIRLSQuestionCraftPage() {
     };
 
     updateDisplayProgress(8, '✨ 準備開始處理...');
-
     let cancelSimProgress: (() => void) | null = null;
     try {
       let result: GeneratePirlsQuestionsOutput | null = null;
-
       if (inputMode === 'image') {
-        // 階段 1：壓縮圖片（10% → 30%，分散到每張圖）
         updateDisplayProgress(12, '📷 正在壓縮圖片以加速上傳...');
         const photoDataUris: string[] = [];
         for (let i = 0; i < imageFiles.length; i++) {
           const uri = await resizeImage(imageFiles[i]);
           photoDataUris.push(uri);
-          const pct = 12 + ((i + 1) / imageFiles.length) * 18; // 12% → 30%
+          const pct = 12 + ((i + 1) / imageFiles.length) * 18;
           updateDisplayProgress(pct, `📷 已處理 ${i + 1}/${imageFiles.length} 張圖片...`);
         }
-        if (photoDataUris.length === 0) {
-          throw new Error('無法處理圖片，請確認檔案是否正確。');
-        }
-
-        // 階段 2：上傳 + AI 處理（30% → 96%，模擬進度）
+        if (photoDataUris.length === 0) throw new Error('無法處理圖片，請確認檔案是否正確。');
         updateDisplayProgress(32, '🚀 正在上傳圖片至 AI 伺服器...');
         cancelSimProgress = simulateProgress(35, updateDisplayProgress, true);
-        result = await generatePirlsQuestions({
-            photoDataUris,
-            questionMode,
-            languageMode,
-            turnstileToken,
-        });
+        result = await generatePirlsQuestions({ photoDataUris, questionMode, languageMode, turnstileToken });
         cancelSimProgress();
         cancelSimProgress = null;
-
-        if (result?.articleContent) {
-            setInputText(result.articleContent); // Update textarea for user visibility
-        }
-
-      } else { // Text input mode
+        if (result?.articleContent) setInputText(result.articleContent);
+      } else {
         updateDisplayProgress(15, '📝 正在打包文章內容...');
-        // 短暫停讓使用者看到 15% 不會跳太快（200ms）
         await new Promise((r) => setTimeout(r, 200));
         updateDisplayProgress(30, '🚀 正在傳送至 AI 伺服器...');
         cancelSimProgress = simulateProgress(32, updateDisplayProgress, false);
-        result = await generatePirlsQuestionsFromText({
-            text: inputText,
-            questionMode,
-            languageMode,
-            turnstileToken,
-        });
+        result = await generatePirlsQuestionsFromText({ text: inputText, questionMode, languageMode, turnstileToken });
         cancelSimProgress();
         cancelSimProgress = null;
       }
@@ -363,10 +284,8 @@ export default function PIRLSQuestionCraftPage() {
         toast({
           title: '成功！',
           description: 'PIRLS 題目已生成。',
-          variant: 'default',
-          className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
+          className: 'bg-sage border-sage-deep text-ink',
         });
-        // B.4: token 用過即丟，再生成要重新驗證
         setTurnstileResetSignal(s => s + 1);
         setTimeout(() => {
           resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -375,19 +294,12 @@ export default function PIRLSQuestionCraftPage() {
         throw new Error('APP未能成功生成題目或有效內容。');
       }
     } catch (err: any) {
-      console.error("生成題目時發生錯誤:", err.message, err.stack);
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
       setError(errorMessage);
-      toast({
-        title: '生成失敗',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast({ title: '生成失敗', description: errorMessage, variant: 'destructive' });
       updateDisplayProgress(loadingProgress, '處理時發生錯誤');
-      // B.4: 失敗時 reset Turnstile token（單次使用）
       setTurnstileResetSignal(s => s + 1);
     } finally {
-      // 確保模擬進度 interval 一定被清理（避免 leak）
       if (cancelSimProgress) cancelSimProgress();
       setIsLoading(false);
     }
@@ -398,77 +310,55 @@ export default function PIRLSQuestionCraftPage() {
     setFileGenerationMessage(message);
   };
 
+  const updateProgressCallback: ProgressCallback = (progress, message) => {
+    setFileGenerationProgress(progress);
+    setFileGenerationMessage(message);
+  };
+
   const handleDownloadPdf = async () => {
     if (!generatedQuestionsOutput) {
       toast({ title: '無法下載 PDF', description: '請先生成題目。', variant: 'destructive' });
       return;
     }
     if (inputMode === 'image' && imageFiles.length === 0 && (!inputText || inputText.trim().length === 0)) {
-        toast({ title: '無法下載 PDF', description: '請確認已上傳圖片或輸入文字以匯出包含文本的 PDF。', variant: 'destructive' });
-        return;
+      toast({ title: '無法下載 PDF', description: '請確認已上傳圖片或輸入文字以匯出包含文本的 PDF。', variant: 'destructive' });
+      return;
     }
-     if (inputMode === 'text' && inputText.trim().length === 0) {
+    if (inputMode === 'text' && inputText.trim().length === 0) {
       toast({ title: '無法下載 PDF', description: '文本內容為空，無法生成 PDF。', variant: 'destructive' });
       return;
     }
-
     setIsGeneratingPdf(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化 PDF 產生程序...');
-    setTimeout(() => {
-      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
+    setTimeout(() => fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     try {
       await exportPIRLStoPDF({
-          questionsOutput: generatedQuestionsOutput,
-          imageFiles: inputMode === 'image' ? imageFiles : [],
-          inputText: inputText, // Always pass inputText as it's the authoritative source
-          showToast: toast,
-          updateProgressCallback,
+        questionsOutput: generatedQuestionsOutput,
+        imageFiles: inputMode === 'image' ? imageFiles : [],
+        inputText,
+        showToast: toast,
+        updateProgressCallback,
       });
     } catch (pdfError: any) {
-      console.error("PDF 生成失敗:", pdfError);
-      toast({
-        title: 'PDF 生成失敗',
-        description: pdfError.message || '無法生成 PDF 檔案，請稍後再試。',
-        variant: 'destructive',
-      });
+      toast({ title: 'PDF 生成失敗', description: pdfError.message || '無法生成 PDF 檔案，請稍後再試。', variant: 'destructive' });
       setFileGenerationMessage(`PDF 生成失敗: ${pdfError.message || '未知錯誤'}`);
-      setFileGenerationProgress(0); 
+      setFileGenerationProgress(0);
     } finally {
       setIsGeneratingPdf(false);
     }
   };
 
-  const updateProgressCallback: ProgressCallback = (progress, message) => {
-    setFileGenerationProgress(progress);
-    setFileGenerationMessage(message);
-  };
-
   const handleDownloadExcel = async () => {
-    if (!generatedQuestionsOutput) {
-      toast({
-        title: '無法下載',
-        description: '請先生成題目。',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!generatedQuestionsOutput) { toast({ title: '無法下載', description: '請先生成題目。', variant: 'destructive' }); return; }
     setIsGeneratingExcel(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化檔案產生程序...');
-    setTimeout(() => {
-      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
+    setTimeout(() => fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     try {
       await exportPIRLStoExcel(generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (excelError: any) {
-      console.error("檔案生成失敗:", excelError);
-      toast({
-        title: '檔案生成失敗',
-        description: excelError.message || '無法生成檔案，請稍後再試。',
-        variant: 'destructive',
-      });
+      toast({ title: '檔案生成失敗', description: excelError.message || '無法生成檔案，請稍後再試。', variant: 'destructive' });
       setFileGenerationMessage(`檔案生成失敗: ${excelError.message || '未知錯誤'}`);
       setFileGenerationProgress(0);
     } finally {
@@ -477,29 +367,15 @@ export default function PIRLSQuestionCraftPage() {
   };
 
   const handleDownloadPaGamO = async () => {
-    if (!generatedQuestionsOutput) {
-      toast({
-        title: '無法下載',
-        description: '請先生成題目。',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!generatedQuestionsOutput) { toast({ title: '無法下載', description: '請先生成題目。', variant: 'destructive' }); return; }
     setIsGeneratingPaGamO(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在初始化 PaGamO 檔案產生程序...');
-    setTimeout(() => {
-      fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
+    setTimeout(() => fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     try {
       await exportPIRLStoPaGamO(generatedQuestionsOutput, toast, fileProgressCallback);
     } catch (paGamOError: any) {
-      console.error("PaGamO 檔案生成失敗:", paGamOError);
-      toast({
-        title: 'PaGamO 檔案生成失敗',
-        description: paGamOError.message || '無法生成檔案，請稍後再試。',
-        variant: 'destructive',
-      });
+      toast({ title: 'PaGamO 檔案生成失敗', description: paGamOError.message || '無法生成檔案，請稍後再試。', variant: 'destructive' });
       setFileGenerationMessage(`PaGamO 檔案生成失敗: ${paGamOError.message || '未知錯誤'}`);
       setFileGenerationProgress(0);
     } finally {
@@ -509,66 +385,41 @@ export default function PIRLSQuestionCraftPage() {
 
   const handleDownloadPaGamOQuizGroup = () => {
     if (!generatedQuestionsOutput || !generatedQuestionsOutput.title || !generatedQuestionsOutput.articleContent) {
-        toast({ title: '無法下載題組', description: '請先生成題目。生成的結果似乎不完整。', variant: 'destructive' });
-        return;
+      toast({ title: '無法下載題組', description: '請先生成題目。生成的結果似乎不完整。', variant: 'destructive' });
+      return;
     }
-
     setIsGeneratingPaGamOQuizGroup(true);
     setFileGenerationProgress(0);
     setFileGenerationMessage('正在準備 PaGamO 題組資料...');
-    setTimeout(() => {
-        fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
-
+    setTimeout(() => fileProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     try {
-        setFileGenerationMessage('資料準備完成，等待下載觸發...');
-        setFileGenerationProgress(75);
-
-        const dataForExport: PaGamOQuizGroupData = {
-            questionsOutput: generatedQuestionsOutput,
-            articleContent: generatedQuestionsOutput.articleContent,
-            articleTitle: generatedQuestionsOutput.title,
-        };
-        
-        // Set state to trigger the useEffect for download
-        setPreparedPaGamOData(dataForExport);
-
+      setFileGenerationMessage('資料準備完成，等待下載觸發...');
+      setFileGenerationProgress(75);
+      setPreparedPaGamOData({
+        questionsOutput: generatedQuestionsOutput,
+        articleContent: generatedQuestionsOutput.articleContent,
+        articleTitle: generatedQuestionsOutput.title,
+      });
     } catch (paGamOError: any) {
-        console.error("PaGamO 題組資料準備失敗:", paGamOError);
-        toast({
-            title: 'PaGamO 題組資料準備失敗',
-            description: paGamOError.message || '無法準備檔案資料，請稍後再試。',
-            variant: 'destructive',
-        });
-        setFileGenerationMessage(`PaGamO 題組資料準備失敗: ${paGamOError.message || '未知錯誤'}`);
-        setFileGenerationProgress(0);
-        setIsGeneratingPaGamOQuizGroup(false);
+      toast({ title: 'PaGamO 題組資料準備失敗', description: paGamOError.message || '無法準備檔案資料，請稍後再試。', variant: 'destructive' });
+      setFileGenerationMessage(`PaGamO 題組資料準備失敗: ${paGamOError.message || '未知錯誤'}`);
+      setFileGenerationProgress(0);
+      setIsGeneratingPaGamOQuizGroup(false);
     }
   };
 
   const handleStartQuiz = () => {
     if (generatedQuestionsOutput && (imageFiles.length > 0 || inputText.trim().length > 0)) {
       setIsQuizActive(true);
-      setTimeout(() => {
-        resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+      setTimeout(() => resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } else {
-       toast({
-        title: '無法開始測驗',
-        description: '請先提供內容 (圖片或文字) 並成功生成題目。',
-        variant: 'destructive',
-      });
+      toast({ title: '無法開始測驗', description: '請先提供內容 (圖片或文字) 並成功生成題目。', variant: 'destructive' });
     }
   };
 
-  const handleExitQuiz = () => {
-    setIsQuizActive(false);
-  };
+  const handleExitQuiz = () => setIsQuizActive(false);
 
-  const handleShowQuizResultsPdfProgress = (show: boolean) => {
-    setIsGeneratingQuizResultsPdf(show);
-  };
-
+  const handleShowQuizResultsPdfProgress = (show: boolean) => setIsGeneratingQuizResultsPdf(show);
   const handleUpdateQuizResultsPdfProgress: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
     setFileGenerationMessage(message);
@@ -580,9 +431,8 @@ export default function PIRLSQuestionCraftPage() {
       return;
     }
     setIsSharingQuiz(true);
-    setCurrentShareLink(''); // Clear previous link
-    setIsShareDialogOpen(true); // Open dialog to show loading/link
-
+    setCurrentShareLink('');
+    setIsShareDialogOpen(true);
     try {
       const imageFilesDataURIs = inputMode === 'image' ? await Promise.all(imageFiles.map(file => resizeImage(file))) : [];
       const { quizId } = await createSharedQuiz({
@@ -590,386 +440,385 @@ export default function PIRLSQuestionCraftPage() {
         imageFilesDataURIs,
         inputText: inputMode === 'text' ? inputText : '',
       });
-      // 路線 B：靜態網站 + query string
-      // 在 GitHub Pages 子路徑下會是 https://cagoooo.github.io/pirls-questioncraft/quiz/?id=xxx
-      // 自訂網域則是 https://your-domain/quiz/?id=xxx
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
       const newShareLink = `${window.location.origin}${basePath}/quiz/?id=${quizId}`;
       setCurrentShareLink(newShareLink);
-      toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white' });
+      toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-sage border-sage-deep text-ink' });
     } catch (shareError: any) {
-      console.error("分享測驗失敗:", shareError);
       setCurrentShareLink('');
-      toast({
-        title: "分享失敗",
-        description: `無法生成臨時分享連結: ${shareError.message || '未知錯誤'}`,
-        variant: "destructive",
-      });
+      toast({ title: "分享失敗", description: `無法生成臨時分享連結: ${shareError.message || '未知錯誤'}`, variant: "destructive" });
     } finally {
       setIsSharingQuiz(false);
     }
   };
 
   const handleCopyShareLink = () => {
-    if (!currentShareLink) {
-        toast({ title: "無連結可複製", description: "請先生成分享連結。", variant: "destructive" });
-        return;
-    }
+    if (!currentShareLink) { toast({ title: "無連結可複製", description: "請先生成分享連結。", variant: "destructive" }); return; }
     navigator.clipboard.writeText(currentShareLink).then(() => {
-      toast({
-        title: "連結已複製",
-        description: "臨時分享連結已複製到剪貼簿。",
-        variant: "default",
-        className: 'bg-green-500 border-green-500 text-white dark:bg-green-600 dark:border-green-600 dark:text-white',
-      });
-    }).catch(err => {
-      console.error("複製連結失敗:", err);
-      toast({
-        title: "複製失敗",
-        description: "無法複製連結，請手動複製。",
-        variant: "destructive",
-      });
+      toast({ title: "連結已複製", description: "臨時分享連結已複製到剪貼簿。", className: 'bg-sage border-sage-deep text-ink' });
+    }).catch(() => {
+      toast({ title: "複製失敗", description: "無法複製連結，請手動複製。", variant: "destructive" });
     });
   };
 
+  const isAnyDownloading = isGeneratingPdf || isGeneratingExcel || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || isGeneratingQuizResultsPdf;
+  const ready = (inputMode === 'image' && imageFiles.length > 0) || (inputMode === 'text' && inputText.trim().length > 0);
+
+  // 結果頁四層次分布計算
+  const distribution = generatedQuestionsOutput
+    ? generatedQuestionsOutput.questions.reduce<Record<string, number>>((acc, q) => {
+        acc[q.pirlsLevel] = (acc[q.pirlsLevel] || 0) + 1;
+        return acc;
+      }, {})
+    : {};
 
   return (
-    <div className="container mx-auto p-4 sm:p-8 min-h-screen flex flex-col items-center">
-      <header className="my-8 text-center">
-        <PirlsLogo className="mx-auto mb-4 h-20 w-auto sm:h-24" />
-        <h1 className="
-          inline-block
-          text-3xl sm:text-4xl font-bold text-primary
-          py-3 px-6 sm:py-4 sm:px-8
-          bg-primary/5 dark:bg-primary/10
-          border-2 border-primary/30
-          rounded-xl
-          shadow-lg
-          transition-all duration-300 ease-in-out
-          hover:shadow-xl hover:border-primary/50 hover:bg-primary/10 dark:hover:bg-primary/20
-          cursor-default
-        ">
-          PIRLS閱讀理解生成站 PRO
-        </h1>
-        <p className="mt-4 text-md sm:text-lg text-muted-foreground">
-          上傳圖片或貼上文本，APP 為您分析內容並設計PIRLS四層次選擇題。
-        </p>
-        <a 
-          href="https://cagoooo.github.io/Akai/wish/"
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="mt-4 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-accent hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent transition-all duration-150 ease-in-out hover:shadow-md"
-        >
-          <MessageSquareHeart className="mr-2 h-4 w-4" />
-          提供使用回饋
-        </a>
-      </header>
+    <div className="min-h-screen px-5 sm:px-9 pt-7 pb-20 text-ink">
+      <div className="max-w-[1240px] mx-auto">
 
-      <main className="w-full max-w-3xl space-y-8">
+        {/* ===== Top Nav ===== */}
+        <nav className="flex justify-between items-center gap-3 px-5 sm:px-[22px] py-3.5 bg-card border-neo rounded-full shadow-neo flex-wrap">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-cream border-neo flex items-center justify-center p-1 overflow-hidden shrink-0">
+              <PirlsLogo className="w-full h-full" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-base font-extrabold leading-tight flex items-center gap-1.5 flex-wrap">
+                QuestionCraft
+                <span className="bg-lemon border-neo rounded-md px-2 py-px text-[11px] leading-tight font-extrabold">PRO</span>
+              </div>
+              <div className="text-[12px] text-muted-foreground mt-0.5">石門國小 · PIRLS 閱讀理解四層次出題助手</div>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <a
+              href="https://cagoooo.github.io/Akai/wish/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <PillBtn color="bg-peach" sm>
+                <MessageSquareHeart className="h-4 w-4" />
+                <span className="hidden xs:inline">使用回饋</span>
+              </PillBtn>
+            </a>
+          </div>
+        </nav>
+
+        {/* ===== Hero ===== */}
         {!isQuizActive && (
-          <Tabs value={inputMode} onValueChange={(value) => handleModeChange(value as InputMode)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-auto">
-              <TabsTrigger value="image" className="py-2"><ImageIcon className="mr-2 h-4 w-4" />上傳圖片</TabsTrigger>
-              <TabsTrigger value="text" className="py-2"><FileText className="mr-2 h-4 w-4" />貼上文本</TabsTrigger>
-            </TabsList>
-            <TabsContent value="image" className="mt-6">
-              <FileUpload 
-                onFilesSelected={handleImageFilesChange} 
-                isLoading={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup} 
-              />
-            </TabsContent>
-            <TabsContent value="text" className="mt-6" ref={textInputAreaRef}>
-              <Card className="w-full bg-accent/10 dark:bg-accent/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-                    <FileText className="h-6 w-6 text-primary" />
-                    貼上文本內容
-                  </CardTitle>
-                  <CardDescription>請將您想分析的文字（例如從 PDF、Word 或網頁複製的內容）貼到下面的文字框中。</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    placeholder="請在此貼上您的文本內容..."
-                    value={inputText}
-                    onChange={handleInputTextChange}
-                    className="h-48 text-base"
-                    disabled={isLoading}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <NeoCard className="mt-6 px-7 sm:px-12 py-9 sm:py-11 relative overflow-hidden">
+            {/* 裝飾色塊 */}
+            <div aria-hidden className="hidden md:block absolute -top-12 -right-12 w-60 h-60 rounded-full bg-peach opacity-55 pointer-events-none" />
+            <div aria-hidden className="hidden md:block absolute -bottom-16 right-[90px] w-[150px] h-[150px] rounded-full bg-sky opacity-50 pointer-events-none" />
+            <div aria-hidden className="hidden md:block absolute top-12 right-[220px] w-[70px] h-[70px] rounded-full bg-sage opacity-60 pointer-events-none" />
+            <div aria-hidden className="hidden md:block absolute top-[130px] right-[90px] w-[26px] h-[26px] rounded-full bg-ink pointer-events-none" />
+            {/* 手繪裝飾 */}
+            <Star size={28} color="#F2DC83" className="hidden md:block absolute top-9 right-[280px] animate-pirls-bob" />
+            <Star size={20} color="#F0A6B5" className="hidden md:block absolute bottom-20 right-[260px] animate-pirls-bob [animation-delay:0.5s]" />
+            <Spark size={22} color="#3D2E1E" className="hidden md:block absolute top-[200px] right-12 animate-pirls-bob [animation-delay:0.8s]" />
+
+            <div className="relative z-[2] max-w-[720px]">
+              <span className="inline-flex items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1.5 text-xs font-bold mb-5">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI 自動出題 · 三步驟完成
+              </span>
+              <h1 className="m-0 font-extrabold tracking-tight leading-[1.05] text-[40px] sm:text-[52px] md:text-[60px]">
+                把任何文章，<br />
+                變成
+                <span
+                  className="relative inline-block px-1.5"
+                  style={{ background: 'linear-gradient(180deg, transparent 60%, #F5C9A8 60%)' }}
+                >
+                  會讀得懂
+                  <Squiggle color="#E89B7B" className="absolute -bottom-2.5 left-2" />
+                </span>
+                的題目。
+              </h1>
+              <p className="mt-4 text-[15px] sm:text-[17px] leading-[1.7] text-ink-soft max-w-[560px]">
+                上傳一張課文照片或貼上一段文字，AI 會依據 PIRLS 國際閱讀素養架構，自動為您設計選擇題、干擾選項與詳細解析。
+              </p>
+              <div className="flex gap-2.5 mt-6 sm:mt-7 flex-wrap">
+                {[
+                  { n: 1, t: '提供素材', c: 'bg-peach' },
+                  { n: 2, t: '選擇規格', c: 'bg-sage' },
+                  { n: 3, t: '一鍵生成', c: 'bg-sky' },
+                ].map((s) => (
+                  <div
+                    key={s.n}
+                    className="flex items-center gap-2.5 bg-card border-neo rounded-full pl-2 pr-4 py-2 text-sm font-bold shadow-neo-sm"
+                  >
+                    <div className={cn('w-7 h-7 rounded-full border-neo flex items-center justify-center font-extrabold text-sm', s.c)}>
+                      {s.n}
+                    </div>
+                    {s.t}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </NeoCard>
         )}
 
-        {!isQuizActive && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold flex items-center"><Blocks className="mr-2 h-5 w-5 text-primary" />題組模式</CardTitle>
-                <CardDescription>選擇您希望 APP 生成的題目數量與組合。</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup
-                  value={questionMode}
-                  onValueChange={(value) => {
-                    if (!isLoading) setQuestionMode(value as '8-questions' | '10-questions');
-                  }}
-                  className="grid grid-cols-1 gap-4"
-                  disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
-                >
-                  <div>
-                    <RadioGroupItem value="8-questions" id="mode-8" className="peer sr-only" />
-                    <Label
-                      htmlFor="mode-8"
+        {/* ===== Workflow：Upload + Settings（idle 階段） ===== */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-5">
+            {/* Upload card */}
+            <NeoCard className="p-6">
+              <div className="flex justify-between items-center flex-wrap gap-3 mb-5">
+                <div>
+                  <div className="text-[11px] font-extrabold tracking-[0.15em] text-muted-foreground mb-1">STEP 01</div>
+                  <div className="text-[22px] font-extrabold">提供素材</div>
+                </div>
+                {/* TabPills */}
+                <div className="inline-flex bg-cream border-neo rounded-full p-1">
+                  {([
+                    { id: 'image', l: '上傳圖片', icon: <ImageIcon className="h-4 w-4" /> },
+                    { id: 'text', l: '貼上文本', icon: <FileText className="h-4 w-4" /> },
+                  ] as const).map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleModeChange(t.id)}
                       className={cn(
-                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                        'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-colors',
+                        inputMode === t.id ? 'bg-ink text-cream' : 'bg-transparent text-ink hover:bg-cream-deep'
                       )}
                     >
-                      <span className="mb-2 block text-base font-semibold">標準模式 (8題)</span>
-                      <p className="text-sm text-muted-foreground">各PIRLS層次各2題，適合標準評量。</p>
-                    </Label>
-                  </div>
-                  <div>
-                    <RadioGroupItem value="10-questions" id="mode-10" className="peer sr-only" />
-                    <Label
-                      htmlFor="mode-10"
-                      className={cn(
-                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                      )}
-                    >
-                      <span className="mb-2 block text-base font-semibold">延伸模式 (10題)</span>
-                      <p className="text-sm text-muted-foreground">強化基礎能力：訊息提取與直接推論各3題。</p>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
+                      {t.icon} {t.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            <Card className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-100">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold flex items-center"><Languages className="mr-2 h-5 w-5 text-primary" />語言模式</CardTitle>
-                <CardDescription>選擇題目與選項的語言，詳解將維持中文。</CardDescription>
-              </CardHeader>
-              <CardContent>
-                 <RadioGroup
-                    value={languageMode}
-                    onValueChange={(value) => {
-                      if (!isLoading) setLanguageMode(value as 'zh-TW' | 'en');
-                    }}
-                    className="grid grid-cols-1 gap-4"
-                    disabled={isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
-                  >
-                  <div>
-                    <RadioGroupItem value="zh-TW" id="lang-zh" className="peer sr-only" />
-                    <Label
-                      htmlFor="lang-zh"
-                      className={cn(
-                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                      )}
-                    >
-                      <span className="mb-2 block text-base font-semibold">繁體中文</span>
-                      <p className="text-sm text-muted-foreground">所有內容均以繁體中文呈現。</p>
-                    </Label>
+              {inputMode === 'image' ? (
+                <FileUpload
+                  onFilesSelected={handleImageFilesChange}
+                  isLoading={isLoading || isAnyDownloading}
+                />
+              ) : (
+                <div ref={textInputAreaRef}>
+                  <Textarea
+                    placeholder="請在此貼上您想出題的文章內容…"
+                    value={inputText}
+                    onChange={handleInputTextChange}
+                    className="w-full min-h-[220px] bg-cream border-[2px] border-ink rounded-[18px] p-4 text-[15px] leading-[1.7] text-ink resize-y focus-visible:ring-0 focus-visible:ring-offset-0"
+                    disabled={isLoading}
+                  />
+                  <div className="mt-2.5 flex justify-between text-xs text-muted-foreground">
+                    <span>支援 PDF / Word / 網頁複製貼上</span>
+                    <span className="font-mono">{inputText.length} 字</span>
                   </div>
-                  <div>
-                    <RadioGroupItem value="en" id="lang-en" className="peer sr-only" />
-                    <Label
-                      htmlFor="lang-en"
-                      className={cn(
-                        "flex h-full flex-col justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary",
-                        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                      )}
-                    >
-                      <span className="mb-2 block text-base font-semibold">English</span>
-                      <p className="text-sm text-muted-foreground">題目與選項為英文，適合英語閱讀測驗。</p>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </NeoCard>
+
+            {/* Settings */}
+            <div className="flex flex-col gap-4">
+              <SettingCard
+                step="02"
+                title="題組數量"
+                emoji="🧩"
+                color="bg-sage"
+                value={questionMode}
+                onChange={(v) => !isLoading && setQuestionMode(v as '8-questions' | '10-questions')}
+                disabled={isLoading || isAnyDownloading}
+                options={[
+                  { id: '8-questions', t: '標準 8 題', d: '四層次各 2 題' },
+                  { id: '10-questions', t: '延伸 10 題', d: '加強提取與推論' },
+                ]}
+              />
+              <SettingCard
+                step="03"
+                title="題目語言"
+                emoji="🌏"
+                color="bg-sky"
+                value={languageMode}
+                onChange={(v) => !isLoading && setLanguageMode(v as 'zh-TW' | 'en')}
+                disabled={isLoading || isAnyDownloading}
+                options={[
+                  { id: 'zh-TW', t: '繁體中文', d: '完整中文呈現' },
+                  { id: 'en', t: 'English', d: '英文題幹與選項，解析中文' },
+                ]}
+              />
+            </div>
           </div>
         )}
 
-        {!isQuizActive && (
-          <TurnstileGate onToken={setTurnstileToken} resetSignal={turnstileResetSignal} />
+        {/* ===== Turnstile ===== */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <div className="mt-5">
+            <TurnstileGate onToken={setTurnstileToken} resetSignal={turnstileResetSignal} />
+          </div>
         )}
 
-        {!isQuizActive && (
-          <Button
+        {/* ===== CTA：大型珊瑚紅生成按鈕 ===== */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <button
             ref={generateButtonRef}
             onClick={handleGenerateQuestions}
-            disabled={
-              isLoading || isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup ||
-              (inputMode === 'image' && imageFiles.length === 0) ||
-              (inputMode === 'text' && inputText.trim().length === 0)
-            }
+            disabled={!ready || isLoading || isAnyDownloading}
             className={cn(
-              "w-full py-3 text-base sm:text-xl font-semibold transition-all duration-150 ease-out hover:scale-[1.015] hover:shadow-lg active:scale-100",
-              "bg-accent text-accent-foreground hover:bg-accent/80"
+              'mt-6 w-full px-6 py-6 rounded-[24px] border-neo shadow-neo-lg',
+              'flex items-center justify-center gap-3',
+              'text-[20px] sm:text-[22px] font-extrabold transition-all',
+              'hover:-translate-y-0.5 hover:shadow-neo-xl active:translate-y-1 active:shadow-neo-none',
+              ready && !isLoading
+                ? 'bg-coral text-white cursor-pointer'
+                : 'bg-muted text-muted-foreground cursor-not-allowed'
             )}
-            size="lg"
           >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <Loader2 className="h-6 w-6 animate-spin" />
                 處理中，請稍候...
               </>
             ) : (
               <>
-                <Brain className="mr-2 h-5 w-5" />
-                生成PIRLS題目
+                <span className="text-[24px] sm:text-[26px]">🚀</span>
+                {ready ? '開始生成 PIRLS 四層次題目' : '請先提供素材（上傳圖片或貼上文本）'}
               </>
             )}
-          </Button>
+          </button>
         )}
 
+        {/* ===== Loading Bar ===== */}
         {isLoading && (
-           <Card ref={loadingSectionRef} className="w-full shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center text-xl font-semibold">
-                <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                APP 努力思考中...
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-2">
-              <Progress value={loadingProgress} className="w-full h-3" />
-              <p className="text-sm text-muted-foreground text-center">
-                {loadingMessage} ({Math.round(loadingProgress)}%)
-              </p>
-            </CardContent>
-          </Card>
+          <div ref={loadingSectionRef} className="mt-6">
+            <NeoCard className="p-6">
+              <div className="flex items-center gap-3.5 mb-4">
+                <div
+                  className="w-12 h-12 rounded-2xl bg-lemon border-neo flex items-center justify-center text-2xl shadow-neo-sm animate-pirls-spin"
+                  aria-hidden
+                >
+                  🧠
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[17px] font-extrabold">AI 努力思考中…</div>
+                  <div className="text-[13px] text-muted-foreground mt-0.5 truncate">{loadingMessage}</div>
+                </div>
+                <div className="font-mono text-[22px] font-extrabold tabular-nums">{Math.round(loadingProgress)}%</div>
+              </div>
+              <div className="h-3.5 bg-cream border-neo rounded-full overflow-hidden">
+                <div
+                  className="h-full transition-[width] duration-300 ease-out"
+                  style={{
+                    width: `${loadingProgress}%`,
+                    background: 'linear-gradient(90deg, #F5C9A8, #E89B7B)',
+                    borderRight: loadingProgress < 100 ? '1.5px solid #3D2E1E' : 'none',
+                  }}
+                />
+              </div>
+            </NeoCard>
+          </div>
         )}
 
+        {/* ===== Error ===== */}
         {error && !isLoading && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>錯誤</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="mt-6">
+            <Alert variant="destructive" className="border-[1.5px] border-ink rounded-[18px] shadow-neo-sm">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>錯誤</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
         )}
 
+        {/* ===== Result section ===== */}
         {generatedQuestionsOutput && !isLoading && (
-          <section ref={resultsSectionRef} className="mt-8">
-             {(isGeneratingPdf || isGeneratingExcel || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup) && (
-              <Card ref={fileProgressSectionRef} className="w-full shadow-md mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl font-semibold">
-                    <Loader2 className="mr-3 h-6 w-6 animate-spin text-primary" />
-                    檔案處理中...
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-2">
-                  <Progress value={fileGenerationProgress} className="w-full h-3" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    {fileGenerationMessage} ({Math.round(fileGenerationProgress)}%)
-                  </p>
-                </CardContent>
-              </Card>
+          <section ref={resultsSectionRef} className="mt-6 flex flex-col gap-5">
+            {/* File generation progress */}
+            {isAnyDownloading && (
+              <NeoCard ref={fileProgressSectionRef} className="p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <div className="font-extrabold text-base">檔案處理中…</div>
+                  <div className="ml-auto font-mono font-extrabold tabular-nums">{Math.round(fileGenerationProgress)}%</div>
+                </div>
+                <div className="h-3 bg-cream border-neo rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-[width] duration-300 ease-out bg-coral"
+                    style={{ width: `${fileGenerationProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">{fileGenerationMessage}</p>
+              </NeoCard>
             )}
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
-                <h2 className="text-2xl font-semibold text-center flex items-center justify-center">
-                  <CheckSquare className="h-7 w-7 mr-2 text-green-600" />
-                  {isQuizActive ? "PIRLS 線上測驗" : `為您生成的PIRLS題目 (${generatedQuestionsOutput.questions.length}題)`}
-                </h2>
-                {!isQuizActive && (
-                  <div className="flex space-x-1 sm:space-x-2 flex-wrap justify-center">
-                    <Button
-                        onClick={handleStartQuiz}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
-                        variant="outline"
-                        className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
-                    >
-                        <ClipboardCheck className="mr-2 h-4 w-4" />
-                        開始測驗
-                    </Button>
-                     <ShareDialog
+
+            {!isQuizActive && (
+              <>
+                {/* Result header：四層次分布 */}
+                <NeoCard className="p-6">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <div className="min-w-0">
+                      <span className="inline-flex items-center gap-2 bg-sage/55 border-neo rounded-full px-3 py-1 text-xs font-extrabold mb-2.5">
+                        <span>✓</span> 已生成 {generatedQuestionsOutput.questions.length} 題
+                      </span>
+                      <div className="text-[20px] sm:text-[24px] font-extrabold truncate">
+                        {generatedQuestionsOutput.title || 'AI 自動生成題組'}
+                      </div>
+                      <div className="text-[13px] text-muted-foreground mt-1">
+                        由 AI 自動分析文章內容生成 · 涵蓋 PIRLS 四層次
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {(Object.keys(PIRLS_LEVEL_META) as PirlsLevel[]).map((k) => {
+                      const m = PIRLS_LEVEL_META[k];
+                      return (
+                        <div key={k} className="bg-cream border-neo rounded-[14px] px-3.5 py-3 flex items-center gap-2.5">
+                          <div className={cn('w-9 h-9 rounded-[10px] border-neo flex items-center justify-center text-base', m.bg)}>
+                            {m.emoji}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] text-muted-foreground font-bold">{m.label}</div>
+                            <div className="text-[18px] font-extrabold font-mono tabular-nums">
+                              {distribution[k] || 0}
+                              <span className="text-[11px] text-muted-foreground ml-0.5">題</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </NeoCard>
+
+                {/* Action bar */}
+                <NeoCard className="p-4">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="text-[13px] font-bold text-muted-foreground mr-1">匯出 / 分享 →</div>
+                    <PillBtn onClick={handleStartQuiz} color="bg-sage" sm disabled={isAnyDownloading}>
+                      ▶ 開始線上測驗
+                    </PillBtn>
+                    <PillBtn onClick={handleDownloadPdf} color="bg-peach" sm disabled={isAnyDownloading}>
+                      {isGeneratingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📄'} PDF
+                    </PillBtn>
+                    <PillBtn onClick={handleDownloadExcel} color="bg-sky" sm disabled={isAnyDownloading}>
+                      {isGeneratingExcel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📊'} Loilonote
+                    </PillBtn>
+                    <PillBtn onClick={handleDownloadPaGamO} color="bg-lemon" sm disabled={isAnyDownloading}>
+                      {isGeneratingPaGamO ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🎮'} PaGamO
+                    </PillBtn>
+                    <PillBtn onClick={handleDownloadPaGamOQuizGroup} color="bg-rose" sm disabled={isAnyDownloading}>
+                      {isGeneratingPaGamOQuizGroup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📚'} PaGamO 題組
+                    </PillBtn>
+                    <div className="ml-auto">
+                      <ShareDialog
                         open={isShareDialogOpen}
                         onOpenChange={setIsShareDialogOpen}
                         onShareClick={handleShareQuiz}
                         onCopyClick={handleCopyShareLink}
-                        triggerDisabled={isSharingQuiz || isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup}
+                        triggerDisabled={isSharingQuiz || isAnyDownloading}
                         isSharingQuiz={isSharingQuiz}
                         currentShareLink={currentShareLink}
                       />
-                    <Button
-                        onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
-                        variant="outline"
-                    >
-                        {isGeneratingPdf ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                PDF準備中...
-                            </>
-                        ) : (
-                            <>
-                                <Download className="mr-2 h-4 w-4" />
-                                下載 PDF
-                            </>
-                        )}
-                    </Button>
-                    <Button
-                        onClick={handleDownloadExcel}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
-                        variant="outline"
-                    >
-                        {isGeneratingExcel ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Loilonote準備中...
-                            </>
-                        ) : (
-                            <>
-                                <SheetIcon className="mr-2 h-4 w-4" />
-                                匯出Loilonote
-                            </>
-                        )}
-                    </Button>
-                    <Button
-                        onClick={handleDownloadPaGamO}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
-                        variant="outline"
-                    >
-                        {isGeneratingPaGamO ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                PaGamO準備中...
-                            </>
-                        ) : (
-                            <>
-                                <SheetIcon className="mr-2 h-4 w-4" />
-                                匯出PaGamO
-                            </>
-                        )}
-                    </Button>
-                    <Button
-                        onClick={handleDownloadPaGamOQuizGroup}
-                        disabled={isGeneratingPdf || isGeneratingExcel || isLoading || isGeneratingQuizResultsPdf || isGeneratingPaGamO || isGeneratingPaGamOQuizGroup || !generatedQuestionsOutput}
-                        variant="outline"
-                        title={'匯出適用於 PaGamO 平台的題組格式'}
-                    >
-                        {isGeneratingPaGamOQuizGroup ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                PaGamO題組準備中...
-                            </>
-                        ) : (
-                            <>
-                                <SheetIcon className="mr-2 h-4 w-4" />
-                                匯出PaGamO題組
-                            </>
-                        )}
-                    </Button>
+                    </div>
                   </div>
-                )}
-            </div>
-            
+                </NeoCard>
+              </>
+            )}
+
+            {/* Quiz / Question list */}
             {isQuizActive ? (
-              <QuizView 
-                questionsOutput={generatedQuestionsOutput} 
+              <QuizView
+                questionsOutput={generatedQuestionsOutput}
                 imageFiles={imageFiles}
                 inputText={inputText}
                 onExitQuiz={handleExitQuiz}
@@ -979,11 +828,11 @@ export default function PIRLSQuestionCraftPage() {
                 isGeneratingQuizResultsPdf={isGeneratingQuizResultsPdf}
               />
             ) : (
-              <Accordion type="single" collapsible className="w-full">
-                {generatedQuestionsOutput?.questions.map((q, index) => (
-                  <QuestionCard 
-                    key={index} 
-                    questionItem={q} 
+              <Accordion type="single" collapsible className="w-full flex flex-col gap-3.5">
+                {generatedQuestionsOutput.questions.map((q, index) => (
+                  <QuestionCard
+                    key={index}
+                    questionItem={q}
                     questionNumber={index + 1}
                     className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500"
                     style={{ animationDelay: `${index * 80}ms` }}
@@ -993,100 +842,110 @@ export default function PIRLSQuestionCraftPage() {
             )}
           </section>
         )}
-      </main>
-      
-      <footer
-        className="w-full max-w-3xl mt-16 mb-8 p-6 bg-foreground dark:bg-background rounded-xl shadow-lg text-center text-base text-background dark:text-foreground transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-foreground/90 dark:hover:bg-background/90"
-      >
-        <p className="leading-relaxed">
-          &copy; {currentYear ? currentYear : ''}{' '}
-          <a 
-            href="https://www.smes.tyc.edu.tw/" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            桃園市石門國小資訊組 阿凱老師 設計
-          </a>
-        </p>
-      </footer>
 
-      <a
-        href="https://document-ai-companion-ipad4.replit.app"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 h-12 px-4 bg-accent text-accent-foreground font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-accent/80 transition-all duration-300 ease-in-out transform hover:scale-105 sm:right-auto sm:left-8"
-      >
-        <Bot className="h-5 w-5" />
-        <span className="text-sm">創建專屬助手🦄</span>
-      </a>
-
-      <a
-        href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-20 right-4 z-50 flex items-center gap-2 h-12 px-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg hover:shadow-xl hover:bg-yellow-400 transition-all duration-300 ease-in-out transform hover:scale-105 sm:bottom-8 sm:right-8"
-      >
-        <Sparkles className="h-5 w-5" />
-        <span className="text-sm">點『石』成金🐝(評語優化)</span>
-      </a>
-
+        {/* ===== Footer ===== */}
+        <footer className="mt-14 bg-ink text-cream rounded-[24px] px-7 py-7 flex justify-between items-center flex-wrap gap-4">
+          <div className="min-w-0">
+            <div className="text-base font-extrabold">PIRLS QuestionCraft PRO</div>
+            <div className="text-[13px] opacity-75 mt-1">
+              Made with <span className="text-rose">❤</span> by{' '}
+              <a
+                href="https://www.smes.tyc.edu.tw/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold underline-offset-4 hover:underline"
+              >
+                桃園市石門國小資訊組 阿凱老師
+              </a>
+              <span className="mx-1.5 opacity-60">·</span>
+              <span className="opacity-75">© {currentYear ?? ''}</span>
+            </div>
+          </div>
+          <div className="flex gap-2.5 flex-wrap">
+            <a
+              href="https://document-ai-companion-ipad4.replit.app"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <PillBtn color="bg-peach" sm>🦄 創建專屬助手</PillBtn>
+            </a>
+            <a
+              href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <PillBtn color="bg-lemon" sm>🐝 點石成金</PillBtn>
+            </a>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
-    
 
-    
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-    
-
-
-    
-
-
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-
-
-
-
-
-    
+/* ===== SettingCard 子元件 ===== */
+function SettingCard({
+  step,
+  title,
+  emoji,
+  color,
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  step: string;
+  title: string;
+  emoji: string;
+  color: string;
+  options: { id: string; t: string; d: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <NeoCard className="p-5">
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className={cn('w-9 h-9 rounded-xl border-neo flex items-center justify-center text-lg shadow-neo-sm', color)}>
+          {emoji}
+        </div>
+        <div>
+          <div className="text-[10px] font-extrabold tracking-[0.15em] text-muted-foreground">STEP {step}</div>
+          <div className="font-extrabold text-[17px]">{title}</div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 mt-3.5">
+        {options.map((o) => {
+          const selected = value === o.id;
+          return (
+            <button
+              key={o.id}
+              onClick={() => onChange(o.id)}
+              disabled={disabled}
+              className={cn(
+                'flex justify-between items-center px-4 py-3 rounded-[14px] text-left transition-all',
+                selected
+                  ? 'bg-cream border-[2px] border-ink'
+                  : 'bg-card border-[1.5px] border-line hover:border-ink/50',
+                disabled && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-ink">{o.t}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{o.d}</div>
+              </div>
+              <div
+                className={cn(
+                  'w-[22px] h-[22px] rounded-full border-neo flex items-center justify-center text-xs font-extrabold shrink-0 ml-3',
+                  selected ? 'bg-ink text-white' : 'bg-card text-transparent'
+                )}
+              >
+                {selected ? '✓' : ''}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </NeoCard>
+  );
+}

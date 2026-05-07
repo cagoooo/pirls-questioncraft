@@ -394,7 +394,7 @@ export function QuizView({
     return (
       <Card
         ref={quizResultsTopRef}
-        className="w-full shadow-xl animate-in fade-in-50 slide-in-from-bottom-8 duration-500"
+        className="w-full border-neo shadow-neo-lg rounded-[24px] animate-in fade-in-50 slide-in-from-bottom-8 duration-500"
       >
         <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center">
@@ -556,7 +556,7 @@ export function QuizView({
             setIsQuizImageDialogOpen(isOpen);
         }}
       >
-        <Card className={cn("w-full shadow-xl", "animate-in fade-in-25 zoom-in-95 duration-500")}>
+        <Card className={cn("w-full border-neo shadow-neo-lg rounded-[24px]", "animate-in fade-in-25 zoom-in-95 duration-500")}>
           <CardHeader className="flex flex-row justify-between items-center pb-4">
             <div className="flex items-center">
               <BookOpen className="h-6 w-6 mr-2 text-primary" />
