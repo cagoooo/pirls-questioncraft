@@ -56,6 +56,13 @@ firestore-debug.log
 # claude code agent local cache
 .agents/
 
+# claude code worktrees / session state（內含解壓的設計交接包等暫存）
+.claude/
+
+# 設計交接包 zip / 解壓資料夾（避免不小心進版控）
+/_*.zip
+/_design_ref/
+
 # B.18: 自動產生的版本檔，由 npm prebuild 寫入
 public/version.json
 
