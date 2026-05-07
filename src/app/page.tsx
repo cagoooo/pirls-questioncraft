@@ -22,7 +22,7 @@ import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Loader2, MessageSquareHeart, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { AlertCircle, Loader2, MessageSquareHeart, FileText, Image as ImageIcon, Sparkles, Star as StarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ProgressCallback = (progress: number, message: string) => void;
@@ -495,10 +495,17 @@ export default function PIRLSQuestionCraftPage() {
               href="https://cagoooo.github.io/Akai/wish/"
               target="_blank"
               rel="noopener noreferrer"
+              title="老師您好！點此給予使用回饋並為這個工具評分（⭐ 1-5 顆星）"
+              aria-label="使用回饋與星星評分"
             >
-              <PillBtn color="bg-peach" sm>
-                <MessageSquareHeart className="h-4 w-4" />
-                <span className="hidden xs:inline">使用回饋</span>
+              <PillBtn color="bg-peach" sm className="!gap-1.5 !px-3.5">
+                <MessageSquareHeart className="h-4 w-4 shrink-0" />
+                <span className="font-extrabold whitespace-nowrap">使用回饋</span>
+                <span className="inline-flex items-center gap-0.5 ml-0.5 text-amber-500">
+                  <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
+                  <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
+                  <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
+                </span>
               </PillBtn>
             </a>
           </div>
