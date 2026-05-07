@@ -71,9 +71,49 @@ interface HelpDialogProps {
   trigger?: React.ReactNode;
 }
 
+/**
+ * localStorage key — 改版時 bump 版本號，所有老師會再被自動彈一次。
+ * v1: 2026-05-07 初版，5 步驟 + 4 條老師小提示
+ */
+const STORAGE_KEY = 'pirls_quickstart_seen_v1';
+
+/** 頁面渲染後再彈，避免感覺像 popup blocker */
+const AUTO_OPEN_DELAY_MS = 700;
+
 export function HelpDialog({ trigger }: HelpDialogProps) {
+  const [open, setOpen] = React.useState(false);
+
+  // 首次訪問自動彈出 — 之後關掉就再也不會自動彈，但仍可從 TopNav 按鈕手動打開
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const seen = window.localStorage.getItem(STORAGE_KEY);
+      if (!seen) {
+        timer = setTimeout(() => setOpen(true), AUTO_OPEN_DELAY_MS);
+      }
+    } catch {
+      // localStorage 不可用（隱私模式 / 第三方 cookie 阻擋）就不自動彈
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    // 一旦關閉（不論自動彈出或手動點開），就記下「看過了」
+    if (!next) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <PillBtn color="bg-lemon" sm aria-label="開啟使用說明">
@@ -146,8 +186,10 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
           </ul>
         </div>
 
-        <p className="mt-4 text-[12px] text-muted-foreground text-center">
-          有問題或建議？右上角的「💬 使用回饋 ⭐⭐⭐」歡迎告訴阿凱老師。
+        <p className="mt-4 text-[12px] text-muted-foreground text-center leading-[1.7]">
+          之後想再看這份說明，隨時點右上角的「📖 使用說明」即可。
+          <br />
+          有問題或建議？歡迎按「💬 使用回饋 ⭐⭐⭐」告訴阿凱老師。
         </p>
       </DialogContent>
     </Dialog>
