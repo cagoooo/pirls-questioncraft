@@ -10,6 +10,7 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { QuizView } from '@/components/QuizView';
 import { TurnstileGate } from '@/components/TurnstileGate';
 import { ShareDialog } from '@/components/ShareDialog';
+import { HelpDialog } from '@/components/HelpDialog';
 import { NeoCard, PillBtn, Star, Squiggle, Spark, PIRLS_LEVEL_META, type PirlsLevel } from '@/components/Neo';
 import {
   generatePirlsQuestions,
@@ -490,7 +491,8 @@ export default function PIRLSQuestionCraftPage() {
               <div className="text-[12px] text-muted-foreground mt-0.5">石門國小 · PIRLS 閱讀理解四層次出題助手</div>
             </div>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap">
+            <HelpDialog />
             <a
               href="https://cagoooo.github.io/Akai/wish/"
               target="_blank"
