@@ -143,7 +143,7 @@ function buildDigestCard(r: WeeklyDigestResult): CardSpec {
       month: '2-digit',
       day: '2-digit',
     }).format(d);
-  const period = `${fmt(start)} – ${fmt(now)}`;
+  const period = `${fmt(start)} ─ ${fmt(now)}`;
 
   // 整體狀態判斷（決定卡片色彩）
   let status: CardSpec['status'] = 'success';
@@ -155,56 +155,72 @@ function buildDigestCard(r: WeeklyDigestResult): CardSpec {
     status = 'warning'; // 失敗率 > 5%
   }
 
-  const fields: CardSpec['fields'] = [
-    { icon: '📅', label: '本週期間', value: period },
-    { icon: '🎯', label: '出題次數', value: `${r.totalGenerations} 次（圖${r.imageGenerations}・字${r.textGenerations}）` },
+  // Hero KPI：3 欄大數字（出題 / 分享 / 交卷）— 視覺最突出
+  const heroKpis: CardSpec['heroKpis'] = [
+    {
+      value: r.totalGenerations,
+      label: '出題',
+      sub: `圖${r.imageGenerations}・字${r.textGenerations}`,
+    },
+    {
+      value: r.totalShares,
+      label: '分享',
+      sub: '連結',
+    },
+    {
+      value: r.totalSubmissions,
+      label: '交卷',
+      sub: '人次',
+    },
   ];
 
-  if (r.failedGenerations > 0) {
-    fields.push({
-      icon: '⚠️',
-      label: '失敗次數',
-      value: `${r.failedGenerations} 次（${(r.failureRate * 100).toFixed(1)}%）`,
-    });
-  }
-
-  fields.push(
-    { icon: '🔗', label: '分享連結', value: `${r.totalShares} 次` },
-    { icon: '👨‍🎓', label: '學生交卷', value: `${r.totalSubmissions} 人次` },
-  );
+  // 次要 metrics：label 縮短到 2 字避免截斷，flex 4:6
+  const fields: CardSpec['fields'] = [];
 
   if (r.classAvgAccuracy !== null) {
     fields.push({
       icon: '📊',
-      label: '班級平均',
+      label: '平均',
       value: `${r.classAvgAccuracy.toFixed(1)}%`,
     });
+  } else if (r.totalSubmissions === 0) {
+    fields.push({ icon: '📊', label: '平均', value: '尚無作答' });
   }
 
   if (r.weakestPirlsLevel) {
     fields.push({
       icon: '🎯',
-      label: '本週弱項',
+      label: '弱項',
       value: PIRLS_LEVEL_LABEL[r.weakestPirlsLevel] ?? r.weakestPirlsLevel,
     });
   }
 
   if (r.busiestDay) {
+    // 縮短日期：2026-05-04 → 05/04
+    const md = r.busiestDay.date.slice(5).replace('-', '/');
     fields.push({
       icon: '🔥',
-      label: '最忙日',
-      value: `${r.busiestDay.date}（${r.busiestDay.count} 次）`,
+      label: '最忙',
+      value: `${md} · ${r.busiestDay.count}次`,
+    });
+  }
+
+  if (r.failedGenerations > 0) {
+    fields.push({
+      icon: '⚠️',
+      label: '失敗',
+      value: `${r.failedGenerations}次 (${(r.failureRate * 100).toFixed(1)}%)`,
     });
   }
 
   // 動態 body 訊息（依狀態）
   let body: string | undefined;
   if (r.totalGenerations === 0) {
-    body = '💡 本週沒人使用本系統。如果是寒暑假/連假很正常。';
+    body = '💡 本週沒人使用本系統，如果是寒暑假/連假很正常。';
   } else if (r.failureRate > 0.1) {
     body = '⚠️ 失敗率偏高，建議查看 Functions log 找原因。可能是 Gemini 模型棄用、quota 不足、或網路問題。';
   } else if (r.classAvgAccuracy !== null && r.classAvgAccuracy < 60) {
-    body = '📚 本週班級平均偏低，可能題目太難或學生需要更多引導，可考慮針對「' +
+    body = '📚 本週班級平均偏低，可考慮針對「' +
       (PIRLS_LEVEL_LABEL[r.weakestPirlsLevel ?? ''] ?? '弱項') + '」加強練習。';
   } else if (r.totalSubmissions > 0 && r.classAvgAccuracy !== null && r.classAvgAccuracy >= 80) {
     body = '🎉 本週班級表現優秀，平均答對率超過 80%！';
@@ -212,12 +228,14 @@ function buildDigestCard(r: WeeklyDigestResult): CardSpec {
 
   return {
     status,
-    title: '📊 PIRLS 本週摘要',
+    title: 'PIRLS 本週摘要',
     appName: APP_NAME,
+    headline: `📅 ${period}`,
+    heroKpis,
     fields,
     body,
     actions: [
-      { label: '📊 線上儀表板', uri: `${SITE_BASE_URL}/admin/`, style: 'primary' },
+      { label: '📊 開啟儀表板', uri: `${SITE_BASE_URL}/admin/`, style: 'primary' },
     ],
   };
 }

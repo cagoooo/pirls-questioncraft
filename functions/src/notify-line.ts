@@ -30,6 +30,10 @@ export type CardSpec = {
   status: keyof typeof CARD_THEMES;
   title: string;
   appName?: string;
+  /** Header 副標：放在 appName 下方（例如週報的日期區間） */
+  headline?: string;
+  /** Hero KPI：3 欄大數字，視覺最突出（適合週報/月報這類數據卡） */
+  heroKpis?: Array<{ value: string | number; label: string; sub?: string }>;
   fields: Array<{ icon?: string; label: string; value: string }>;
   /** 額外段落（在 fields 與 footer 之間，例如貼文章摘要） */
   body?: string;
@@ -238,43 +242,118 @@ function buildFlexBubble(card: CardSpec) {
       margin: 'sm',
     });
   }
+  if (card.headline) {
+    headerContents.push({
+      type: 'text',
+      text: card.headline,
+      color: '#FFFFFF',
+      size: 'sm',
+      weight: 'bold',
+      margin: 'md',
+    });
+  }
 
-  // body：欄位 + 可選的長文字段落
-  const bodyContents: any[] = card.fields.map((f) => ({
-    type: 'box',
-    layout: 'horizontal',
-    spacing: 'sm',
-    contents: [
-      {
-        type: 'text',
-        text: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
-        color: '#888888',
-        size: 'sm',
-        flex: 3,
-      },
-      {
-        type: 'text',
-        text: f.value || '—',
-        color: '#1E293B',
-        size: 'sm',
-        flex: 7,
-        wrap: true,
-      },
-    ],
-  }));
+  const bodyContents: any[] = [];
+
+  // Hero KPI：3 欄大數字（視覺最突出區塊）
+  if (card.heroKpis?.length) {
+    const kpis = card.heroKpis.slice(0, 3);
+    bodyContents.push({
+      type: 'box',
+      layout: 'horizontal',
+      spacing: 'sm',
+      contents: kpis.map((k) => ({
+        type: 'box',
+        layout: 'vertical',
+        flex: 1,
+        contents: [
+          {
+            type: 'text',
+            text: String(k.value),
+            color: theme.headerBg,
+            weight: 'bold',
+            size: 'xxl',
+            align: 'center',
+          },
+          {
+            type: 'text',
+            text: k.label,
+            color: '#64748B',
+            size: 'xs',
+            align: 'center',
+            margin: 'xs',
+          },
+          ...(k.sub
+            ? [
+                {
+                  type: 'text',
+                  text: k.sub,
+                  color: '#94A3B8',
+                  size: 'xxs',
+                  align: 'center',
+                },
+              ]
+            : []),
+        ],
+      })),
+    });
+    if (card.fields.length) {
+      bodyContents.push({ type: 'separator', margin: 'lg', color: '#E5E7EB' });
+    }
+  }
+
+  // 次要 fields：label 與 value 雙欄（label 短，避免截斷）
+  if (card.fields.length) {
+    const fieldRows = card.fields.map((f, i) => ({
+      type: 'box',
+      layout: 'horizontal',
+      spacing: 'sm',
+      margin: i === 0 && card.heroKpis?.length ? 'lg' : 'sm',
+      contents: [
+        {
+          type: 'text',
+          text: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
+          color: '#64748B',
+          size: 'sm',
+          flex: 4,
+        },
+        {
+          type: 'text',
+          text: f.value || '—',
+          color: '#1E293B',
+          size: 'sm',
+          weight: 'bold',
+          flex: 6,
+          align: 'end',
+          wrap: true,
+        },
+      ],
+    }));
+    bodyContents.push(...fieldRows);
+  }
+
   if (card.body) {
     bodyContents.push({
       type: 'separator',
-      margin: 'md',
+      margin: 'lg',
       color: '#E5E7EB',
     });
     bodyContents.push({
-      type: 'text',
-      text: card.body,
-      color: '#475569',
-      size: 'xs',
-      wrap: true,
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: '#F8FAFC',
+      cornerRadius: '8px',
+      paddingAll: '10px',
       margin: 'md',
+      contents: [
+        {
+          type: 'text',
+          text: card.body,
+          color: '#475569',
+          size: 'xs',
+          wrap: true,
+        },
+      ],
     });
   }
 
@@ -307,7 +386,7 @@ function buildFlexBubble(card: CardSpec) {
 
   return {
     type: 'bubble',
-    size: 'kilo',
+    size: card.heroKpis?.length ? 'mega' : 'kilo',
     header: {
       type: 'box',
       layout: 'vertical',
@@ -337,8 +416,12 @@ function cardToPlainText(card: CardSpec): string {
   const lines = [
     `${theme.icon} ${card.title}`,
     card.appName ? `(${card.appName})` : '',
+    card.headline ? card.headline : '',
     '',
+    ...(card.heroKpis?.map((k) => `${k.label}：${k.value}${k.sub ? ` ${k.sub}` : ''}`) ?? []),
+    ...(card.heroKpis?.length ? [''] : []),
     ...card.fields.map((f) => `${f.icon || ''} ${f.label}：${f.value || '—'}`),
+    card.body ? `\n${card.body}` : '',
     card.footerNote ? `\n${card.footerNote}` : '',
   ].filter(Boolean);
   return lines.join('\n').substring(0, 4900);
