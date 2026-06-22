@@ -41,6 +41,7 @@ const TURNSTILE_SECRET = defineSecret('TURNSTILE_SECRET');
 // B.14: LINE Bot 共用 Channel 的 Token + 管理員 userId（PIRLS_ 前綴與其他專案隔離）
 const PIRLS_LINE_CHANNEL_ACCESS_TOKEN = defineSecret('PIRLS_LINE_CHANNEL_ACCESS_TOKEN');
 const PIRLS_LINE_ADMIN_USER_ID = defineSecret('PIRLS_LINE_ADMIN_USER_ID');
+const GOOGLE_CHAT_WEBHOOK_URL = defineSecret('GOOGLE_CHAT_WEBHOOK_URL');
 // B.26: Admin dashboard 授權用 key（Bearer token 比對）
 const PIRLS_ADMIN_KEY = defineSecret('PIRLS_ADMIN_KEY');
 
@@ -124,12 +125,16 @@ function withProtection(
 }
 
 /** 取要監看的 secrets（給 onRequest 的 secrets 陣列用） */
-const LINE_SECRETS = [PIRLS_LINE_CHANNEL_ACCESS_TOKEN, PIRLS_LINE_ADMIN_USER_ID];
+const NOTIFY_SECRETS = [
+  PIRLS_LINE_CHANNEL_ACCESS_TOKEN,
+  PIRLS_LINE_ADMIN_USER_ID,
+  GOOGLE_CHAT_WEBHOOK_URL
+];
 
 // ---- AI flows ----
 
 export const generateFromImages = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...LINE_SECRETS] },
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS] },
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
@@ -188,7 +193,7 @@ export const generateFromImages = onRequest(
 );
 
 export const generateFromText = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...LINE_SECRETS] },
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS] },
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
@@ -246,7 +251,7 @@ export const generateFromText = onRequest(
 // ---- Shared quiz storage ----
 
 export const createSharedQuiz = onRequest(
-  { secrets: [TURNSTILE_SECRET, ...LINE_SECRETS] },
+  { secrets: [TURNSTILE_SECRET, ...NOTIFY_SECRETS] },
   withProtection(
     async (req, res) => {
       if (req.method !== 'POST') {
@@ -353,7 +358,7 @@ const SUBMISSIONS_COLLECTION = 'submissions';
  * 不要 Turnstile（學生量大），但加限流防一個學生灌爆
  */
 export const submitQuizAnswer = onRequest(
-  { secrets: [...LINE_SECRETS] },
+  { secrets: [...NOTIFY_SECRETS] },
   withProtection(
     async (req, res) => {
       if (req.method !== 'POST') {
@@ -506,7 +511,7 @@ export const weeklyDigest = onSchedule(
     schedule: '0 21 * * 0',
     timeZone: 'Asia/Taipei',
     region: 'asia-east1',
-    secrets: [...LINE_SECRETS],
+    secrets: [...NOTIFY_SECRETS],
   },
   async () => {
     const result = await runWeeklyDigest();
@@ -618,7 +623,7 @@ export const getAdminStats = onRequest(
  * 範例：curl 'https://...cloudfunctions.net/triggerWeeklyDigestNow?adminKey=U183cf...'
  */
 export const triggerWeeklyDigestNow = onRequest(
-  { secrets: [...LINE_SECRETS] },
+  { secrets: [...NOTIFY_SECRETS] },
   withCors(async (req, res) => {
     const provided = (req.query?.adminKey ?? '') as string;
     const expected = process.env.PIRLS_LINE_ADMIN_USER_ID?.trim() ?? '';

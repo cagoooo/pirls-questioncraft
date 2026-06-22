@@ -54,47 +54,158 @@ function isConfigured(token?: string, userId?: string): boolean {
  * 若 token / userId 未設或為 placeholder 自動 no-op。
  */
 export function notifyAdminCard(card: CardSpec): void {
+  // 1) LINE push (Best-effort, only send if configured)
   const token = process.env.PIRLS_LINE_CHANNEL_ACCESS_TOKEN?.trim();
   const userId = process.env.PIRLS_LINE_ADMIN_USER_ID?.trim();
-  if (!isConfigured(token, userId)) return;
+  if (isConfigured(token, userId)) {
+    const flex = buildFlexBubble(card);
+    const altText = `${CARD_THEMES[card.status].icon} ${card.title}`;
 
-  const flex = buildFlexBubble(card);
-  const altText = `${CARD_THEMES[card.status].icon} ${card.title}`;
+    fetch(LINE_PUSH_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        to: userId,
+        messages: [{ type: 'flex', altText, contents: flex }],
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          // 雷 #9 安全網：Flex 失敗自動 fallback 純文字
+          const errBody = await res.text().catch(() => '');
+          logger.warn('[notify-line] Flex failed, fallback to text', {
+            status: res.status,
+            body: errBody.slice(0, 300),
+          });
+          const text = cardToPlainText(card);
+          await fetch(LINE_PUSH_API, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              to: userId,
+              messages: [{ type: 'text', text }],
+            }),
+          }).catch((e) => logger.warn('[notify-line] text fallback also failed', { msg: e?.message }));
+        }
+      })
+      .catch((err) => logger.warn('[notify-line] push failed', { msg: err?.message }));
+  }
 
-  fetch(LINE_PUSH_API, {
+  // 2) Google Chat Webhook (Best-effort, only send if configured)
+  const googleChatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL?.trim();
+  if (
+    googleChatWebhookUrl &&
+    googleChatWebhookUrl !== 'DISABLED' &&
+    googleChatWebhookUrl !== 'PLACEHOLDER_NOT_CONFIGURED'
+  ) {
+    sendGoogleChatNotification(googleChatWebhookUrl, card);
+  }
+}
+
+/**
+ * 推送卡片至 Google Chat Webhook (cardsV2)
+ */
+function sendGoogleChatNotification(url: string, card: CardSpec): void {
+  const theme = CARD_THEMES[card.status];
+  const now = new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date());
+
+  const statusEmoji = theme.icon;
+  const titleText = `${statusEmoji} ${card.title}`;
+  
+  // push notification preview text (最外層 text 欄位，解決手機端「傳送了一個附件檔案給你」的痛點)
+  const summaryText = `${titleText} (${card.fields.map(f => `${f.label}: ${f.value}`).join(', ')})`;
+
+  // Build widgets
+  const widgets: any[] = card.fields.map(f => ({
+    decoratedText: {
+      topLabel: f.label,
+      text: `${f.icon ? f.icon + ' ' : ''}${f.value || '—'}`,
+      wrapText: true
+    }
+  }));
+
+  if (card.body) {
+    widgets.push({
+      textParagraph: {
+        text: card.body
+      }
+    });
+  }
+
+  if (card.actions?.length) {
+    widgets.push({
+      buttonList: {
+        buttons: card.actions.slice(0, 3).map(act => ({
+          text: act.label,
+          onClick: {
+            openLink: {
+              url: act.uri
+            }
+          }
+        }))
+      }
+    });
+  }
+
+  const imageUrl = card.status === 'success' || card.status === 'started'
+    ? 'https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/check_circle/default/24px.svg'
+    : card.status === 'failed'
+      ? 'https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/error/default/24px.svg'
+      : 'https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/warning/default/24px.svg';
+
+  const payload = {
+    text: summaryText,
+    cardsV2: [{
+      cardId: 'notify-' + Date.now(),
+      card: {
+        header: {
+          title: titleText,
+          subtitle: card.appName || 'PIRLS閱讀理解生成站 PRO',
+          imageUrl: imageUrl,
+          imageType: 'CIRCLE'
+        },
+        sections: [{
+          widgets: widgets
+        }],
+        footer: {
+          textParagraph: {
+            text: card.footerNote ? `${now} · ${card.footerNote}` : now
+          }
+        }
+      }
+    }]
+  };
+
+  fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      to: userId,
-      messages: [{ type: 'flex', altText, contents: flex }],
-    }),
+    body: JSON.stringify(payload),
   })
     .then(async (res) => {
       if (!res.ok) {
-        // 雷 #9 安全網：Flex 失敗自動 fallback 純文字
         const errBody = await res.text().catch(() => '');
-        logger.warn('[notify-line] Flex failed, fallback to text', {
+        logger.warn('[notify-gchat] Webhook failed', {
           status: res.status,
           body: errBody.slice(0, 300),
         });
-        const text = cardToPlainText(card);
-        await fetch(LINE_PUSH_API, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            to: userId,
-            messages: [{ type: 'text', text }],
-          }),
-        }).catch((e) => logger.warn('[notify-line] text fallback also failed', { msg: e?.message }));
       }
     })
-    .catch((err) => logger.warn('[notify-line] push failed', { msg: err?.message }));
+    .catch((err) => logger.warn('[notify-gchat] fetch failed', { msg: err?.message }));
 }
 
 function buildFlexBubble(card: CardSpec) {

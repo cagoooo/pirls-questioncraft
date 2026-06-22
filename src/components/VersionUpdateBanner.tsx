@@ -31,6 +31,19 @@ export function VersionUpdateBanner() {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
 
+    // 開發環境下 (localhost) 主動解除註冊所有現存的 Service Worker，避免 HMR 衝突
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+      });
+      return;
+    }
+
     let ignored = false;
 
     navigator.serviceWorker
