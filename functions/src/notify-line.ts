@@ -170,6 +170,15 @@ function sendGoogleChatNotification(url: string, card: CardSpec): void {
       ? 'https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/error/default/24px.svg'
       : 'https://fonts.gstatic.com/s/i/short-term/release/googlesymbols/warning/default/24px.svg';
 
+  // 加上時間戳與備註 (Google Chat cardsV2 不支援獨立的 card.footer，須以 widget 形式呈現)
+  widgets.push({
+    textParagraph: {
+      text: card.footerNote
+        ? `<font color="#94A3B8">${now} · ${card.footerNote}</font>`
+        : `<font color="#94A3B8">${now}</font>`
+    }
+  });
+
   const payload = {
     text: summaryText,
     cardsV2: [{
@@ -183,12 +192,7 @@ function sendGoogleChatNotification(url: string, card: CardSpec): void {
         },
         sections: [{
           widgets: widgets
-        }],
-        footer: {
-          textParagraph: {
-            text: card.footerNote ? `${now} · ${card.footerNote}` : now
-          }
-        }
+        }]
       }
     }]
   };
