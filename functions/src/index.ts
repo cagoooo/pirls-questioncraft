@@ -154,6 +154,19 @@ export const generateFromImages = onRequest(
         trackUsage('generate-images');
         // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
         const estKB = Math.round(photoDataUris.reduce((sum, d) => sum + d.length, 0) * 0.75 / 1024);
+
+        // 自動建立一個預覽 quiz 用於快速跳轉審查 (TTL 與預設一致為 60 分鐘)
+        const quizId = generateUniqueId();
+        const expiresAtMs = Date.now() + QUIZ_EXPIRY_MS;
+        await db.collection(COLLECTION).doc(quizId).set({
+          questionsOutput: result,
+          imageFilesDataURIs: photoDataUris,
+          inputText: '圖片出題',
+          createdAt: Timestamp.now(),
+          expiresAt: Timestamp.fromMillis(expiresAtMs),
+        });
+        const previewUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
+
         notifyAdminCard({
           status: 'success',
           title: '有人剛完成圖片出題',
@@ -169,6 +182,9 @@ export const generateFromImages = onRequest(
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
           body: `📖 文章摘要\n${summarizeText(result.articleContent, 100)}`,
+          actions: [
+            { label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }
+          ]
         });
         res.json({ success: true, data: result });
       } catch (e: any) {
@@ -211,6 +227,19 @@ export const generateFromText = onRequest(
         const result = await runGenerateFromText({ text, questionMode, languageMode });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text');
+
+        // 自動建立一個預覽 quiz 用於快速跳轉審查 (TTL 與預設一致為 60 分鐘)
+        const quizId = generateUniqueId();
+        const expiresAtMs = Date.now() + QUIZ_EXPIRY_MS;
+        await db.collection(COLLECTION).doc(quizId).set({
+          questionsOutput: result,
+          imageFilesDataURIs: [],
+          inputText: text,
+          createdAt: Timestamp.now(),
+          expiresAt: Timestamp.fromMillis(expiresAtMs),
+        });
+        const previewUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
+
         notifyAdminCard({
           status: 'success',
           title: '有人剛完成文字出題',
@@ -225,6 +254,9 @@ export const generateFromText = onRequest(
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
           body: `📖 文章摘要\n${summarizeText(text, 100)}`,
+          actions: [
+            { label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }
+          ]
         });
         res.json({ success: true, data: result });
       } catch (e: any) {
