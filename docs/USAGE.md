@@ -258,7 +258,7 @@ curl "https://generativelanguage.googleapis.com/v1beta/models?key=$KEY" | jq '.m
 3. **GitHub Pages 子路徑**：URL 永遠帶 `/pirls-questioncraft/` 前綴，除非掛自訂網域（見 `OPTIMIZATION.md §A.7`）。
 4. **`next.config.ts` 仍開 `ignoreBuildErrors`**：易把 bug 帶上線，建議逐步修掉（見 §B.2）。
 5. **單頁元件過大**：`page.tsx` 1067 行、`QuizView` 752 行、`FileUpload` 522 行。
-6. **Gemini quota 無速率限制**：學生大量併發可能爆 quota。
+6. **Gemini quota 已有限流保護**：`generateFromImages` / `generateFromText` 目前每 IP 每小時最多 5 次；若正式大量公開，仍建議搭配 GCP Budget Alert 與後台用量週報觀察。
 7. **無自動測試**。
 8. **OG 域名硬寫死** `pirlss.smes.tyc.edu.tw`（`layout.tsx`），自訂網域時需改。
 

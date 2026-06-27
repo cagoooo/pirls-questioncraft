@@ -50,6 +50,7 @@ const SITE_BASE_URL = 'https://cagoooo.github.io/pirls-questioncraft';
 const COLLECTION = 'sharedQuizzes';
 const QUIZ_EXPIRY_MS = 60 * 60 * 1000;
 const MAX_PAYLOAD_BYTES = 900 * 1024;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const PIRLS_LEVEL_LABEL: Record<string, string> = {
   'locate & retrieve': '訊息提取',
@@ -99,17 +100,23 @@ function withCors(handler: (req: Request, res: Response) => Promise<void> | void
 /** 加速率限制 + Turnstile 驗證的中介層，包在 AI 出題類 endpoint 上 */
 function withProtection(
   handler: (req: Request, res: Response) => Promise<void> | void,
-  opts: { perMinute?: number; needTurnstile?: boolean } = {}
+  opts: { perMinute?: number; limit?: number; windowMs?: number; windowLabel?: string; needTurnstile?: boolean } = {}
 ) {
-  const { perMinute = 5, needTurnstile = true } = opts;
+  const {
+    perMinute,
+    limit = perMinute ?? 5,
+    windowMs = 60_000,
+    windowLabel = windowMs === ONE_HOUR_MS ? '小時' : '分鐘',
+    needTurnstile = true,
+  } = opts;
   return withCors(async (req, res) => {
     const ip = getClientIp(req);
-    const limit = await checkRateLimit(ip, { perMinute });
-    if (!limit.allowed) {
+    const rateLimit = await checkRateLimit(ip, { limit, windowMs });
+    if (!rateLimit.allowed) {
       res.status(429).json({
         success: false,
-        error: `請求過於頻繁，請稍候再試（${perMinute} 次/分鐘上限）。`,
-        resetAt: limit.resetAt,
+        error: `為了保護共用的 Gemini API 額度，題組生成目前限制每個使用者每${windowLabel}最多 ${limit} 次。請稍候再試，並把生成次數留給實際備課或教學使用。`,
+        resetAt: rateLimit.resetAt,
       });
       return;
     }
@@ -204,7 +211,7 @@ export const generateFromImages = onRequest(
         throw e;
       }
     },
-    { perMinute: 5 }
+    { limit: 5, windowMs: ONE_HOUR_MS }
   )
 );
 
@@ -276,7 +283,7 @@ export const generateFromText = onRequest(
         throw e;
       }
     },
-    { perMinute: 5 }
+    { limit: 5, windowMs: ONE_HOUR_MS }
   )
 );
 

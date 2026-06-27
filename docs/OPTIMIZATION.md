@@ -28,7 +28,7 @@
 | Firebase 專案 | `pirls-questioncraft` (asia-east1) | ✅ Blaze |
 | Cloud Functions | **9 個 endpoint**（Node 22） | ✅ |
 | Firestore | `sharedQuizzes` + `submissions` + `rateLimits` + **`usageStats`** | ✅ TTL 全開 |
-| Cloudflare Turnstile | 三層護欄（Turnstile + 5 RPM/IP + maxInstances=10） | ✅ |
+| Cloudflare Turnstile | 三層護欄（Turnstile + 出題 5 次/小時/IP + maxInstances=10） | ✅ |
 | LINE 通知 | 即時 Flex 卡 + **每週日 21:00 自動週報** | ✅ |
 | Service Worker | `/sw.js` 分策略快取 + `version.json` polling + 更新 banner | ✅ |
 | **🆕 Budget Alert** | $50/月警戒（50%/90%/100% email） | ✅ |
@@ -55,7 +55,7 @@
 | Gemini Key Rotate + Restriction | ✅ | UID `98604e6e`，限制 Generative Language API |
 | Cloudflare Turnstile | ✅ | site key 在 GitHub Actions yml、secret 在 Firebase Secret Manager |
 | Firestore Rules | ✅ 全鎖死 | client 進不來、全部走 admin SDK |
-| 三層護欄 | ✅ | Turnstile + 5 RPM/IP + maxInstances=10 |
+| 三層護欄 | ✅ | Turnstile + 出題 5 次/小時/IP + maxInstances=10 |
 | Admin endpoint 加速率限制 | ✅ | 即使密碼簡短也擋暴力破解（5/min/IP） |
 | Cloud Functions Secret 管理 | ✅ | 全 Secret Manager（GEMINI_API_KEY / TURNSTILE / LINE / ADMIN）|
 | Service Worker 更新流程 | ✅ skipWaiting + clients.claim + version.json polling | |

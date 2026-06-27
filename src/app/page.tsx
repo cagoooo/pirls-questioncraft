@@ -658,6 +658,16 @@ export default function PIRLSQuestionCraftPage() {
           </div>
         )}
 
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <Alert className="mt-5 border-[1.5px] border-ink bg-lemon/60 rounded-[18px] shadow-neo-sm">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>請珍惜 AI 出題額度</AlertTitle>
+            <AlertDescription className="leading-6">
+              題組生成會消耗共用的 Gemini API 額度。每位使用者每小時最多可生成 5 次，請確認素材與題數後再產生，避免只是測試或連續重複生成。
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* ===== CTA：大型珊瑚紅生成按鈕 ===== */}
         {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
           <button

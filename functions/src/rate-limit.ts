@@ -1,18 +1,23 @@
 // functions/src/rate-limit.ts
-// 用 Firestore counter 做 IP 滑動視窗限流。
+// 用 Firestore counter 做 IP 固定時間窗限流。
 // 兩個關鍵設計：
 //  1. 寫入用 transaction + serverTimestamp，避免並發 race
-//  2. 計數欄存到 rateLimits/{ip}_{minute}，doc TTL 自動清，不留垃圾
+//  2. 計數欄存到 rateLimits/{ip}_{bucket}，doc TTL 自動清，不留垃圾
 //  3. 失敗時 fail-open（限流系統壞了寧可放行，不要擋住正常使用者）
 
 import { getFirestore, Timestamp, type Transaction } from 'firebase-admin/firestore';
 
 const COLLECTION = 'rateLimits';
 const TTL_MINUTES = 5;
+const ONE_MINUTE_MS = 60_000;
 
 export interface RateLimitOptions {
   /** 每分鐘最多幾次。預設 10 */
   perMinute?: number;
+  /** 指定時間窗內最多幾次。若設定，優先於 perMinute */
+  limit?: number;
+  /** 時間窗長度（毫秒）。若設定 limit，預設仍為 1 分鐘 */
+  windowMs?: number;
   /** 過期 TTL，分鐘數，避免 doc 累積。預設 5 分鐘 */
   ttlMinutes?: number;
 }
@@ -32,12 +37,13 @@ export async function checkRateLimit(
   ip: string,
   opts: RateLimitOptions = {}
 ): Promise<RateLimitResult> {
-  const perMinute = opts.perMinute ?? 10;
-  const ttlMinutes = opts.ttlMinutes ?? TTL_MINUTES;
+  const windowMs = opts.windowMs ?? ONE_MINUTE_MS;
+  const limit = opts.limit ?? opts.perMinute ?? 10;
+  const ttlMinutes = opts.ttlMinutes ?? Math.max(TTL_MINUTES, Math.ceil(windowMs / ONE_MINUTE_MS) + 1);
 
-  // 用「分鐘」當 bucket key（同一分鐘內的請求共用 counter）
-  const bucket = Math.floor(Date.now() / 60_000);
-  const docId = `${sanitizeIp(ip)}_${bucket}`;
+  // 用固定時間窗當 bucket key（同一時間窗內的請求共用 counter）
+  const bucket = Math.floor(Date.now() / windowMs);
+  const docId = `${sanitizeIp(ip)}_${windowMs}_${bucket}`;
   const db = getFirestore();
   const ref = db.collection(COLLECTION).doc(docId);
 
@@ -46,33 +52,33 @@ export async function checkRateLimit(
       const snap = await tx.get(ref);
       const current = (snap.exists && (snap.data() as any)?.count) || 0;
 
-      if (current >= perMinute) {
+      if (current >= limit) {
         return {
           allowed: false,
           remaining: 0,
-          resetAt: (bucket + 1) * 60_000,
-          reason: `Rate limit exceeded: ${perMinute} requests/min`,
+          resetAt: (bucket + 1) * windowMs,
+          reason: `Rate limit exceeded: ${limit} requests/${windowMs}ms`,
         };
       }
 
       const expiresAt = Timestamp.fromMillis(Date.now() + ttlMinutes * 60_000);
       tx.set(
         ref,
-        { count: current + 1, expiresAt, ip: ip.slice(0, 64), bucket },
+        { count: current + 1, expiresAt, ip: ip.slice(0, 64), bucket, windowMs },
         { merge: true }
       );
 
       return {
         allowed: true,
-        remaining: perMinute - current - 1,
-        resetAt: (bucket + 1) * 60_000,
+        remaining: limit - current - 1,
+        resetAt: (bucket + 1) * windowMs,
       };
     });
     return result;
   } catch (e) {
     // Fail-open: 限流系統壞掉寧可放行
     console.error('rate-limit check failed, fail-open:', e);
-    return { allowed: true, remaining: perMinute, resetAt: Date.now() + 60_000 };
+    return { allowed: true, remaining: limit, resetAt: Date.now() + windowMs };
   }
 }
 
