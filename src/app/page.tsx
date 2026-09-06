@@ -498,10 +498,10 @@ export default function PIRLSQuestionCraftPage() {
           <div className="flex gap-2 shrink-0 flex-wrap">
             <HelpDialog />
             <a
-              href="https://cagoooo.github.io/Akai/wish/"
+              href="https://cagoooo.github.io/Akai/?wish=1"
               target="_blank"
               rel="noopener noreferrer"
-              title="老師您好！點此給予使用回饋並為這個工具評分（⭐ 1-5 顆星）"
+              title="開啟許願池後，請選「使用回饋」並為這個工具評分（⭐ 1-5 顆星）"
               aria-label="使用回饋與星星評分"
             >
               <PillBtn color="bg-peach" sm className="!gap-1.5 !px-3.5">
