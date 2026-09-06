@@ -54,7 +54,7 @@ const STEPS: Step[] = [
   {
     emoji: '💾',
     title: '匯出 / 分享',
-    desc: '一鍵匯出 PDF、Loilonote、PaGamO（兩種格式）；或產生「線上測驗連結」給學生作答，老師端能即時看到全班成績。',
+    desc: '可匯出教師 PDF、LoiLoNote、PaGamO（兩種格式）。「更多平台／閱讀素材」提供 Wayground、Kahoot、Wordwall 貼題準備表，以及不含解答的學生閱讀素材。亦可分享線上測驗連結。',
     color: 'bg-rose',
   },
 ];

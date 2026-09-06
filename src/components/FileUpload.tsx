@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ChangeEvent, ClipboardEvent, DragEvent } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -114,7 +114,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
     }
   }, [processNewFiles]);
 
-  const handlePaste = useCallback(async (event: ClipboardEvent<Document>) => {
+  const handlePaste = useCallback(async (event: globalThis.ClipboardEvent) => {
     if (isLoading) return;
 
     const items = event.clipboardData?.items;
@@ -157,7 +157,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
   }, [isLoading, selectedFiles.length, processNewFiles, toast]);
 
   useEffect(() => {
-    const pasteHandler = (event: Event) => handlePaste(event as ClipboardEvent<Document>);
+    const pasteHandler = (event: Event) => handlePaste(event as globalThis.ClipboardEvent);
     document.addEventListener('paste', pasteHandler);
     return () => {
       document.removeEventListener('paste', pasteHandler);

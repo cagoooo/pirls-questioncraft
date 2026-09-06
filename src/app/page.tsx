@@ -19,6 +19,8 @@ import {
 } from '@/lib/api';
 import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
+import { PlatformExportDialog } from '@/components/PlatformExportDialog';
+import type { ReadingSource } from '@/lib/generateReadingPdf';
 import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
@@ -121,6 +123,7 @@ export default function PIRLSQuestionCraftPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [readingSource, setReadingSource] = useState<ReadingSource>({ text: '', images: [] });
 
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
@@ -282,6 +285,7 @@ export default function PIRLSQuestionCraftPage() {
       if (result && result.questions && result.questions.length > 0) {
         updateDisplayProgress(100, '題目已成功生成！');
         setGeneratedQuestionsOutput(result);
+        setReadingSource({ text: inputMode === 'text' ? inputText : result.articleContent, images: inputMode === 'image' ? [...imageFiles] : [] });
         toast({
           title: '成功！',
           description: 'PIRLS 題目已生成。',
@@ -807,7 +811,7 @@ export default function PIRLSQuestionCraftPage() {
                       ▶ 開始線上測驗
                     </PillBtn>
                     <PillBtn onClick={handleDownloadPdf} color="bg-peach" sm disabled={isAnyDownloading}>
-                      {isGeneratingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📄'} PDF
+                      {isGeneratingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📄'} 教師 PDF（含解答）
                     </PillBtn>
                     <PillBtn onClick={handleDownloadExcel} color="bg-sky" sm disabled={isAnyDownloading}>
                       {isGeneratingExcel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📊'} Loilonote
@@ -818,6 +822,7 @@ export default function PIRLSQuestionCraftPage() {
                     <PillBtn onClick={handleDownloadPaGamOQuizGroup} color="bg-rose" sm disabled={isAnyDownloading}>
                       {isGeneratingPaGamOQuizGroup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '📚'} PaGamO 題組
                     </PillBtn>
+                    <PlatformExportDialog data={generatedQuestionsOutput} readingSource={readingSource} disabled={isAnyDownloading} />
                     <div className="ml-auto">
                       <ShareDialog
                         open={isShareDialogOpen}

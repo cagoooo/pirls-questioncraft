@@ -13,7 +13,8 @@
     "deploy:functions": "firebase deploy --only functions",
     "deploy:firestore": "firebase deploy --only firestore",
     "generate:assets": "node tools/generate-assets.mjs",
-    "generate:version": "node tools/generate-version.mjs"
+    "generate:version": "node tools/generate-version.mjs",
+    "test": "node tools/test-platform-exports.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

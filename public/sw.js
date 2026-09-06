@@ -51,7 +51,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // version.json 強制走 network，**絕對不能 cache**
-  if (url.pathname.endsWith('/version.json')) return;
+  if (url.pathname.endsWith('/version.json') || url.pathname.includes('/export-templates/')) return;
 
   // HTML / navigate → network-first
   if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {

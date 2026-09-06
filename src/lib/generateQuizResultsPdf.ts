@@ -39,7 +39,7 @@ const pirlsLevelRgbColors: Record<PirlsQuestionOriginal['pirlsLevel'], [number, 
   'evaluate & critique': [168, 85, 247],  // purple-500
 };
 
-const themeColors = {
+const themeColors: Record<string, [number, number, number]> = {
   primary: [37, 99, 235],
   textDefault: [0, 0, 0],
   textMuted: [100, 100, 100],

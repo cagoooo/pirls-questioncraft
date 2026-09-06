@@ -191,4 +191,5 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+// Compatibility name used by the PDF/export callback types.
+export { useToast, toast, toast as Toast }

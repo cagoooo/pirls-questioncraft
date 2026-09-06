@@ -17,7 +17,7 @@ interface PdfExportOptions {
   inputText?: string;
 }
 
-const convertFileToDataUri = (file: File): Promise<string> => {
+export const convertFileToDataUri = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
@@ -40,7 +40,7 @@ const pirlsLevelRgbColors: Record<PirlsQuestion['pirlsLevel'], [number, number, 
   'evaluate & critique': [107, 33, 168], // Purple-700
 };
 
-const themeColors = {
+const themeColors: Record<string, [number, number, number]> = {
   primary: [37, 99, 235], // Updated to reflect new primary HSL(217 90% 60%)
   accent: [163, 135, 217],
   textDefault: [0, 0, 0],
@@ -49,7 +49,7 @@ const themeColors = {
 };
 
 
-async function loadAndRegisterFont(
+export async function loadAndRegisterFont(
   doc: jsPDF, 
   fontFileName: string, 
   fontFamilyNameInPdf: string, 
