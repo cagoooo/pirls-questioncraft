@@ -1,5 +1,7 @@
 # Firebase Studio
 
+🌐 **線上使用：[PIRLS 閱讀理解生成站 PRO](https://cagoooo.github.io/pirls-questioncraft/)**
+
 This is a NextJS starter in Firebase Studio.
 
 To get started, take a look at src/app/page.tsx.
@@ -15,7 +17,7 @@ PIRLS 閱讀素養題組生成站｜AI 輔助 PIRLS 四層次選擇題自動出�
 - Repository：`cagoooo/pirls-questioncraft`
 - 可見性：公開
 - 主要技術：TypeScript、React、Next.js、Tailwind CSS、Firebase
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/pirls-questioncraft/>
 
 ### 可以怎麼應用
 
