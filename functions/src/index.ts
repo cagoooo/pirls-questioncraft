@@ -76,6 +76,33 @@ function summarizeText(text: string, maxLen = 80): string {
   return cleaned.length > maxLen ? cleaned.slice(0, maxLen) + '...' : cleaned;
 }
 
+// Firestore 單筆文件上限 1 MiB，預留空間給題目與欄位名稱
+const PREVIEW_IMAGE_BUDGET_BYTES = 700 * 1024;
+
+/** 建立管理員預覽用 quiz；圖片太大就改存文章文字。失敗只記 log，不影響出題結果。 */
+async function savePreviewQuiz(
+  questionsOutput: { articleContent?: string },
+  photoDataUris: string[],
+  inputText: string
+): Promise<string | null> {
+  const imagesBytes = photoDataUris.reduce((sum, d) => sum + d.length, 0);
+  const keepImages = imagesBytes <= PREVIEW_IMAGE_BUDGET_BYTES;
+  const quizId = generateUniqueId();
+  try {
+    await db.collection(COLLECTION).doc(quizId).set({
+      questionsOutput,
+      imageFilesDataURIs: keepImages ? photoDataUris : [],
+      inputText: keepImages ? inputText : (questionsOutput.articleContent ?? ''),
+      createdAt: Timestamp.now(),
+      expiresAt: Timestamp.fromMillis(Date.now() + QUIZ_EXPIRY_MS),
+    });
+    return quizId;
+  } catch (e) {
+    console.error('savePreviewQuiz failed:', e);
+    return null;
+  }
+}
+
 function generateUniqueId(): string {
   return Math.random().toString(36).substring(2, 12) + Date.now().toString(36).substring(4);
 }
@@ -162,17 +189,8 @@ export const generateFromImages = onRequest(
         // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
         const estKB = Math.round(photoDataUris.reduce((sum, d) => sum + d.length, 0) * 0.75 / 1024);
 
-        // 自動建立一個預覽 quiz 用於快速跳轉審查 (TTL 與預設一致為 60 分鐘)
-        const quizId = generateUniqueId();
-        const expiresAtMs = Date.now() + QUIZ_EXPIRY_MS;
-        await db.collection(COLLECTION).doc(quizId).set({
-          questionsOutput: result,
-          imageFilesDataURIs: photoDataUris,
-          inputText: '圖片出題',
-          createdAt: Timestamp.now(),
-          expiresAt: Timestamp.fromMillis(expiresAtMs),
-        });
-        const previewUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
+        const quizId = await savePreviewQuiz(result, photoDataUris, '圖片出題');
+        const previewUrl = quizId ? `${SITE_BASE_URL}/quiz/?id=${quizId}` : null;
 
         notifyAdminCard({
           status: 'success',
@@ -189,9 +207,9 @@ export const generateFromImages = onRequest(
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
           body: `📖 文章摘要\n${summarizeText(result.articleContent, 100)}`,
-          actions: [
-            { label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }
-          ]
+          actions: previewUrl
+            ? [{ label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }]
+            : undefined,
         });
         res.json({ success: true, data: result });
       } catch (e: any) {
@@ -235,17 +253,8 @@ export const generateFromText = onRequest(
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text');
 
-        // 自動建立一個預覽 quiz 用於快速跳轉審查 (TTL 與預設一致為 60 分鐘)
-        const quizId = generateUniqueId();
-        const expiresAtMs = Date.now() + QUIZ_EXPIRY_MS;
-        await db.collection(COLLECTION).doc(quizId).set({
-          questionsOutput: result,
-          imageFilesDataURIs: [],
-          inputText: text,
-          createdAt: Timestamp.now(),
-          expiresAt: Timestamp.fromMillis(expiresAtMs),
-        });
-        const previewUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
+        const quizId = await savePreviewQuiz(result, [], text);
+        const previewUrl = quizId ? `${SITE_BASE_URL}/quiz/?id=${quizId}` : null;
 
         notifyAdminCard({
           status: 'success',
@@ -261,9 +270,9 @@ export const generateFromText = onRequest(
             { icon: '⏱️', label: '耗時', value: `${elapsed}s` },
           ],
           body: `📖 文章摘要\n${summarizeText(text, 100)}`,
-          actions: [
-            { label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }
-          ]
+          actions: previewUrl
+            ? [{ label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }]
+            : undefined,
         });
         res.json({ success: true, data: result });
       } catch (e: any) {

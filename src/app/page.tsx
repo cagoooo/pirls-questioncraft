@@ -76,7 +76,22 @@ function simulateProgress(
   return () => clearInterval(id);
 }
 
-const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
+// 分享內容需低於後端 900 KiB 上限，預留題目 JSON 的空間
+const SHARE_IMAGE_BUDGET_CHARS = 760 * 1024;
+const SHARE_COMPRESS_STEPS: Array<[number, number]> = [
+  [1600, 0.85], [1280, 0.8], [1024, 0.75], [860, 0.7], [720, 0.65], [600, 0.6],
+];
+
+/** 逐步降解析度直到所有圖片總量放得進分享上限；仍放不下回傳 null */
+const compressImagesForShare = async (files: File[]): Promise<string[] | null> => {
+  for (const [maxSize, quality] of SHARE_COMPRESS_STEPS) {
+    const uris = await Promise.all(files.map((file) => resizeImage(file, maxSize, quality)));
+    if (uris.reduce((sum, u) => sum + u.length, 0) <= SHARE_IMAGE_BUDGET_CHARS) return uris;
+  }
+  return null;
+};
+
+const resizeImage = (file: File, maxSize: number = 1600, quality: number = 0.85): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -97,7 +112,7 @@ const resizeImage = (file: File, maxSize: number = 1600): Promise<string> => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject(new Error('Failed to get canvas 2D context.'));
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = (err) => reject(err);
       img.src = e.target.result as string;
@@ -439,11 +454,21 @@ export default function PIRLSQuestionCraftPage() {
     setCurrentShareLink('');
     setIsShareDialogOpen(true);
     try {
-      const imageFilesDataURIs = inputMode === 'image' ? await Promise.all(imageFiles.map(file => resizeImage(file))) : [];
+      let imageFilesDataURIs: string[] = [];
+      let sharedText = inputMode === 'text' ? inputText : '';
+      if (inputMode === 'image') {
+        const fitted = await compressImagesForShare(imageFiles);
+        if (fitted) {
+          imageFilesDataURIs = fitted;
+        } else {
+          sharedText = generatedQuestionsOutput.articleContent;
+          toast({ title: '圖片太大，改用文字分享', description: '原圖總量超過分享上限，學生端將顯示 AI 辨識出的文章文字。' });
+        }
+      }
       const { quizId } = await createSharedQuiz({
         questionsOutput: generatedQuestionsOutput,
         imageFilesDataURIs,
-        inputText: inputMode === 'text' ? inputText : '',
+        inputText: sharedText,
       });
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
       const newShareLink = `${window.location.origin}${basePath}/quiz/?id=${quizId}`;
