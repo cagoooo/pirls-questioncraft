@@ -56,10 +56,14 @@ async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
   return (json.data ?? (json as any)) as T;
 }
 
-async function getJSON<T>(endpoint: string, params: Record<string, string>): Promise<T> {
+async function getJSON<T>(
+  endpoint: string,
+  params: Record<string, string>,
+  headers?: Record<string, string>
+): Promise<T> {
   const url = new URL(`${API_BASE}/${endpoint}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), headers ? { headers } : undefined);
   const json: ApiRes<T> = await res.json().catch(() => ({
     success: false,
     error: `伺服器回應非 JSON（${res.status}）`,
@@ -106,10 +110,43 @@ export interface CreateSharedQuizArgs {
   turnstileToken?: string;
 }
 
-export async function createSharedQuiz(args: CreateSharedQuizArgs): Promise<{ quizId: string }> {
-  const r = await postJSON<{ quizId: string }>('createSharedQuiz', args);
-  // postJSON 已經把外層拆掉，這裡 r 就是 { quizId }
+/** teacherKey：v0.3.0 老師專用金鑰，只有出題老師拿得到，用來開全班成績儀表板 */
+export async function createSharedQuiz(args: CreateSharedQuizArgs): Promise<{ quizId: string; teacherKey?: string }> {
+  const r = await postJSON<{ quizId: string; teacherKey?: string }>('createSharedQuiz', args);
+  // postJSON 已經把外層拆掉，這裡 r 就是 { quizId, teacherKey }
   return r as any;
+}
+
+// ---- v0.3.0: 老師專用儀表板連結 ----
+// 金鑰放在網址 # 後面（不會送到任何伺服器、也不會出現在存取紀錄），
+// 並記在出題老師這台裝置的 localStorage，沒帶金鑰的網址在同一台電腦也能開。
+
+const TEACHER_KEY_STORAGE_PREFIX = 'pirls-teacher-key:';
+
+export function rememberTeacherKey(quizId: string, teacherKey: string): void {
+  try {
+    localStorage.setItem(TEACHER_KEY_STORAGE_PREFIX + quizId, teacherKey);
+  } catch {
+    /* 無痕模式或封鎖儲存時略過，仍可用完整連結 */
+  }
+}
+
+export function recallTeacherKey(quizId: string): string | null {
+  try {
+    return localStorage.getItem(TEACHER_KEY_STORAGE_PREFIX + quizId);
+  } catch {
+    return null;
+  }
+}
+
+export function buildDashboardUrl(origin: string, basePath: string, quizId: string, teacherKey: string): string {
+  return `${origin}${basePath}/dashboard/?id=${encodeURIComponent(quizId)}#k=${encodeURIComponent(teacherKey)}`;
+}
+
+export function readTeacherKeyFromHash(hash: string): string | null {
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
+  const k = params.get('k');
+  return k && k.trim() ? k.trim() : null;
 }
 
 export interface SharedQuizData {
@@ -155,8 +192,8 @@ export interface DashboardData {
   submissions: SubmissionRecord[];
 }
 
-export async function getSubmissions(quizId: string): Promise<DashboardData> {
-  const r = await getJSON<DashboardData>('getSubmissions', { quizId });
+export async function getSubmissions(quizId: string, teacherKey: string): Promise<DashboardData> {
+  const r = await getJSON<DashboardData>('getSubmissions', { quizId }, { Authorization: `Bearer ${teacherKey}` });
   return r as any;
 }
 

@@ -19,7 +19,14 @@ import {
   ChevronDown, ChevronRight, Info,
 } from 'lucide-react';
 import { PirlsLogo } from '@/components/PirlsLogo';
-import { getSubmissions, type DashboardData, type SubmissionRecord } from '@/lib/api';
+import {
+  getSubmissions,
+  readTeacherKeyFromHash,
+  recallTeacherKey,
+  rememberTeacherKey,
+  type DashboardData,
+  type SubmissionRecord,
+} from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { PIRLS_LEVEL_LABEL, PIRLS_LEVEL_COLOR } from './constants';
 
@@ -161,6 +168,8 @@ function DashboardInner() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [studentUrl, setStudentUrl] = useState('');
+  // v0.3.0：老師專用金鑰（網址 #k= 或本機記住的），undefined = 還沒讀
+  const [teacherKey, setTeacherKey] = useState<string | null | undefined>(undefined);
 
   const [sortKey, setSortKey] = useState<SortKey>('submittedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -183,6 +192,18 @@ function DashboardInner() {
     setStudentUrl(`${window.location.origin}${basePath}/quiz/?id=${quizId}`);
   }, [quizId]);
 
+  // 讀老師金鑰：優先網址 #k=，其次出題時這台裝置記住的
+  useEffect(() => {
+    if (!quizId) { setTeacherKey(null); return; }
+    const fromHash = readTeacherKeyFromHash(window.location.hash);
+    if (fromHash) {
+      rememberTeacherKey(quizId, fromHash);
+      setTeacherKey(fromHash);
+      return;
+    }
+    setTeacherKey(recallTeacherKey(quizId));
+  }, [quizId]);
+
   // 「上次更新 X 秒前」每 10 秒重新計算
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 10_000);
@@ -190,7 +211,7 @@ function DashboardInner() {
   }, []);
 
   const fetchData = useCallback(async (mode: 'full' | 'background') => {
-    if (!quizId) return;
+    if (!quizId || !teacherKey) return;
     if (mode === 'full') {
       setIsLoading(true);
       setError(null);
@@ -198,7 +219,7 @@ function DashboardInner() {
       setIsRefreshing(true);
     }
     try {
-      const d = await getSubmissions(quizId);
+      const d = await getSubmissions(quizId, teacherKey);
       setData(d);
       setLastUpdated(Date.now());
       if (mode === 'background') setError(null);
@@ -209,7 +230,7 @@ function DashboardInner() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [quizId]);
+  }, [quizId, teacherKey]);
 
   useEffect(() => {
     if (!quizId) {
@@ -217,8 +238,14 @@ function DashboardInner() {
       setIsLoading(false);
       return;
     }
+    if (teacherKey === undefined) return;
+    if (!teacherKey) {
+      setError('全班成績只有出題老師能看。請使用出題時「分享測驗」視窗裡的「開啟儀表板」或「複製老師專用連結」；學生作答連結無法查看全班成績。');
+      setIsLoading(false);
+      return;
+    }
     fetchData('full');
-  }, [quizId, reloadSignal, fetchData]);
+  }, [quizId, teacherKey, reloadSignal, fetchData]);
 
   // 自動刷新（30 秒一次，分頁隱藏時暫停）
   useEffect(() => {

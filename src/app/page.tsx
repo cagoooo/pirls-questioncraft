@@ -16,6 +16,8 @@ import {
   generatePirlsQuestions,
   generatePirlsQuestionsFromText,
   createSharedQuiz,
+  rememberTeacherKey,
+  buildDashboardUrl,
 } from '@/lib/api';
 import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
@@ -147,6 +149,7 @@ export default function PIRLSQuestionCraftPage() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isSharingQuiz, setIsSharingQuiz] = useState(false);
   const [currentShareLink, setCurrentShareLink] = useState('');
+  const [currentDashboardLink, setCurrentDashboardLink] = useState('');
 
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
@@ -452,6 +455,7 @@ export default function PIRLSQuestionCraftPage() {
     }
     setIsSharingQuiz(true);
     setCurrentShareLink('');
+    setCurrentDashboardLink('');
     setIsShareDialogOpen(true);
     try {
       let imageFilesDataURIs: string[] = [];
@@ -465,7 +469,7 @@ export default function PIRLSQuestionCraftPage() {
           toast({ title: '圖片太大，改用文字分享', description: '原圖總量超過分享上限，學生端將顯示 AI 辨識出的文章文字。' });
         }
       }
-      const { quizId } = await createSharedQuiz({
+      const { quizId, teacherKey } = await createSharedQuiz({
         questionsOutput: generatedQuestionsOutput,
         imageFilesDataURIs,
         inputText: sharedText,
@@ -473,9 +477,14 @@ export default function PIRLSQuestionCraftPage() {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
       const newShareLink = `${window.location.origin}${basePath}/quiz/?id=${quizId}`;
       setCurrentShareLink(newShareLink);
+      if (teacherKey) {
+        rememberTeacherKey(quizId, teacherKey);
+        setCurrentDashboardLink(buildDashboardUrl(window.location.origin, basePath, quizId, teacherKey));
+      }
       toast({ title: "臨時分享連結已生成", description: "連結已顯示在分享視窗中。", className: 'bg-sage border-sage-deep text-ink' });
     } catch (shareError: any) {
       setCurrentShareLink('');
+      setCurrentDashboardLink('');
       toast({ title: "分享失敗", description: `無法生成臨時分享連結: ${shareError.message || '未知錯誤'}`, variant: "destructive" });
     } finally {
       setIsSharingQuiz(false);
@@ -857,6 +866,7 @@ export default function PIRLSQuestionCraftPage() {
                         triggerDisabled={isSharingQuiz || isAnyDownloading}
                         isSharingQuiz={isSharingQuiz}
                         currentShareLink={currentShareLink}
+                        currentDashboardLink={currentDashboardLink}
                       />
                     </div>
                   </div>

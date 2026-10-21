@@ -2,7 +2,7 @@
 
 🌐 **線上使用：[PIRLS 閱讀理解生成站 PRO](https://cagoooo.github.io/pirls-questioncraft/)**
 
-> 📌 **目前版本：v0.2.0**（依據 `package.json`）
+> 📌 **目前版本：v0.3.0**（依據 `package.json`）
 
 This is a NextJS starter in Firebase Studio.
 
@@ -68,6 +68,7 @@ npm run lint
 ### 安全與資料注意事項
 
 - 不要提交 `.env`、服務帳號、API 金鑰、token、學生個資或正式環境匯出資料。
+- 學生隱私（v0.3.0 起）：交卷通知只帶測驗代號、班級、座號與答對統計，不含學生姓名；全班成績儀表板需出題老師的「老師專用連結」（網址 `#k=` 後的金鑰，資料庫只存雜湊），學生把作答連結改成 `/dashboard/` 也看不到全班成績。
 - 使用 Firebase、Supabase、Google API 或其他雲端服務時，請建立自己的測試專案並套用最小權限。
 - 若要公開衍生作品，請先確認程式碼、圖片、音訊、字型與教材內容的授權。
 

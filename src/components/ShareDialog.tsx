@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Share2, Copy, AlertTriangle, BarChart3, ExternalLink } from 'lucide-react';
 
@@ -22,6 +23,8 @@ export interface ShareDialogProps {
   isSharingQuiz: boolean;
   /** 已生成的分享連結（包含 ?id=xxx） */
   currentShareLink: string;
+  /** v0.3.0：老師專用儀表板連結（含老師金鑰，只給出題老師，不可給學生） */
+  currentDashboardLink: string;
 }
 
 export function ShareDialog({
@@ -32,21 +35,18 @@ export function ShareDialog({
   triggerDisabled,
   isSharingQuiz,
   currentShareLink,
+  currentDashboardLink,
 }: ShareDialogProps) {
-  // 從分享連結拆出 quizId 組老師端儀表板 URL
-  let dashboardUrl: string | null = null;
-  try {
-    if (currentShareLink) {
-      const u = new URL(currentShareLink);
-      const id = u.searchParams.get('id');
-      if (id) {
-        const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-        dashboardUrl = `${u.origin}${basePath}/dashboard/?id=${id}`;
-      }
-    }
-  } catch {
-    /* ignore parse error */
-  }
+  // v0.3.0：儀表板連結由後端回傳的老師金鑰組成，不再從學生連結推出來
+  const dashboardUrl: string | null = currentDashboardLink || null;
+  const [dashboardCopied, setDashboardCopied] = useState(false);
+  const copyDashboardUrl = () => {
+    if (!dashboardUrl) return;
+    navigator.clipboard.writeText(dashboardUrl).then(() => {
+      setDashboardCopied(true);
+      setTimeout(() => setDashboardCopied(false), 2000);
+    }).catch(() => undefined);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,18 +101,31 @@ export function ShareDialog({
                     <BarChart3 className="h-4 w-4" /> 老師端儀表板
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    學生作答後，可在此頁查看班級成績分布、各題答對率、PIRLS 四層次平均
+                    學生作答後，可在此頁查看班級成績分布、各題答對率、PIRLS 四層次平均。
+                    這是<strong>老師專用連結</strong>，請勿傳給學生；建議先複製保存（同一台電腦會自動記住）。
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => window.open(dashboardUrl!, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    開啟儀表板
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:flex-1 min-h-[44px]"
+                      onClick={() => window.open(dashboardUrl!, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      開啟儀表板
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:flex-1 min-h-[44px]"
+                      onClick={copyDashboardUrl}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {dashboardCopied ? '已複製老師連結' : '複製老師專用連結'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

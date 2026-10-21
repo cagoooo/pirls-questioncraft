@@ -33,6 +33,10 @@ jobs:
         working-directory: functions
         run: npm run build
 
+      - name: Privacy guard tests
+        working-directory: functions
+        run: node --test test/privacy.test.cjs
+
       - name: Auth to GCP
         id: auth
         uses: google-github-actions/auth@v2

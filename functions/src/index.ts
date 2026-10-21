@@ -22,6 +22,14 @@ import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
 import { trackUsage, getRecentUsage } from './usage-tracker';
 import { runWeeklyDigest } from './weekly-digest';
+import {
+  buildSubmissionNotifyFields,
+  extractTeacherKey,
+  generateTeacherKey,
+  hashTeacherKey,
+  isTeacherKeyValid,
+  stripTeacherSecrets,
+} from './privacy';
 
 initializeApp();
 const db = getFirestore();
@@ -323,12 +331,15 @@ export const createSharedQuiz = onRequest(
         return;
       }
       const quizId = generateUniqueId();
+      // v0.3.0：老師專用金鑰只回給出題老師，資料庫只存雜湊
+      const teacherKey = generateTeacherKey();
       const now = Date.now();
       const expiresAtMs = now + QUIZ_EXPIRY_MS;
       await db.collection(COLLECTION).doc(quizId).set({
         questionsOutput,
         imageFilesDataURIs: imageFilesDataURIs ?? [],
         inputText: inputText ?? '',
+        teacherKeyHash: hashTeacherKey(teacherKey),
         createdAt: Timestamp.fromMillis(now),
         expiresAt: Timestamp.fromMillis(expiresAtMs),
       });
@@ -341,8 +352,7 @@ export const createSharedQuiz = onRequest(
       }).format(new Date(expiresAtMs));
       trackUsage('share-quiz');
       const studentUrl = `${SITE_BASE_URL}/quiz/?id=${quizId}`;
-      const dashboardUrl = `${SITE_BASE_URL}/dashboard/?id=${quizId}`;
-      // 學生分享連結建立成功通知（含 2 顆可點按鈕）
+      // 學生分享連結建立成功通知（老師儀表板需老師金鑰，不放進通知）
       notifyAdminCard({
         status: 'success',
         title: '老師剛產生了學生分享連結',
@@ -356,10 +366,9 @@ export const createSharedQuiz = onRequest(
         ],
         actions: [
           { label: '👨‍🎓 開學生連結', uri: studentUrl, style: 'primary' },
-          { label: '📊 老師儀表板', uri: dashboardUrl, style: 'secondary' },
         ],
       });
-      res.json({ success: true, quizId });
+      res.json({ success: true, quizId, teacherKey });
     },
     { perMinute: 10, needTurnstile: false }
   )
@@ -386,7 +395,7 @@ export const getSharedQuiz = onRequest(
       res.status(404).json({ success: false, error: '測驗不存在或已過期。' });
       return;
     }
-    const { createdAt, expiresAt: _exp, ...rest } = data;
+    const { createdAt, expiresAt: _exp, ...rest } = stripTeacherSecrets(data);
     res.json({
       success: true,
       quizData: {
@@ -438,6 +447,8 @@ export const submitQuizAnswer = onRequest(
           pirlsLevelStats: pirlsLevelStats ?? {},
           submittedAt: Timestamp.now(),
           expiresAt: submissionExpiresAt,
+          // 測驗本體 60 分鐘後會被清掉，作答紀錄自己也帶一份雜湊，老師 7 天內仍可驗證
+          ...(typeof quizData.teacherKeyHash === 'string' ? { teacherKeyHash: quizData.teacherKeyHash } : {}),
         });
       trackUsage('submit-quiz');
 
@@ -473,28 +484,29 @@ export const submitQuizAnswer = onRequest(
 
       const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
       const accIcon = accuracy >= 80 ? '🎉' : accuracy >= 60 ? '👍' : '📚';
-      const dashboardUrl = `${SITE_BASE_URL}/dashboard/?id=${quizId}`;
-      const quizTitle = (await db.collection(COLLECTION).doc(quizId).get()).data()?.questionsOutput?.title ?? '—';
+      const quizTitle = quizData?.questionsOutput?.title ?? '—';
 
+      // v0.3.0：通知不帶學生姓名，也不放儀表板連結（儀表板需老師金鑰）
       notifyAdminCard({
         status: 'success',
         title: `${accIcon} 第 ${totalSubs} 位學生剛交卷`,
         appName: APP_NAME,
-        fields: [
-          { icon: '📝', label: '測驗', value: quizTitle },
-          { icon: '👤', label: '學生', value: `${studentInfo.class} ${studentInfo.seatNumber}號 ${studentInfo.name}` },
-          { icon: '✅', label: '答對', value: `${correctCount} / ${totalCount}（${accuracy}%）` },
-          ...(studentWeakest
-            ? [{ icon: '⚠️', label: '個人弱項', value: `${PIRLS_LEVEL_LABEL[studentWeakest.level] ?? studentWeakest.level}（${Math.round(studentWeakest.accuracy)}%）` }]
-            : []),
-          { icon: '🏫', label: '班級平均', value: `${classAvgAccuracy.toFixed(1)}%（${totalSubs} 人）` },
-          ...(weakest
-            ? [{ icon: '🎯', label: '班級弱項', value: `${PIRLS_LEVEL_LABEL[weakest.level] ?? weakest.level}（${Math.round(weakest.accuracy)}%）` }]
-            : []),
-        ],
-        actions: [
-          { label: '📊 看完整儀表板', uri: dashboardUrl, style: 'primary' },
-        ],
+        fields: buildSubmissionNotifyFields({
+          quizId,
+          quizTitle,
+          studentInfo,
+          correctCount,
+          totalCount,
+          accuracy,
+          studentWeakest: studentWeakest
+            ? { label: PIRLS_LEVEL_LABEL[studentWeakest.level] ?? studentWeakest.level, accuracy: studentWeakest.accuracy }
+            : null,
+          classAvgAccuracy,
+          totalSubs,
+          classWeakest: weakest
+            ? { label: PIRLS_LEVEL_LABEL[weakest.level] ?? weakest.level, accuracy: weakest.accuracy }
+            : null,
+        }),
       });
 
       res.json({ success: true, submissionId: ref.id });
@@ -505,7 +517,8 @@ export const submitQuizAnswer = onRequest(
 
 /**
  * 老師端讀取某 quiz 的所有學生作答（聚合資料）。
- * 純讀，不限流（老師可能 reload 看即時數字）。
+ * v0.3.0：必須帶 Authorization: Bearer <老師金鑰>，學生改網址讀不到全班成績。
+ * 金鑰 192 bits 無法暴力猜；不加 IP 限流，避免同校共用對外 IP 的老師互相擋到。
  */
 export const getSubmissions = onRequest(
   withCors(async (req, res) => {
@@ -522,6 +535,19 @@ export const getSubmissions = onRequest(
       .collection('students')
       .orderBy('submittedAt', 'desc')
       .get();
+
+    const storedHashes = [
+      quizData?.teacherKeyHash,
+      ...subsSnap.docs.map((d: QueryDocumentSnapshot) => (d.data() as any).teacherKeyHash),
+    ];
+    if (!isTeacherKeyValid(storedHashes, extractTeacherKey(req.headers?.authorization))) {
+      res.set('Cache-Control', 'no-store');
+      res.status(403).json({
+        success: false,
+        error: '全班成績只有出題老師能看。請使用「分享測驗」視窗裡的「開啟儀表板」按鈕（老師專用連結）；學生作答連結無法查看全班成績。',
+      });
+      return;
+    }
 
     const submissions = subsSnap.docs.map((d: QueryDocumentSnapshot) => {
       const x = d.data() as any;

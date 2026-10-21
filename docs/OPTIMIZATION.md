@@ -22,7 +22,7 @@
 | 資源 | 連結 | 狀態 |
 |---|---|---|
 | 網站本體 | https://cagoooo.github.io/pirls-questioncraft/ | ✅ Live |
-| 老師端班級成績儀表板 | `/dashboard/?id=xxx` | ✅ Live |
+| 老師端班級成績儀表板 | `/dashboard/?id=xxx#k=老師金鑰`（v0.3.0 起需老師專用連結） | ✅ Live |
 | **🆕 老師端使用統計 admin** | `/admin/`（密碼：你的設定） | ✅ Live |
 | GitHub Repo | https://github.com/cagoooo/pirls-questioncraft | ✅ Public |
 | Firebase 專案 | `pirls-questioncraft` (asia-east1) | ✅ Blaze |
