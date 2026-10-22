@@ -13,7 +13,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "npm run build && node --test test/privacy.test.cjs"
+    "test": "npm run build && node --test test/privacy.test.cjs test/prompt-explanation.test.cjs"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.33.0",

@@ -366,7 +366,7 @@ export async function exportQuizResultsToPDF(
       doc.setFont('NotoSansTC', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(...themeColors.textMuted);
-      const explanationHeader = '解題引導：';
+      const explanationHeader = '答後講解：';
       doc.text(explanationHeader, margin, yPos);
       const explanationLines = doc.splitTextToSize(result.explanation, contentWidth - doc.getTextWidth(explanationHeader) -2);
       doc.text(explanationLines, margin + doc.getTextWidth(explanationHeader) + 2 , yPos);

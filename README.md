@@ -2,7 +2,7 @@
 
 🌐 **線上使用：[PIRLS 閱讀理解生成站 PRO](https://cagoooo.github.io/pirls-questioncraft/)**
 
-> 📌 **目前版本：v0.3.0**（依據 `package.json`）
+> 📌 **目前版本：v0.3.1**（依據 `package.json`）
 
 This is a NextJS starter in Firebase Studio.
 

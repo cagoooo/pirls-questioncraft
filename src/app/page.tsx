@@ -45,7 +45,7 @@ function simulateProgress(
         { until: 62, msg: '📝 AI 正在校正錯字、重組成完整文章...' },
         { until: 72, msg: '💭 AI 正在理解文章主旨與脈絡...' },
         { until: 82, msg: '🎯 AI 正在設計 PIRLS 四層次題目...' },
-        { until: 90, msg: '✏️ AI 正在撰寫干擾選項與解題引導...' },
+        { until: 90, msg: '✏️ AI 正在撰寫干擾選項與答後講解...' },
         { until: 95, msg: '⚖️ AI 正在校對題目層次平衡...' },
         { until: 96, msg: '✨ 即將完成，最後潤飾中...' },
       ]
@@ -53,7 +53,7 @@ function simulateProgress(
         { until: 55, msg: '💭 AI 正在閱讀並理解文章...' },
         { until: 68, msg: '🧠 AI 正在分析 PIRLS 四層次架構...' },
         { until: 78, msg: '🎯 AI 正在設計選擇題與選項...' },
-        { until: 86, msg: '✏️ AI 正在撰寫干擾選項與解題引導...' },
+        { until: 86, msg: '✏️ AI 正在撰寫干擾選項與答後講解...' },
         { until: 92, msg: '⚖️ AI 正在校對題目層次平衡...' },
         { until: 95, msg: '✨ 即將完成，最後潤飾中...' },
         { until: 96, msg: '✨ 即將完成，最後潤飾中...' },

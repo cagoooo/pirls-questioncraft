@@ -33,9 +33,9 @@ jobs:
         working-directory: functions
         run: npm run build
 
-      - name: Privacy guard tests
+      - name: Privacy and prompt guard tests
         working-directory: functions
-        run: node --test test/privacy.test.cjs
+        run: node --test test/privacy.test.cjs test/prompt-explanation.test.cjs
 
       - name: Auth to GCP
         id: auth
