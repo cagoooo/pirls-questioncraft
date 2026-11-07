@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PIRLS 閱讀題組小幫手",
   "short_name": "PIRLS 小幫手",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "框選網頁截圖或反白文字，用自己的 Gemini 金鑰產生 PIRLS 閱讀理解題組，並匯出 PaGamO 批量上傳檔。",
   "icons": {
     "16": "icons/icon-16.png",

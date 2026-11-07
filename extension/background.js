@@ -10,6 +10,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({ id: 'pirls-text', title: '用這段文字出 PIRLS 題組', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'pirls-capture', title: '框選這個畫面出 PIRLS 題組', contexts: ['page', 'image'] });
+  chrome.contextMenus.create({ id: 'pirls-page', title: '讀取這頁全文出 PIRLS 題組（部落格、新聞）', contexts: ['page'] });
   chrome.contextMenus.create({ id: 'open-workbench', title: '開啟工作台', contexts: ['action'] });
   chrome.contextMenus.create({ id: 'open-options', title: '設定（Gemini 金鑰）', contexts: ['action'] });
   if (reason === 'install') chrome.runtime.openOptionsPage();
@@ -18,6 +19,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'pirls-text') return useSelection(info, tab);
   if (info.menuItemId === 'pirls-capture') return startCapture(tab);
+  if (info.menuItemId === 'pirls-page') return readFullPage(tab);
   if (info.menuItemId === 'open-workbench') return openWorkbench();
   if (info.menuItemId === 'open-options') return chrome.runtime.openOptionsPage();
 });
@@ -33,6 +35,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     switch (msg?.type) {
       case 'START_CAPTURE':
         return startCapture(msg.tab ?? sender.tab);
+      case 'READ_PAGE':
+        return readFullPage(msg.tab ?? sender.tab);
       case 'REGION_SELECTED':
         return finishCapture(sender.tab, msg.rect, msg.viewport);
       case 'CAPTURE_CANCEL':
@@ -156,6 +160,35 @@ async function useSelection(info, tab) {
     sourceMode: 'text',
   });
   await openWorkbench();
+}
+
+// ---------- 讀取這頁全文 ----------
+async function readFullPage(tab) {
+  if (!tab?.id) return { ok: false, error: '找不到目前的分頁。' };
+  let result;
+  try {
+    const res = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['vendor/Readability.js', 'content/extract-article.js'],
+    });
+    result = res?.[res.length - 1]?.result;
+  } catch (e) {
+    await chrome.storage.local.set({ lastNotice: `這個頁面無法讀取全文（例如 PDF 檢視器、Chrome 設定頁）。請改用「框選這個畫面」截圖出題。` });
+    await openWorkbench();
+    return { ok: false, error: e?.message };
+  }
+  const text = (result?.text ?? '').trim();
+  if (text.length < 80) {
+    await chrome.storage.local.set({ lastNotice: '這一頁找不到足夠的文章文字（可能文章是圖片或掃描檔）。請改用「框選這個畫面」截圖出題。' });
+    await openWorkbench();
+    return { ok: false, error: 'too-short' };
+  }
+  await chrome.storage.local.set({
+    [KEYS.text]: { text, title: result.title || tab.title || '', url: result.url || tab.url || '', ts: Date.now(), from: 'page' },
+    sourceMode: 'text',
+  });
+  await openWorkbench();
+  return { ok: true, length: text.length };
 }
 
 // ---------- 工作台 ----------

@@ -240,15 +240,24 @@ $('cropOk').addEventListener('click', () => applyCrop(false));
 $('cropFull').addEventListener('click', () => applyCrop(true));
 
 // ---------- 素材：文字 ----------
+const TEXT_WARN = 4000;
+const TEXT_MAX = 20000;
+let textSource = null;
+
 function renderTextMeta(src) {
+  if (src !== undefined) textSource = src;
   const len = $('sourceText').value.trim().length;
-  $('textMeta').textContent = `${len} 字${src?.title ? `｜來源：${src.title}` : ''}`;
+  const from = textSource?.from === 'page' ? '（讀取全文）' : '';
+  let html = `<b>${len.toLocaleString()}</b> 字${textSource?.title ? `｜來源：${escapeHtml(textSource.title)}${from}` : ''}`;
+  if (len > TEXT_MAX) html += `<br><span class="len-bad">⚠️ 超過 ${TEXT_MAX.toLocaleString()} 字，太長了，請刪掉不需要的段落再出題。</span>`;
+  else if (len > TEXT_WARN) html += `<br><span class="len-warn">💡 PIRLS 文章通常 500～2,000 字。這篇比較長，建議刪掉前言、廣告、留言等不需要的段落，AI 會更快、題目更聚焦。</span>`;
+  $('textMeta').innerHTML = html;
 }
 let textTimer;
 $('sourceText').addEventListener('input', () => {
   renderTextMeta();
   clearTimeout(textTimer);
-  textTimer = setTimeout(() => chrome.storage.local.set({ [KEYS.text]: { text: $('sourceText').value, ts: Date.now() } }), 400);
+  textTimer = setTimeout(() => chrome.storage.local.set({ [KEYS.text]: { ...(textSource ?? {}), text: $('sourceText').value, ts: Date.now() } }), 400);
 });
 
 // ---------- 出題 ----------
@@ -291,6 +300,7 @@ $('generate').addEventListener('click', async () => {
   } else {
     text = $('sourceText').value.trim();
     if (text.length < 80) return setStatus('error', '⚠️ 文章太短了（至少約 80 字），PIRLS 題組需要一篇完整的文章。');
+    if (text.length > TEXT_MAX) return setStatus('error', `⚠️ 文章超過 ${TEXT_MAX.toLocaleString()} 字，請先刪掉不需要的段落。`);
   }
   if (draft && !confirm('重新出題會取代目前的題目（包含你改過的內容），確定嗎？')) return;
 
@@ -473,7 +483,7 @@ $('newSet').addEventListener('click', async () => {
   await setShots([]);
   renderShots();
   renderDraft();
-  renderTextMeta();
+  renderTextMeta(null);
   $('genStatus').classList.add('hidden');
   window.scrollTo({ top: 0 });
 });
@@ -487,7 +497,8 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   }
   if (changes[KEYS.text] && changes[KEYS.text].newValue?.text !== $('sourceText').value) {
     $('sourceText').value = changes[KEYS.text].newValue?.text ?? '';
-    renderTextMeta(changes[KEYS.text].newValue);
+    renderTextMeta(changes[KEYS.text].newValue ?? null);
+    autoGrow($('sourceText'));
   }
   if (changes.sourceMode) {
     mode = changes.sourceMode.newValue === 'text' ? 'text' : 'image';

@@ -1,8 +1,8 @@
 # PIRLS 閱讀題組小幫手（Chrome 擴充套件）
 
-在任何網頁**框選截圖**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後下載 PaGamO 批量上傳檔。
+在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後下載 PaGamO 批量上傳檔。
 
-> 目前版本：v0.1.0（第 1 階段：截圖／文字出題、逐題修改、下載 PaGamO 檔案）
+> 目前版本：v0.2.0（截圖／讀取全文／反白文字出題、逐題修改、下載 PaGamO 檔案）
 > 下一版（第 2 階段）：按一下就帶到 PaGamO 批量上傳頁、自動放好檔案。
 
 ## 一、安裝（第一次約 5 分鐘）
@@ -31,6 +31,7 @@
 
 其他用法：
 
+- **讀取這頁全文出題**（部落格、新聞最好用）：按工具列圖示 →「📖 讀取這頁全文」，或在網頁空白處按右鍵 →「讀取這頁全文出 PIRLS 題組」。會自動去掉選單、側欄、廣告、留言，只留下正文；文章超過 4,000 字會提醒你刪掉不需要的段落。
 - **反白文字出題**：在網頁反白一段文章 → 按右鍵 →「用這段文字出 PIRLS 題組」。
 - **貼上圖片**：在工作台按 Ctrl+V 貼上圖片，或把圖片檔拖進來。
 - **PDF 檢視器等無法框選的頁面**：會先截整個畫面，到工作台按 ✂️ 裁切。
@@ -58,14 +59,15 @@
 | 出現「模型已停用」 | 到設定頁按「儲存並測試」，會自動換成可用的模型 |
 | 重開 Chrome 後擴充套件不見了 | 確認資料夾沒有被搬動、改名或刪除；重新「載入未封裝項目」 |
 | 學校電腦沒有「開發人員模式」開關 | 可能被學校的電腦管理政策鎖住，請洽資訊組 |
-| 截圖框選沒有反應 | Chrome 設定頁、擴充功能商店等頁面不允許截圖；換一般網頁再試 |
+| 截圖框選沒有反應 | Chrome 設定頁、擴充功能商店、新分頁不允許截圖，換一般網頁再試；也可以改按快捷鍵 Alt+Shift+P。若仍沒反應，到 `chrome://extensions` 看這個擴充套件有沒有紅色「錯誤」按鈕，截圖給資訊組 |
+| 讀取全文抓到奇怪的內容 | 少數網站版面特殊，可以在工作台的文字框直接刪改；文章是圖片的頁面請改用框選截圖 |
 
 ## 給開發者
 
-- 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）。
+- 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，36 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，44 項）。
 
 ---
 

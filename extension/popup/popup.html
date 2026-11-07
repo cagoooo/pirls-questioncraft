@@ -26,9 +26,12 @@
   <div class="stack">
     <button class="btn primary big" id="capture" type="button">📷 框選這個畫面</button>
     <p class="count">快捷鍵 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></p>
+    <button class="btn go" id="readPage" type="button">📖 讀取這頁全文</button>
+    <p class="count">適合部落格、新聞等文字網頁</p>
     <button class="btn" id="bench" type="button">📝 開啟工作台 <span id="n"></span></button>
     <button class="btn ghost" id="opts" type="button">⚙️ 設定與金鑰</button>
   </div>
+  <div id="err" class="notice error hidden" role="alert"></div>
   <div id="warn" class="notice warn hidden">⚠️ 還沒設定 Gemini 金鑰，請先按「設定與金鑰」。</div>
   <p class="credit">Made with <span aria-label="愛心">❤️</span> by <a href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5" target="_blank" rel="noopener noreferrer">阿凱老師</a></p>
   <script type="module" src="popup.js"></script>

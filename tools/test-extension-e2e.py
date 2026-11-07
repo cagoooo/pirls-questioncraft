@@ -26,6 +26,22 @@ ARTICLE_HTML = """<!doctype html><html lang=zh-Hant><meta charset=utf-8><title>�
 <p>雲越來越重，小水滴又變成雨，落回小河裡。小河帶著它流向大海，旅行又重新開始。</p>
 <div style="height:1200px"></div></div></body></html>"""
 
+BLOG_HTML = """<!doctype html><html lang=zh-Hant><meta charset=utf-8><title>小河邊的觀察日記｜阿水的部落格</title>
+<body style="margin:0;font:18px/1.8 'Microsoft JhengHei'">
+<header><nav><a href=/>首頁</a> <a href=/about>關於我</a> <a href=/shop>好物推薦</a> <a href=/contact>聯絡我們</a></nav></header>
+<div style="display:flex;gap:24px;padding:24px">
+<article class=post style="flex:3">
+<h1>小河邊的觀察日記</h1>
+<p>星期六早上，我和爸爸帶著放大鏡和筆記本，來到家附近的小河邊。河水清清的，可以看到河底的小石頭和游來游去的小魚。</p>
+<p>我們先觀察岸邊的植物。爸爸說，長在水邊的水芹菜喜歡潮濕的地方，所以葉子特別翠綠。我把它的樣子畫在筆記本上，還量了葉子的長度，大約有五公分。</p>
+<p>接著，我們發現一隻白鷺鷥站在淺水裡，一動也不動。過了好一會兒，牠突然把嘴巴伸進水裡，叼起一條小魚。爸爸告訴我，白鷺鷥很有耐心，會等魚游到身邊才出手。</p>
+<p>回家的路上，我想著今天看到的一切：清澈的河水讓魚兒有地方住，魚兒又成為白鷺鷥的食物。原來小河裡的每一種生物，都和別的生物有關係。我決定下次還要再來，看看不同季節的小河有什麼變化。</p>
+</article>
+<aside style="flex:1"><h3>熱門文章</h3><ul><li><a href=/a>十大必買文具開箱</a></li><li><a href=/b>週末親子景點懶人包</a></li></ul><p>訂閱電子報，好康不漏接！</p></aside>
+</div>
+<section id=comments><h3>留言（2）</h3><p>小美：寫得好棒，我也想去！</p><p>路人甲：請問這條河在哪裡？</p></section>
+<footer>© 阿水的部落格 版權所有</footer></body></html>"""
+
 LEVELS = ["locate & retrieve", "make straightforward inferences", "interpret & integrate", "evaluate & critique"]
 def fake_questions(n=8):
     return {"title": "小水滴的旅行", "articleContent": "清晨，小水滴躺在荷葉上。\n雲越來越重，小水滴又變成雨。",
@@ -69,7 +85,7 @@ with sync_playwright() as p:
         page.on("console", lambda m: errors.append(f"{page.url[-40:]} console.{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"{page.url[-40:]} pageerror: {e}"))
     ctx.on("page", watch)
-    ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=ARTICLE_HTML, content_type="text/html; charset=utf-8"))
+    ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=BLOG_HTML if "blog" in r.request.url else ARTICLE_HTML, content_type="text/html; charset=utf-8"))
 
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
     ext_id = sw.url.split("/")[2]
@@ -282,6 +298,52 @@ with sync_playwright() as p:
     pop.wait_for_timeout(500)
     check("工具列小視窗顯示截圖數", "張截圖" in pop.inner_text("#n"), pop.inner_text("#n"))
     pop.screenshot(path=str(OUT / "popup.png"))
+
+
+    # 13. 從工具列小視窗按「框選這個畫面」（v0.1.0 按了沒反應的那條路）
+    def open_popup_for(url_pattern):
+        pg = ctx.new_page()
+        pg.goto(f"{base}/popup/popup.html")
+        pg.wait_for_selector("#capture")
+        pg.evaluate("""async (pat) => {
+          const [t] = await chrome.tabs.query({ url: pat });
+          // 模擬「小視窗屬於這個分頁」：把 query 指到測試網頁
+          chrome.tabs.query = async () => [t];
+        }""", url_pattern)
+        return pg
+    art.bring_to_front()
+    pg = open_popup_for("https://pirls-test.example/article*")
+    pg.click("#capture", no_wait_after=True)
+    art.wait_for_selector("[data-pirls-host]", state="attached", timeout=5000)
+    check("小視窗按「框選這個畫面」會出現框選畫面", art.locator("[data-pirls-host]").count() == 1)
+    art.keyboard.press("Escape")
+    art.wait_for_timeout(400)
+
+    # 14. 讀取部落格全文
+    blog = ctx.new_page()
+    blog.goto("https://pirls-test.example/blog.html")
+    blog.bring_to_front()
+    pg = open_popup_for("https://pirls-test.example/blog*")
+    pg.click("#readPage", no_wait_after=True)
+    bench.wait_for_timeout(1500)
+    st = bench.evaluate("chrome.storage.local.get(['sourceText','sourceMode'])")
+    txt = (st.get("sourceText") or {}).get("text", "")
+    check("讀取全文：抓到文章正文", "放大鏡和筆記本" in txt and "不同季節的小河" in txt, txt[:80])
+    check("讀取全文：濾掉選單、側欄、留言、頁尾", not any(k in txt for k in ["好物推薦", "熱門文章", "訂閱電子報", "路人甲", "版權所有"]), txt[-120:])
+    check("讀取全文：段落保留換行", txt.count(chr(10)) >= 3, repr(txt[:120]))
+    check("讀取全文：切到文字分頁並記錄來源", st.get("sourceMode") == "text" and (st.get("sourceText") or {}).get("from") == "page")
+    bench.bring_to_front()
+    bench.wait_for_timeout(500)
+    check("工作台顯示來源（讀取全文）", "讀取全文" in bench.inner_text("#textMeta") and bench.input_value("#sourceText") == txt, bench.inner_text("#textMeta"))
+
+    # 15. 長文提醒
+    bench.fill("#sourceText", "一" * 5000)
+    bench.wait_for_timeout(300)
+    check("超過 4,000 字顯示建議刪減", bench.locator(".len-warn").count() == 1)
+    bench.fill("#sourceText", "一" * 20001)
+    bench.wait_for_timeout(300)
+    check("超過 20,000 字顯示太長", bench.locator(".len-bad").count() == 1)
+    bench.fill("#sourceText", txt)
 
     sw_errors = [e for e in errors if "favicon" not in e and "status of 400" not in e]  # 400 來自第 2 步故意送無效金鑰
     check("沒有任何 JavaScript 錯誤", not sw_errors, "\n".join(sw_errors[:10]))

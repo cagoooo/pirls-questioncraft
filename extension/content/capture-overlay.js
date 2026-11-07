@@ -120,13 +120,13 @@
     t.className = 'toast';
     t.style.pointerEvents = 'auto';
     if (res?.ok) {
-      t.innerHTML = `<p>✅ 已加入第 <b>${res.count}</b> 張截圖。文章跨頁的話，捲到下一段再框一次。</p>
+      t.innerHTML = `<p>✅ 已加入第 <b>${res.count}</b> 張截圖。<br>下一步：按「<b>前往工作台出題</b>」。文章跨頁的話，捲到下一段按「繼續框選」。</p>
         <div class="row"><button class="primary" data-act="go">前往工作台出題</button><button data-act="more">繼續框選</button><button data-act="close">關閉</button></div>`;
     } else {
       t.innerHTML = `<p>⚠️ 截圖沒有成功：${escapeHtml(res?.error ?? '未知原因')}</p><div class="row"><button data-act="close">關閉</button></div>`;
     }
     root.appendChild(t);
-    const timer = setTimeout(() => host.remove(), 9000);
+    const timer = setTimeout(() => host.remove(), 20000);
     t.addEventListener('click', (e) => {
       const act = e.target?.dataset?.act;
       if (!act) return;

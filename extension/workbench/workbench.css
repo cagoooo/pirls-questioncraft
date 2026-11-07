@@ -75,3 +75,6 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
   .shot .tools { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
   .row-btns .btn.big { width: 100%; }
 }
+
+.len-warn { color: #8A5A12; }
+.len-bad { color: var(--danger); font-weight: 700; }
