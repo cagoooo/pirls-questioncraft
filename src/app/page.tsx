@@ -571,7 +571,7 @@ export default function PIRLSQuestionCraftPage() {
             <Star size={20} color="#F0A6B5" className="hidden md:block absolute bottom-20 right-[260px] animate-pirls-bob [animation-delay:0.5s]" />
             <Spark size={22} color="#3D2E1E" className="hidden md:block absolute top-[200px] right-12 animate-pirls-bob [animation-delay:0.8s]" />
 
-            <div className="relative z-[2] max-w-[52rem] xl:max-w-[calc(100%-28rem)]">
+            <div className="relative z-[2] max-w-[52rem] 2xl:max-w-[calc(100%-28rem)]">
               <span className="inline-flex items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1.5 text-sm font-bold mb-5">
                 <Sparkles className="h-3.5 w-3.5" />
                 AI 自動出題 · 三步驟完成
@@ -610,10 +610,12 @@ export default function PIRLSQuestionCraftPage() {
               </div>
             </div>
 
-            {/* 大螢幕：右側放 Chrome 擴充套件介紹卡，善用空間 */}
+            {/* 大螢幕（≥1536px）：右側放 Chrome 擴充套件介紹卡；筆電寬度會擠到標題，所以不顯示 */}
+            {/* 外層負責垂直置中、內層卡片負責滑鼠浮起：兩個都用 transform，分開才不會互相蓋掉 */}
+            <div className="hidden 2xl:flex items-center absolute inset-y-0 right-12 z-[2] pointer-events-none">
             <Link
               href="/extension/"
-              className="hidden xl:flex flex-col gap-3 absolute right-12 top-1/2 -translate-y-1/2 z-[2] w-[25rem] bg-card border-neo rounded-[22px] shadow-neo-lg p-6 text-ink no-underline neo-hover-lift"
+              className="pointer-events-auto flex flex-col gap-3 w-[25rem] bg-card border-neo rounded-[22px] shadow-neo-lg p-6 text-ink no-underline neo-hover-lift"
             >
               <span className="self-start inline-flex items-center gap-1.5 bg-sky border-neo rounded-full px-3 py-1 text-sm font-extrabold">🧩 新功能・Chrome 擴充套件</span>
               <span className="text-[1.375rem] font-extrabold leading-snug">在任何網頁截圖或讀全文，<br />一分鐘變成 PIRLS 題組</span>
@@ -624,6 +626,7 @@ export default function PIRLSQuestionCraftPage() {
               </span>
               <span className="self-start inline-flex items-center gap-1.5 bg-lemon border-neo rounded-full px-4 py-2 text-base font-extrabold shadow-neo-sm mt-1">免費下載與安裝說明 →</span>
             </Link>
+            </div>
           </NeoCard>
         )}
 
