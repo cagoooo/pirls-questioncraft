@@ -125,8 +125,16 @@ function backendLines(file) {
   assert.equal(gemini.checkResult(gemini.normalize(broken), '8-questions').fatal.length, 2);
   checks++;
 
-  const sorted = gemini.sortModels(['gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-3.0-flash-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-embedding-001', 'gemma-3-27b-it']);
-  assert.deepEqual(sorted, ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-3.0-flash-preview', 'gemini-2.0-flash-lite', 'gemini-2.5-pro']);
+  const sorted = gemini.sortModels(['gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-3.0-flash-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-embedding-001', 'gemma-3-27b-it', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview']);
+  assert.deepEqual(sorted, ['gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-3.0-flash-preview', 'gemini-2.5-pro']);
+  checks++;
+
+  // 升級時：沒手動選過模型 → 換成 Flash-Lite；手動選過 → 不動
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  assert.equal(gemini.upgradeDefaultModel({ apiKey: 'k', model: 'gemini-2.5-flash', models }), 'gemini-2.5-flash-lite');
+  assert.equal(gemini.upgradeDefaultModel({ apiKey: 'k', model: 'gemini-2.5-flash', models, modelChosenByUser: true }), null);
+  assert.equal(gemini.upgradeDefaultModel({ apiKey: 'k', model: 'gemini-2.5-flash-lite', models }), null);
+  assert.equal(gemini.upgradeDefaultModel({ apiKey: '', model: 'gemini-2.5-flash', models }), null);
   checks++;
 
   console.log(`Extension tests passed: ${checks} checks.`);

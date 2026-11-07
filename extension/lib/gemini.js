@@ -58,7 +58,8 @@ function rank(name) {
   const lite = /flash-lite/.test(id);
   const flash = /flash/.test(id);
   const pro = /pro/.test(id);
-  const cls = flash && !lite ? 0 : lite ? 1 : pro ? 2 : 3;
+  // 預設最快的 Flash-Lite（2026-11-07 阿凱老師實測 Flash 太慢），其次 Flash，最後 Pro
+  const cls = lite ? 0 : flash ? 1 : pro ? 2 : 3;
   const ver = Number(id.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
   const preview = /preview|exp/.test(id) ? 1 : 0;
   const alias = /latest/.test(id) ? 1 : 0;
@@ -73,6 +74,13 @@ function compare(a, b) {
 }
 
 export const sortModels = (ids) => [...ids].filter((id) => id.startsWith('gemini-') && !EXCLUDE.test(id)).sort(compare);
+
+/** 舊版預設的模型若不是老師自己選的，升級後改成目前的預設（最快的）。回傳新模型或 null。 */
+export function upgradeDefaultModel(settings) {
+  if (!settings?.apiKey || settings.modelChosenByUser || !settings.models?.length) return null;
+  const best = sortModels(settings.models)[0];
+  return best && best !== settings.model ? best : null;
+}
 
 export async function listModels(key) {
   const out = [];
@@ -171,6 +179,15 @@ export function checkResult(data, questionMode) {
 
 const FORMAT_HINT = `JSON 格式：{"title": 文章標題, "articleContent": 文章全文, "questions": [{"question": 題幹, "options": [四個選項], "correctAnswerIndex": 正解索引 0～3, "explanation": 解析, "pirlsLevel": ${PIRLS_LEVELS.map((l) => `"${l}"`).join(' | ')}}]}`;
 
+const FORMAT_HINT_TEXT = FORMAT_HINT.replace('"articleContent": 文章全文, ', '');
+const TEXT_MODE_NOTE = '（補充說明：這次不需要輸出 articleContent 欄位，系統會自動放入上方 <ARTICLE> 的原文。請直接輸出 title 與 questions，把心力放在出好題目。）';
+const TEXT_SCHEMA = {
+  ...RESPONSE_SCHEMA,
+  properties: { title: RESPONSE_SCHEMA.properties.title, questions: RESPONSE_SCHEMA.properties.questions },
+  required: ['title', 'questions'],
+  propertyOrdering: ['title', 'questions'],
+};
+
 const ORDER = Object.fromEntries(PIRLS_LEVELS.map((l, i) => [l, i]));
 
 /**
@@ -184,7 +201,11 @@ export async function generateQuestions({ key, model, images = [], text = '', qu
   const parts = [
     ...images.map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } })),
     { text: prompt },
+    // 文字模式：原文由程式自己放回，不讓 AI 逐字抄一遍（長文章可省下大量時間）
+    ...(isText ? [{ text: TEXT_MODE_NOTE }] : []),
   ];
+  const schema = isText ? TEXT_SCHEMA : RESPONSE_SCHEMA;
+  const hint = isText ? FORMAT_HINT_TEXT : FORMAT_HINT;
   let note = '';
   let last;
   let useSchema = true;
@@ -194,9 +215,9 @@ export async function generateQuestions({ key, model, images = [], text = '', qu
       key,
       method: 'POST',
       body: {
-        contents: [{ role: 'user', parts: [...parts, ...(useSchema ? [] : [{ text: FORMAT_HINT }]), ...(note ? [{ text: note }] : [])] }],
+        contents: [{ role: 'user', parts: [...parts, ...(useSchema ? [] : [{ text: hint }]), ...(note ? [{ text: note }] : [])] }],
         generationConfig: useSchema
-          ? { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0.7 }
+          ? { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7 }
           : { responseMimeType: 'application/json', temperature: 0.7 },
       },
     });

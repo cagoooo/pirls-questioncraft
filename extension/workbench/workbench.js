@@ -1,5 +1,5 @@
 import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS } from '../lib/store.js';
-import { generateQuestions } from '../lib/gemini.js';
+import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
 
@@ -16,6 +16,8 @@ let busy = false;
 // ---------- 初始化 ----------
 async function init() {
   settings = await getSettings();
+  const upgraded = upgradeDefaultModel(settings);
+  if (upgraded) settings = await saveSettings({ model: upgraded });
   const store = await chrome.storage.local.get([KEYS.draft, KEYS.text, 'sourceMode', 'lastNotice']);
   draft = store[KEYS.draft] ?? null;
   shots = await getShots();
@@ -455,22 +457,62 @@ $('article').addEventListener('input', (e) => {
 }));
 
 // ---------- 匯出 ----------
-function exportFile(group) {
+function exportOpts(group) {
+  const c = draft.category;
+  if (!c.subject.trim() || !c.book.trim() || !c.chapter.trim()) throw new Error('科目、冊次、章節都要填寫。');
+  return { group, subject: c.subject.trim(), book: c.book.trim(), chapter: c.chapter.trim() };
+}
+
+function showExportOk(html) {
+  $('exportOk').innerHTML = html;
+  $('exportOk').classList.remove('hidden');
+}
+
+function showExportError(e) {
+  $('exportOk').classList.add('hidden');
   const err = $('exportErr');
-  err.classList.add('hidden');
+  err.textContent = `❌ 無法匯出：${e.message}`;
+  err.classList.remove('hidden');
+  err.scrollIntoView({ block: 'center' });
+}
+
+function exportFile(group) {
+  $('exportErr').classList.add('hidden');
   try {
-    const c = draft.category;
-    if (!c.subject.trim() || !c.book.trim() || !c.chapter.trim()) throw new Error('科目、冊次、章節都要填寫。');
-    const name = globalThis.PirlsPagamo.download(draft.data, {
-      group, subject: c.subject.trim(), book: c.book.trim(), chapter: c.chapter.trim(),
-    });
-    setStatus('', `✅ 已下載「${escapeHtml(name)}」。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
+    const name = globalThis.PirlsPagamo.download(draft.data, exportOpts(group));
+    showExportOk(`✅ 已下載「${escapeHtml(name)}」。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
+    return name;
   } catch (e) {
-    err.textContent = `❌ 無法匯出：${e.message}`;
-    err.classList.remove('hidden');
-    err.scrollIntoView({ block: 'center' });
+    showExportError(e);
+    return null;
   }
 }
+
+function toBase64(u8) {
+  let bin = '';
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// 下載備份 → 存好要上傳的檔案 → 背景程式打開 PaGamO 批量上傳頁並自動放檔
+async function sendToPagamo(group) {
+  const name = exportFile(group);
+  if (!name) return;
+  try {
+    const bytes = new Uint8Array(globalThis.PirlsPagamo.toBytes(draft.data, exportOpts(group)));
+    await chrome.storage.local.set({
+      pagamoPending: { name, base64: toBase64(bytes), group, typeLabel: group ? '題組' : '選擇題', ts: Date.now() },
+    });
+    const res = await chrome.runtime.sendMessage({ type: 'SEND_TO_PAGAMO' });
+    if (res?.ok === false) throw new Error(res.error || '打不開 PaGamO 頁面');
+    showExportOk(`🚀 已下載備份，並打開 PaGamO 批量上傳頁：題型「${group ? '題組' : '選擇題'}」與檔案會自動放好，請在 PaGamO 頁面確認後按「上傳」。`);
+  } catch (e) {
+    showExportError(e);
+  }
+}
+
+$('sendGroup').addEventListener('click', () => sendToPagamo(true));
+$('sendChoice').addEventListener('click', () => sendToPagamo(false));
 $('dlGroup').addEventListener('click', () => exportFile(true));
 $('dlChoice').addEventListener('click', () => exportFile(false));
 

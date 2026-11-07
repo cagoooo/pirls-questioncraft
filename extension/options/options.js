@@ -56,8 +56,8 @@ $('save').addEventListener('click', async () => {
   show('', '⏳ 正在向 Google 確認金鑰，並找出可用的模型…（約 5～20 秒）');
   await saveSettings({ apiKey: key });
   try {
-    const prev = (await getSettings()).model;
-    const { model, models } = await testKey(key, prev);
+    const cur = await getSettings();
+    const { model, models } = await testKey(key, cur.modelChosenByUser ? cur.model : undefined);
     await saveSettings({ model, models });
     fillModels(models, model);
     show('ok', `✅ 可以使用！已選好模型 <b>${model}</b>（共找到 ${models.length} 個可用模型）。<br>現在可以到網頁上按工具列的 PIRLS 圖示，或按 <b>Alt+Shift+P</b> 框選截圖出題。`);
@@ -70,14 +70,14 @@ $('save').addEventListener('click', async () => {
 
 $('clear').addEventListener('click', async () => {
   if (!confirm('確定要從這台電腦清除 Gemini 金鑰嗎？清除後要重新貼上才能出題。')) return;
-  await saveSettings({ apiKey: '', model: '', models: [] });
+  await saveSettings({ apiKey: '', model: '', models: [], modelChosenByUser: false });
   keyInput.value = '';
   fillModels([], '');
   show('warn', '🧹 金鑰已清除。');
 });
 
 $('model').addEventListener('change', async (e) => {
-  await saveSettings({ model: e.target.value });
+  await saveSettings({ model: e.target.value, modelChosenByUser: true });
   show('ok', `✅ 已改用模型 <b>${e.target.value}</b>。`);
 });
 

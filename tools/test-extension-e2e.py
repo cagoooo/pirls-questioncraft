@@ -42,6 +42,42 @@ BLOG_HTML = """<!doctype html><html lang=zh-Hant><meta charset=utf-8><title>小�
 <section id=comments><h3>留言（2）</h3><p>小美：寫得好棒，我也想去！</p><p>路人甲：請問這條河在哪裡？</p></section>
 <footer>© 阿水的部落格 版權所有</footer></body></html>"""
 
+# 模擬 PaGamO 批量上傳頁（結構依 2026-11-07 實地偵察：Ant Design 題型單選、input[type=file]、「上 傳」按鈕；選檔時不上傳）
+FAKE_PAGAMO_BATCH = """<!doctype html><html><meta charset=utf-8><title>PaGamO</title><body>
+<div id=types>
+<label class="ant-radio-wrapper ant-radio-wrapper-checked"><input type=radio name=t class=ant-radio-input>選擇題</label>
+<label class="ant-radio-wrapper"><input type=radio name=t class=ant-radio-input>是非題</label>
+<label class="ant-radio-wrapper"><input type=radio name=t class=ant-radio-input>填充題</label>
+<label class="ant-radio-wrapper"><input type=radio name=t class=ant-radio-input>題組</label>
+</div>
+<a id=tpl href="https://cdn.pagamo.org/dyna_questions/templates/v5/PaGamO_批量上傳範例_選擇題.xlsx">範例檔</a>
+<span><input type=file accept=".xlsx,.png,.jpg,.jpeg,.mp3,.zip" multiple></span>
+<div class=ant-upload-list></div>
+<div style="height:1500px"></div>
+<button type=submit class="ant-btn">上 傳</button>
+<script>
+document.querySelectorAll('label.ant-radio-wrapper').forEach(l => l.addEventListener('click', () => {
+  document.querySelectorAll('label.ant-radio-wrapper').forEach(o => o.classList.remove('ant-radio-wrapper-checked'));
+  setTimeout(() => { l.classList.add('ant-radio-wrapper-checked');
+    document.getElementById('tpl').href = 'https://cdn.pagamo.org/dyna_questions/templates/v5/PaGamO_批量上傳範例_' + l.textContent.trim() + '.xlsx'; }, 150);
+}));
+document.querySelector('input[type=file]').addEventListener('change', e => {
+  const list = document.querySelector('.ant-upload-list');
+  list.innerHTML = [...e.target.files].map(f => '<div class=ant-upload-list-item><span class=ant-upload-list-item-name>' + f.name + '</span></div>').join('');
+});
+document.querySelector('button[type=submit]').addEventListener('click', () => { window.__submitted = true; });
+</script></body></html>"""
+pagamo_state = {"logged_in": True}
+def pagamo_route(route):
+    url = route.request.url
+    if "add_questions/batch" in url:
+        if not pagamo_state["logged_in"]:
+            return route.fulfill(status=302, headers={"Location": "https://www.pagamo.org/sign_in"})
+        return route.fulfill(body=FAKE_PAGAMO_BATCH, content_type="text/html; charset=utf-8")
+    if "sign_in" in url:
+        return route.fulfill(body="<!doctype html><meta charset=utf-8><title>登入</title><h1>請登入</h1>", content_type="text/html; charset=utf-8")
+    return route.fulfill(body="<!doctype html><meta charset=utf-8><title>PaGamO 首頁</title><h1>首頁</h1>", content_type="text/html; charset=utf-8")
+
 LEVELS = ["locate & retrieve", "make straightforward inferences", "interpret & integrate", "evaluate & critique"]
 def fake_questions(n=8):
     return {"title": "小水滴的旅行", "articleContent": "清晨，小水滴躺在荷葉上。\n雲越來越重，小水滴又變成雨。",
@@ -85,9 +121,12 @@ with sync_playwright() as p:
         page.on("console", lambda m: errors.append(f"{page.url[-40:]} console.{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"{page.url[-40:]} pageerror: {e}"))
     ctx.on("page", watch)
+    ctx.route("https://www.pagamo.org/**", pagamo_route)
     ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=BLOG_HTML if "blog" in r.request.url else ARTICLE_HTML, content_type="text/html; charset=utf-8"))
 
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
+    sw_logs = []
+    sw.on("console", lambda m: sw_logs.append(f"{m.type}: {m.text}"))
     ext_id = sw.url.split("/")[2]
     print("extension id:", ext_id)
     base = f"chrome-extension://{ext_id}"
@@ -117,7 +156,7 @@ with sync_playwright() as p:
     opts.fill("#key", "FAKE_KEY_FOR_MOCK_ONLY_000000000000000")
     opts.click("#save")
     opts.wait_for_selector("#keyStatus.ok", timeout=30000)
-    check("測試金鑰成功並選 gemini-2.5-flash", opts.input_value("#model") == "gemini-2.5-flash", opts.inner_text("#keyStatus"))
+    check("測試金鑰成功並預設選最快的 Flash-Lite", opts.input_value("#model") == "gemini-2.0-flash-lite", opts.inner_text("#keyStatus"))
     check("排除非出題模型", "text-embedding-004" not in opts.inner_html("#model"))
     check("金鑰放在 header 不放網址", all("key=" not in c["url"] for c in calls) and calls[-1]["key"].startswith("FAKE_KEY"))
     opts.fill("#subject", "國語")
@@ -260,7 +299,9 @@ with sync_playwright() as p:
     gen = [c for c in calls[n_before:] if ":generateContent" in c["url"]]
     body = json.loads(gen[-1]["body"]) if gen else {}
     parts = body.get("contents", [{}])[0].get("parts", [])
-    check("文字出題用 <ARTICLE> 提示詞、沒有圖片", len(parts) == 1 and "<ARTICLE>" in parts[0]["text"] and article in parts[0]["text"])
+    check("文字出題用 <ARTICLE> 提示詞、沒有圖片", len(parts) == 2 and "<ARTICLE>" in parts[0]["text"] and article in parts[0]["text"] and "不需要輸出 articleContent" in parts[1]["text"])
+    sch = body.get("generationConfig", {}).get("responseSchema", {})
+    check("文字模式不讓 AI 抄回原文（格式不含 articleContent）", "articleContent" not in sch.get("properties", {}) and "questions" in sch.get("properties", {}))
     check("文字模式保留原文", bench.input_value("#article") == article)
 
     # 10b. Google 不接受格式規定時，自動改用一般 JSON 模式
@@ -345,7 +386,74 @@ with sync_playwright() as p:
     check("超過 20,000 字顯示太長", bench.locator(".len-bad").count() == 1)
     bench.fill("#sourceText", txt)
 
-    sw_errors = [e for e in errors if "favicon" not in e and "status of 400" not in e]  # 400 來自第 2 步故意送無效金鑰
+    # 17. 送到 PaGamO（已登入）：下載備份 → 打開批量上傳頁 → 選「題組」→ 放好檔案 → 不自動按上傳
+    bench.set_viewport_size({"width": 1440, "height": 900})
+    bench.evaluate("chrome.storage.local.get('draft')")  # 確認還有題目
+    # Playwright 攔不到擴充套件「新開分頁」的第一個請求，所以先開好 PaGamO 分頁，測「沿用已開分頁」這條路
+    pg_pagamo = ctx.new_page()
+    pg_pagamo.goto("https://www.pagamo.org/api/teacher_console/questions/add_questions/batch")
+    with bench.expect_download() as dl3:
+        bench.click("#sendGroup")
+    check("送到 PaGamO 會先下載備份", dl3.value.suggested_filename.startswith("PIRLS_PaGamO_題組_"), dl3.value.suggested_filename)
+    try:
+        pg_pagamo.wait_for_selector(".ant-upload-list-item-name", timeout=15000)
+    except Exception:
+        print("DEBUG url:", pg_pagamo.url)
+        print("DEBUG pending:", bench.evaluate("chrome.storage.local.get('pagamoPending').then(r => r.pagamoPending ? Object.keys(r.pagamoPending) : null)"))
+        print("DEBUG track:", bench.evaluate("chrome.storage.session.get(null)"))
+        print("DEBUG banner:", pg_pagamo.evaluate("document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || 'none'"))
+        print("DEBUG sw errors:", sw_logs[-10:])
+        raise
+    check("打開的是批量上傳頁", "add_questions/batch" in pg_pagamo.url, pg_pagamo.url)
+    checked = pg_pagamo.evaluate("[...document.querySelectorAll('label.ant-radio-wrapper-checked')].map(l => l.textContent.trim())")
+    check("自動選好「題組」題型", checked == ["題組"], str(checked))
+    fname = pg_pagamo.inner_text(".ant-upload-list-item-name")
+    check("自動放入題組檔", fname == dl3.value.suggested_filename, fname)
+    b64 = pg_pagamo.evaluate("""async () => { const f = document.querySelector('input[type=file]').files[0];
+      const u = new Uint8Array(await f.arrayBuffer()); let s = ''; for (const c of u) s += String.fromCharCode(c); return btoa(s); }""")
+    tmp = OUT / "placed.xlsx"; tmp.write_bytes(base64.b64decode(b64))
+    ws3 = openpyxl.load_workbook(tmp).active
+    r11 = [c.value for c in ws3[11]]
+    check("放進 PaGamO 的檔案內容正確（題組文章列）", r11[0] == 1 and r11[1] == "國語" and ws3.max_row == 19, str(r11[:4]) + f" rows={ws3.max_row}")
+    banner = pg_pagamo.evaluate("document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || ''")
+    check("PaGamO 頁面顯示「請確認後按上傳」", "已選好題型" in banner and "上傳" in banner, banner[:80])
+    check("不會自動按下上傳", pg_pagamo.evaluate("window.__submitted === undefined"))
+    check("上傳按鈕被框起來提醒", "4px" in pg_pagamo.evaluate("document.querySelector('button[type=submit]').style.outline"))
+    check("用完即清掉暫存檔", bench.evaluate("chrome.storage.local.get('pagamoPending').then(r => !r.pagamoPending)"))
+    check("工作台在匯出區顯示說明", "PaGamO 批量上傳頁" in bench.inner_text("#exportOk"), bench.inner_text("#exportOk"))
+
+    # 18. 還沒登入：先提示登入；登入後回到 PaGamO 首頁會自動帶到批量上傳並放好「選擇題」檔
+    pagamo_state["logged_in"] = False
+    with bench.expect_download():
+        bench.click("#sendChoice")
+    pg_pagamo.wait_for_url("**/sign_in", timeout=10000)
+    pg_pagamo.wait_for_selector("[data-pirls-pagamo]", state="attached", timeout=8000)
+    hint = pg_pagamo.evaluate("(document.querySelector('[data-pirls-pagamo]').shadowRoot || document.querySelector('[data-pirls-pagamo]')).textContent")
+    check("沒登入時提示先登入（沿用同一個分頁）", "請先登入" in hint, hint[:60])
+    pagamo_state["logged_in"] = True
+    pg_pagamo.goto("https://www.pagamo.org/")  # 模擬登入成功後 PaGamO 帶回首頁
+    pg_pagamo.wait_for_url("**/add_questions/batch", timeout=10000)
+    pg_pagamo.wait_for_selector(".ant-upload-list-item-name", timeout=15000)
+    checked = pg_pagamo.evaluate("[...document.querySelectorAll('label.ant-radio-wrapper-checked')].map(l => l.textContent.trim())")
+    check("登入後自動回到批量上傳、選好「選擇題」並放好檔", checked == ["選擇題"] and "選擇題" in pg_pagamo.inner_text(".ant-upload-list-item-name"), str(checked))
+    pg_pagamo.goto("https://www.pagamo.org/")
+    pg_pagamo.wait_for_timeout(1500)
+    check("完成後不再攔截 PaGamO 的其他頁面", "add_questions" not in pg_pagamo.url, pg_pagamo.url)
+
+    # 16. 舊版設定（Flash）升級：打開工作台就自動換成 Flash-Lite；手動選過的不動
+    bench.evaluate("""async () => { const r = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({ settings: { ...r.settings, model: 'gemini-2.5-flash', models: ['gemini-2.5-flash', 'gemini-2.0-flash-lite'], modelChosenByUser: false } }); }""")
+    bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(500)
+    m = bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.model)")
+    check("舊設定自動換成 Flash-Lite", m == "gemini-2.0-flash-lite", m)
+    bench.evaluate("""async () => { const r = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({ settings: { ...r.settings, model: 'gemini-2.5-flash', modelChosenByUser: true } }); }""")
+    bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(500)
+    m = bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.model)")
+    check("老師手動選的模型不會被換掉", m == "gemini-2.5-flash", m)
+
+    # 400 來自第 2 步故意送無效金鑰；pagamo.org 開頭的是 PaGamO 網站自己的程式錯誤（擴充套件換網址時可能連到真站的登入頁）
+    sw_errors = [e for e in errors if "favicon" not in e and "status of 400" not in e and not e.startswith("https://www.pagamo.org")]
     check("沒有任何 JavaScript 錯誤", not sw_errors, "\n".join(sw_errors[:10]))
     ctx.close()
 

@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = {
   apiKey: '',
   model: '',
   models: [],
+  modelChosenByUser: false, // 老師自己在設定頁改過模型才是 true；否則升級時會換成新的預設
   subject: '閱讀素養題組',
   book: '',            // 空白＝自動用目前學期（例：115上）
   chapterMode: 'title', // title＝用文章標題當章節；custom＝用下方自訂文字

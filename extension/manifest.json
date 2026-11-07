@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "PIRLS 閱讀題組小幫手",
   "short_name": "PIRLS 小幫手",
-  "version": "0.2.0",
-  "description": "框選網頁截圖或反白文字，用自己的 Gemini 金鑰產生 PIRLS 閱讀理解題組，並匯出 PaGamO 批量上傳檔。",
+  "version": "0.3.0",
+  "description": "框選截圖、讀取全文或反白文字，用自己的 Gemini 金鑰產生 PIRLS 閱讀理解題組，一鍵送到 PaGamO 批量上傳頁。",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -23,11 +23,22 @@
     "type": "module"
   },
   "options_page": "options/options.html",
-  "permissions": ["activeTab", "storage", "unlimitedStorage", "contextMenus", "scripting"],
-  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "unlimitedStorage",
+    "contextMenus",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://www.pagamo.org/*"
+  ],
   "commands": {
     "capture-region": {
-      "suggested_key": { "default": "Alt+Shift+P" },
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
       "description": "框選目前網頁的截圖來出題"
     }
   },

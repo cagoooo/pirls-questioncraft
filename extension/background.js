@@ -1,5 +1,6 @@
 // 背景程式：截圖、裁切、右鍵選單、快捷鍵、打開工作台。
-import { getShots, setShots, KEYS } from './lib/store.js';
+import { getShots, setShots, KEYS, getSettings, saveSettings } from './lib/store.js';
+import { upgradeDefaultModel } from './lib/gemini.js';
 
 const WORKBENCH_URL = chrome.runtime.getURL('workbench/workbench.html');
 const MAX_SHOTS = 10;
@@ -14,6 +15,11 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   chrome.contextMenus.create({ id: 'open-workbench', title: '開啟工作台', contexts: ['action'] });
   chrome.contextMenus.create({ id: 'open-options', title: '設定（Gemini 金鑰）', contexts: ['action'] });
   if (reason === 'install') chrome.runtime.openOptionsPage();
+  if (reason === 'update') {
+    // v0.3.0 起預設改用 Flash-Lite：老師沒有手動選過模型的話，自動換過去
+    const next = upgradeDefaultModel(await getSettings());
+    if (next) await saveSettings({ model: next });
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -45,6 +51,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'OPEN_WORKBENCH':
         await openWorkbench();
         return { ok: true };
+      case 'SEND_TO_PAGAMO':
+        return sendToPagamo();
       default:
         return undefined;
     }
@@ -189,6 +197,79 @@ async function readFullPage(tab) {
   });
   await openWorkbench();
   return { ok: true, length: text.length };
+}
+
+// ---------- 送到 PaGamO 批量上傳頁 ----------
+// 工作台先把 xlsx 存成 pagamoPending，這裡負責打開頁面、處理登入，頁面載入完成後注入 content/pagamo-upload.js。
+const PAGAMO_BATCH_URL = 'https://www.pagamo.org/api/teacher_console/questions/add_questions/batch';
+const PAGAMO_TRACK = 'pagamoTrack'; // session：{ tabId, hops }
+const MAX_HOPS = 3; // 自動導回批量上傳頁的次數上限，避免沒登入時一直跳來跳去
+
+async function sendToPagamo() {
+  let tab;
+  try {
+    const [existing] = await chrome.tabs.query({ url: 'https://www.pagamo.org/api/teacher_console/questions/add_questions/*' });
+    if (existing) {
+      tab = await chrome.tabs.update(existing.id, { url: PAGAMO_BATCH_URL, active: true });
+      await chrome.windows.update(existing.windowId, { focused: true });
+    }
+  } catch { /* 找不到就開新分頁 */ }
+  if (!tab) tab = await chrome.tabs.create({ url: PAGAMO_BATCH_URL });
+  await chrome.storage.session.set({ [PAGAMO_TRACK]: { tabId: tab.id, hops: 0 } });
+  // 頁面可能在記下分頁之前就載完了（網路很快時），這裡主動補檢查一次
+  const now = await chrome.tabs.get(tab.id).catch(() => null);
+  if (now?.status === 'complete' && now.url && now.url !== 'about:blank') handlePagamoTab(tab.id, now);
+  return { ok: true, tabId: tab.id };
+}
+
+chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+  if (change.status === 'complete') handlePagamoTab(tabId, tab);
+});
+
+let pagamoBusy = false;
+async function handlePagamoTab(tabId, tab) {
+  if (pagamoBusy) return;
+  const { [PAGAMO_TRACK]: track } = await chrome.storage.session.get(PAGAMO_TRACK);
+  if (!track || track.tabId !== tabId) return;
+  const { pagamoPending: pending } = await chrome.storage.local.get('pagamoPending');
+  if (!pending || Date.now() - pending.ts > 10 * 60 * 1000) {
+    await chrome.storage.session.remove(PAGAMO_TRACK);
+    return;
+  }
+  const url = tab.url ?? '';
+  if (!/^https:\/\/www\.pagamo\.org\//.test(url)) return;
+  pagamoBusy = true;
+  try {
+    if (url.startsWith(PAGAMO_BATCH_URL)) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content/pagamo-upload.js'] });
+      await chrome.storage.session.remove(PAGAMO_TRACK);
+    } else if (/sign_in|login/i.test(url) || track.hops >= MAX_HOPS) {
+      // 還沒登入：提示老師先登入，登入後回到 PaGamO 任一頁就會自動導回批量上傳頁
+      await chrome.scripting.executeScript({ target: { tabId }, func: showLoginHint, args: [track.hops >= MAX_HOPS] });
+      if (track.hops >= MAX_HOPS) await chrome.storage.session.set({ [PAGAMO_TRACK]: { ...track, hops: 0 } });
+    } else {
+      await chrome.storage.session.set({ [PAGAMO_TRACK]: { ...track, hops: track.hops + 1 } });
+      await chrome.tabs.update(tabId, { url: PAGAMO_BATCH_URL });
+    }
+  } catch (e) {
+    console.warn('[PIRLS] PaGamO 自動放檔失敗：', e);
+  } finally {
+    pagamoBusy = false;
+  }
+}
+
+// 注入到 PaGamO 頁面執行（不能用外面的變數）
+function showLoginHint(stuck) {
+  if (document.querySelector('[data-pirls-pagamo]')) return;
+  const box = document.createElement('div');
+  box.setAttribute('data-pirls-pagamo', '');
+  box.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;width:min(680px,calc(100vw - 24px));'
+    + 'font:15px/1.6 "Noto Sans TC","Microsoft JhengHei",sans-serif;color:#3D2E1E;background:#FDF0D0;border:1.5px solid #3D2E1E;'
+    + 'border-radius:16px;box-shadow:0 5px 0 #3D2E1E;padding:12px 16px;';
+  box.textContent = stuck
+    ? '🔑 PIRLS 小幫手：好像還沒登入 PaGamO 教師帳號。請先登入，登入後會自動帶你到「批量上傳」並放好檔案（10 分鐘內有效）。'
+    : '🔑 PIRLS 小幫手：請先登入 PaGamO 教師帳號，登入後會自動帶你到「批量上傳」並放好檔案（10 分鐘內有效）。';
+  document.documentElement.appendChild(box);
 }
 
 // ---------- 工作台 ----------

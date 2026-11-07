@@ -96,19 +96,25 @@
             <label class="field"><span>章節</span><input id="catChapter" type="text"></label>
           </div>
           <div id="exportErr" class="notice error hidden"></div>
+          <div id="exportOk" class="notice ok hidden" role="status" aria-live="polite"></div>
           <div class="row-btns">
-            <button class="btn go big" id="dlGroup" type="button">⬇️ 下載 PaGamO 題組版（含文章，建議）</button>
-            <button class="btn" id="dlChoice" type="button">⬇️ 下載一般選擇題版</button>
+            <button class="btn go big" id="sendGroup" type="button">🚀 送到 PaGamO（題組版，建議）</button>
+            <button class="btn" id="sendChoice" type="button">🚀 送到 PaGamO（一般選擇題）</button>
+          </div>
+          <p class="muted send-note">按下後會先下載一份備份，接著自動打開 PaGamO 批量上傳頁、選好題型、放好檔案，你只要確認後按「上傳」。</p>
+          <div class="row-btns dl-only">
+            <span class="muted">只下載檔案：</span>
+            <button class="btn small ghost" id="dlGroup" type="button">⬇️ 題組版</button>
+            <button class="btn small ghost" id="dlChoice" type="button">⬇️ 選擇題版</button>
           </div>
           <details class="howto">
-            <summary>下載後怎麼匯入 PaGamO？</summary>
+            <summary>自動放檔沒成功？手動匯入步驟</summary>
             <ol>
               <li>打開 <a href="https://www.pagamo.org/api/teacher_console/questions/add_questions/batch" target="_blank" rel="noopener noreferrer">PaGamO 批量上傳頁</a>（教師後台 → 個人題庫 → 新增題目 → 批量上傳）。</li>
-              <li>「題型」選 <b>題組</b>（下載題組版時）或 <b>選擇題</b>（下載一般版時）。</li>
-              <li>把剛下載的 xlsx 拖進上傳區 → 按「上傳」。</li>
+              <li>「題型」選 <b>題組</b>（題組版）或 <b>選擇題</b>（一般版）。</li>
+              <li>把下載的 xlsx 拖進上傳區 → 按「上傳」。</li>
               <li>到「題目總覽」確認題數與正解。</li>
             </ol>
-            <p class="muted">下一版會把這幾步自動化：按一下就帶到 PaGamO、自動放好檔案。</p>
           </details>
           <div class="row-btns end">
             <button class="btn small ghost" id="newSet" type="button">🆕 清空，準備下一篇</button>
