@@ -70,12 +70,12 @@ function SortHeader({
   const Icon = !active ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
   return (
     <th
-      className={`py-2 px-2 cursor-pointer select-none hover:bg-muted/40 transition ${align === 'center' ? 'text-center' : ''} ${className ?? ''}`}
+      className={`py-3 px-3 text-[0.9375rem] font-bold whitespace-nowrap cursor-pointer select-none hover:bg-cream transition ${align === 'center' ? 'text-center' : ''} ${className ?? ''}`}
       onClick={() => onClick(sortKey)}
     >
-      <span className={`inline-flex items-center gap-1 ${active ? 'text-primary font-bold' : ''}`}>
+      <span className={`inline-flex items-center gap-1 ${active ? 'text-coral' : ''}`}>
         {label}
-        <Icon className={`h-3 w-3 ${active ? 'opacity-100' : 'opacity-40'}`} />
+        <Icon className={`h-4 w-4 ${active ? 'opacity-100' : 'opacity-40'}`} />
       </span>
     </th>
   );
@@ -94,7 +94,7 @@ function ExpandedStudentDetail({
     <div className="space-y-3">
       {/* 個人 PIRLS 層次表現 */}
       {student.pirlsLevelStats && Object.keys(student.pirlsLevelStats).length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[0.9375rem]">
           <span className="text-muted-foreground font-medium">PIRLS 層次：</span>
           {Object.entries(PIRLS_LEVEL_LABEL).map(([key, label]) => {
             const stat = student.pirlsLevelStats?.[key];
@@ -103,7 +103,7 @@ function ExpandedStudentDetail({
             const color = PIRLS_LEVEL_COLOR[key] ?? '#888';
             return (
               <div key={key} className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: color }} />
                 <span>{label}</span>
                 <span className="font-bold tabular-nums" style={{ color }}>
                   {stat.correct}/{stat.total} ({pct}%)
@@ -117,13 +117,13 @@ function ExpandedStudentDetail({
       {/* 逐題對錯 grid */}
       {questions.length > 0 ? (
         <div>
-          <div className="text-xs text-muted-foreground mb-1.5">
-            逐題對錯（hover 看題目與答案）：
-            <span className="inline-block w-2 h-2 bg-green-500 rounded-sm ml-2 mr-1" />答對
-            <span className="inline-block w-2 h-2 bg-red-400 rounded-sm ml-2 mr-1" />答錯
-            <span className="inline-block w-2 h-2 bg-gray-300 rounded-sm ml-2 mr-1" />略過
+          <div className="text-sm text-muted-foreground mb-2">
+            逐題對錯（滑鼠移到格子上看題目與答案）：
+            <span className="inline-block w-3 h-3 bg-green-500 rounded-sm ml-2 mr-1 align-middle" />答對
+            <span className="inline-block w-3 h-3 bg-red-400 rounded-sm ml-2 mr-1 align-middle" />答錯
+            <span className="inline-block w-3 h-3 bg-gray-300 rounded-sm ml-2 mr-1 align-middle" />略過
           </div>
-          <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-15 gap-1.5">
+          <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-10 gap-2">
             {questions.map((q, idx) => {
               const ans = student.answers[idx];
               const isSkipped = ans == null;
@@ -140,7 +140,7 @@ function ExpandedStudentDetail({
                 <div
                   key={idx}
                   title={tooltipText}
-                  className={`${cellClass} border rounded text-xs text-center py-1.5 px-1 font-bold cursor-help select-none`}
+                  className={`${cellClass} border-[1.5px] rounded-lg text-[0.9375rem] text-center py-2 px-1 font-extrabold cursor-help select-none`}
                 >
                   {idx + 1}
                 </div>
@@ -149,7 +149,7 @@ function ExpandedStudentDetail({
           </div>
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground italic">題目資料已刪除，無法呈現逐題對錯。</div>
+        <div className="text-sm text-muted-foreground italic">題目資料已刪除，無法呈現逐題對錯。</div>
       )}
     </div>
   );
@@ -471,7 +471,7 @@ function DashboardInner() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="h-12 w-12 text-primary animate-spin" />
-        <p className="text-muted-foreground mt-4">讀取儀表板資料中...</p>
+        <p className="text-lg text-muted-foreground mt-4">讀取儀表板資料中...</p>
       </div>
     );
   }
@@ -479,17 +479,17 @@ function DashboardInner() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-md shadow-lg">
+        <Card className="w-full max-w-lg border-neo rounded-[24px] shadow-neo">
           <CardHeader>
-            <CardTitle className="text-center text-xl font-semibold text-destructive">無法載入儀表板</CardTitle>
+            <CardTitle className="text-center text-[1.5rem] font-extrabold text-destructive">無法載入儀表板</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 py-8">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>錯誤</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-base">{error}</AlertDescription>
             </Alert>
-            <Button asChild className="w-full">
+            <Button asChild className="w-full h-11 text-base rounded-full">
               <Link href="/">返回首頁</Link>
             </Button>
           </CardContent>
@@ -502,8 +502,22 @@ function DashboardInner() {
   // #18: 題目資料已被刪除但仍有學生作答紀錄 → 走「降級」模式（不渲染需要 questions 的卡片）
   const questionsMissing = !!data && dedupedSubmissions.length > 0 && data.questions.length === 0;
 
+  const accOf = (s: SubmissionRecord) => (s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0);
+  const attentionCount = dedupedSubmissions.filter(s => accOf(s) < 60).length;
+  const topCount = dedupedSubmissions.filter(s => accOf(s) >= 80).length;
+  const showFilter = (mode: 'all' | 'attention' | 'top') => {
+    setFilterMode(mode);
+    document.getElementById('student-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // 2026-11-07 改版：沿用網站奶油色＋黑邊立體風格，桌機加寬、字級放大
+  const dashBtn = 'h-11 px-4 rounded-full border-neo bg-card text-ink shadow-neo-sm text-[0.9375rem] font-bold hover:bg-cream-deep hover:text-ink';
+  const dashCard = 'border-neo rounded-[24px] shadow-neo bg-card';
+  const pillBtn = (active: boolean) =>
+    `h-10 px-4 rounded-full border-neo text-[0.9375rem] font-bold transition-colors ${active ? 'bg-ink text-cream' : 'bg-card text-ink hover:bg-cream-deep'}`;
+
   return (
-    <div className="container mx-auto p-4 sm:p-8 min-h-screen">
+    <div className="mx-auto w-full max-w-[min(1680px,96vw)] px-4 sm:px-8 py-6 sm:py-8 min-h-screen text-ink">
       {/* 列印樣式：藏掉互動 UI、避免 card 跨頁切半 */}
       <style>{`
         @media print {
@@ -514,93 +528,97 @@ function DashboardInner() {
         }
       `}</style>
 
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <PirlsLogo className="mb-2 h-12 w-auto sm:h-16" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary">老師端儀表板</h1>
-          {data?.quizTitle && (
-            <p className="text-base sm:text-lg text-muted-foreground mt-1">
-              📝 {data.quizTitle}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">Quiz ID: {quizId}</p>
-          {lastUpdated && (
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              {isRefreshing ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : autoRefresh ? (
-                <Wifi className="h-3 w-3 text-green-600" />
-              ) : (
-                <WifiOff className="h-3 w-3" />
+      <header className="mb-6 bg-card border-neo rounded-[24px] shadow-neo px-5 sm:px-7 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cream border-neo p-1.5 shrink-0 overflow-hidden">
+            <PirlsLogo className="w-full h-full" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-[1.625rem] sm:text-[2rem] font-extrabold leading-tight">老師端儀表板</h1>
+            {data?.quizTitle && (
+              <p className="text-[1.125rem] sm:text-[1.25rem] font-bold mt-0.5 break-words">📝 {data.quizTitle}</p>
+            )}
+            <p className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>測驗代碼：<span className="font-mono">{quizId}</span></span>
+              {lastUpdated && (
+                <span className="inline-flex items-center gap-1">
+                  {isRefreshing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : autoRefresh ? (
+                    <Wifi className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <WifiOff className="h-4 w-4" />
+                  )}
+                  上次更新：{formatRelative(lastUpdated, now)}
+                  {autoRefresh && <span className="text-green-700">・每 30 秒自動更新</span>}
+                </span>
               )}
-              上次更新：{formatRelative(lastUpdated, now)}
-              {autoRefresh && <span className="text-green-700">· 自動更新中（每 30 秒）</span>}
             </p>
-          )}
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 print:hidden">
+        <div className="flex flex-wrap gap-2 print:hidden">
           <Button
             variant="outline"
-            size="sm"
+            className={dashBtn}
             onClick={() => setAutoRefresh(v => !v)}
             title={autoRefresh ? '關閉自動更新' : '開啟自動更新'}
           >
             {autoRefresh ? (
-              <><Wifi className="h-4 w-4 mr-1 text-green-600" /> 自動更新中</>
+              <><Wifi className="h-4 w-4 mr-1.5 text-green-600" /> 自動更新中</>
             ) : (
-              <><WifiOff className="h-4 w-4 mr-1" /> 自動更新關</>
+              <><WifiOff className="h-4 w-4 mr-1.5" /> 自動更新關</>
             )}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setReloadSignal(s => s + 1)} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} /> 重新整理
+          <Button variant="outline" className={dashBtn} onClick={() => setReloadSignal(s => s + 1)} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} /> 重新整理
           </Button>
           {!empty && (
             <>
-              <Button variant="outline" size="sm" onClick={downloadCSV}>
-                <Download className="h-4 w-4 mr-1" /> 匯出 CSV
+              <Button variant="outline" className={`${dashBtn} bg-sage/60`} onClick={downloadCSV}>
+                <Download className="h-4 w-4 mr-1.5" /> 匯出 CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="h-4 w-4 mr-1" /> 列印 / 存 PDF
+              <Button variant="outline" className={dashBtn} onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-1.5" /> 列印 / 存 PDF
               </Button>
             </>
           )}
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/"><ArrowLeft className="h-4 w-4 mr-1" /> 回首頁</Link>
+          <Button variant="outline" className={dashBtn} asChild>
+            <Link href="/"><ArrowLeft className="h-4 w-4 mr-1.5" /> 回首頁</Link>
           </Button>
         </div>
       </header>
 
       {empty ? (
-        <Card className="max-w-2xl mx-auto">
+        <Card className={`max-w-2xl mx-auto ${dashCard}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" /> 還沒有人交卷
+            <CardTitle className="flex items-center gap-2 text-[1.5rem]">
+              <Users className="h-6 w-6" /> 還沒有人交卷
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base">
               學生作答後資料會自動出現（每 30 秒刷新一次）。可以再投影一次學生作答 QR Code：
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {studentUrl ? (
               <>
-                <div className="flex justify-center bg-white p-4 rounded-lg border">
+                <div className="flex justify-center bg-white p-5 rounded-2xl border-neo">
                   <QRCodeSVG
                     value={studentUrl}
-                    size={220}
+                    size={260}
                     bgColor="#ffffff"
                     fgColor="#000000"
                     level="L"
                     includeMargin={false}
                   />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">學生作答連結</p>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-bold text-muted-foreground">學生作答連結</p>
                   <div className="flex gap-2">
-                    <Input value={studentUrl} readOnly className="text-xs font-mono" />
-                    <Button size="sm" variant="outline" onClick={copyStudentUrl} title="複製連結">
+                    <Input value={studentUrl} readOnly className="h-11 text-sm font-mono border-neo rounded-xl" />
+                    <Button variant="outline" className={dashBtn} onClick={copyStudentUrl} title="複製連結">
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" asChild title="另開新視窗">
+                    <Button variant="outline" className={dashBtn} asChild title="另開新視窗">
                       <a href={studentUrl} target="_blank" rel="noreferrer">
                         <ExternalLink className="h-4 w-4" />
                       </a>
@@ -609,7 +627,7 @@ function DashboardInner() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">學生作答連結載入中…</p>
+              <p className="text-base text-muted-foreground">學生作答連結載入中…</p>
             )}
           </CardContent>
         </Card>
@@ -617,21 +635,21 @@ function DashboardInner() {
         <>
           {/* 提示橫幅：重複交卷去重 / 題目已刪除 */}
           {(duplicateCount > 0 || questionsMissing) && (
-            <div className="mb-4 space-y-2">
+            <div className="mb-5 space-y-2">
               {duplicateCount > 0 && (
-                <Alert>
+                <Alert className="border-neo rounded-[18px] bg-lemon/40">
                   <Info className="h-4 w-4" />
-                  <AlertTitle>已自動合併重複交卷</AlertTitle>
-                  <AlertDescription>
+                  <AlertTitle className="text-base">已自動合併重複交卷</AlertTitle>
+                  <AlertDescription className="text-[0.9375rem]">
                     偵測到 {duplicateCount} 筆重複交卷（同班級+座號+姓名），已取「最後一次交卷」作為計分依據。
                   </AlertDescription>
                 </Alert>
               )}
               {questionsMissing && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="border-neo rounded-[18px]">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>題目資料已刪除</AlertTitle>
-                  <AlertDescription>
+                  <AlertTitle className="text-base">題目資料已刪除</AlertTitle>
+                  <AlertDescription className="text-[0.9375rem]">
                     本測驗的題目資料已不存在（可能已過期或被清除），仍可看學生分數與 PIRLS 層次表現，但無法呈現「各題答對率」與「逐題選項分布」。
                   </AlertDescription>
                 </Alert>
@@ -639,39 +657,35 @@ function DashboardInner() {
             </div>
           )}
 
-          {/* KPI 卡片 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 print-avoid-break">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1 text-xs">
-                  <Users className="h-3 w-3" /> 交卷人數
-                </CardDescription>
-                <CardTitle className="text-3xl text-primary">{dedupedSubmissions.length}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1 text-xs">
-                  <Target className="h-3 w-3" /> 班級平均
-                </CardDescription>
-                <CardTitle className="text-3xl text-primary">{stats!.avg.toFixed(1)}%</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">最高分</CardDescription>
-                <CardTitle className="text-3xl text-green-600">{stats!.high.toFixed(0)}%</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">最低分</CardDescription>
-                <CardTitle className="text-3xl text-orange-600">{stats!.low.toFixed(0)}%</CardTitle>
-              </CardHeader>
-            </Card>
+          {/* KPI：重點數字（需關注／優秀可點擊直接篩選成績表） */}
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6 print-avoid-break">
+            {[
+              { icon: <Users className="h-4 w-4" />, label: '交卷人數', value: `${dedupedSubmissions.length}`, unit: '人', color: '#3D2E1E' },
+              { icon: <Target className="h-4 w-4" />, label: '班級平均', value: stats!.avg.toFixed(1), unit: '%', color: '#B2643F' },
+              { icon: <span aria-hidden>🏆</span>, label: '最高分', value: stats!.high.toFixed(0), unit: '%', color: '#15803d' },
+              { icon: <span aria-hidden>📉</span>, label: '最低分', value: stats!.low.toFixed(0), unit: '%', color: '#c2410c' },
+              { icon: <span aria-hidden>⚠️</span>, label: '需關注（<60%）', value: `${attentionCount}`, unit: '人', color: '#b91c1c', onClick: () => showFilter('attention'), bg: 'bg-rose/25' },
+              { icon: <span aria-hidden>⭐</span>, label: '優秀（≥80%）', value: `${topCount}`, unit: '人', color: '#15803d', onClick: () => showFilter('top'), bg: 'bg-sage/25' },
+            ].map(k => {
+              const body = (
+                <>
+                  <div className="flex items-center gap-1.5 text-[0.9375rem] font-bold text-muted-foreground">{k.icon}{k.label}</div>
+                  <div className="mt-2 font-extrabold tabular-nums leading-none text-[2.25rem] xl:text-[2.5rem]" style={{ color: k.color }}>
+                    {k.value}<span className="text-[1.125rem] ml-1 font-bold">{k.unit}</span>
+                  </div>
+                  {k.onClick && <div className="mt-2 text-sm font-bold text-muted-foreground print:hidden">點一下看名單 →</div>}
+                </>
+              );
+              const cls = `text-left ${k.bg ?? 'bg-card'} border-neo rounded-[20px] shadow-neo-sm px-5 py-4`;
+              return k.onClick ? (
+                <button key={k.label} type="button" onClick={k.onClick} className={`${cls} neo-hover-lift`}>{body}</button>
+              ) : (
+                <div key={k.label} className={cls}>{body}</div>
+              );
+            })}
           </div>
 
-          {/* 三張 recharts 圖表（lazy-loaded）：分數分布、各題答對率、PIRLS 雷達 */}
+          {/* 三張 recharts 圖表（lazy-loaded）：分數分布、四層次雷達、各題答對率 */}
           <DashboardCharts
             scoreBins={stats!.scoreBins}
             perQuestion={stats!.perQuestion}
@@ -679,143 +693,60 @@ function DashboardInner() {
             hasQuestions={stats!.hasQuestions}
           />
 
-          {/* 逐題選項分布（迷思分析）— 題目資料缺失時隱藏 */}
-          {stats!.hasQuestions && (
-          <Card className="mb-6 print-avoid-break">
-            <CardHeader>
-              <CardTitle>逐題選項分布（迷思分析）</CardTitle>
-              <CardDescription>
-                看出學生卡在哪個誘答選項。
-                <span className="inline-block ml-1 align-middle">
-                  <span className="inline-block w-3 h-3 bg-green-500 rounded-sm mr-1" />正解
-                  <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm mx-1" />干擾選項
-                </span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {stats!.perQuestion.map((q) => (
-                <div key={q.idx} className="border-b pb-4 last:border-b-0 last:pb-0">
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm">第 {q.idx} 題</span>
-                      <Badge variant="outline" style={{ borderColor: q.color, color: q.color }}>
-                        {PIRLS_LEVEL_LABEL[q.pirlsLevel] ?? q.pirlsLevel}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        答對率 <span className="font-bold" style={{ color: q.color }}>{q.accuracy}%</span> · {q.correct}/{q.answered}
-                        {q.skippedCount > 0 && <span className="ml-1 text-orange-600">· 略過 {q.skippedCount}</span>}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-foreground/80">{q.fullQuestion}</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    {q.options.map((optText, optIdx) => {
-                      const cnt = q.optionCounts[optIdx];
-                      const pct = q.total > 0 ? Math.round((cnt / q.total) * 100) : 0;
-                      const isCorrect = optIdx === q.correctAnswerIndex;
-                      return (
-                        <div key={optIdx} className="flex items-center gap-2 text-xs">
-                          <div className="w-7 shrink-0 font-medium flex items-center gap-0.5">
-                            {isCorrect && <span className="text-green-600" aria-label="正解">✓</span>}
-                            <span>{String.fromCharCode(65 + optIdx)}.</span>
-                          </div>
-                          <div className="flex-1 min-w-0 truncate" title={optText}>{optText}</div>
-                          <div className="w-24 sm:w-32 bg-gray-100 dark:bg-gray-800 rounded h-3 relative overflow-hidden shrink-0">
-                            <div
-                              className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-gray-400'}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <div className="w-16 text-right font-mono shrink-0 tabular-nums">
-                            {cnt} ({pct}%)
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {q.skippedCount > 0 && (
-                      <div className="text-xs text-muted-foreground pl-9 italic">
-                        略過未答：{q.skippedCount} 人
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          )}
-
+          {/* 下半部：學生成績表（老師最常看，放前面）＋ 逐題選項分布；大螢幕左右並排 */}
+          <div className={`grid grid-cols-1 gap-6 items-start ${stats!.hasQuestions ? '2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]' : ''}`}>
           {/* 學生成績表格 */}
-          <Card className="print-avoid-break">
+          <Card id="student-table" className={`print-avoid-break scroll-mt-6 min-w-0 ${dashCard}`}>
             <CardHeader>
-              <CardTitle>學生成績表</CardTitle>
-              <CardDescription>點欄位標題可排序；可搜尋、依需關注/優秀篩選；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
+              <CardTitle className="text-[1.5rem]">學生成績表</CardTitle>
+              <CardDescription className="text-[0.9375rem]">點欄位標題可排序、點學生看逐題對錯；可搜尋或篩選需關注／優秀；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
             </CardHeader>
             <CardContent>
               {/* 篩選工具列 */}
-              <div className="flex flex-wrap items-center gap-2 mb-3 print:hidden">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <div className="flex flex-wrap items-center gap-2.5 mb-4 print:hidden">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
-                    placeholder="搜尋姓名/座號/班級…"
+                    placeholder="搜尋姓名、座號、班級…"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-7 h-8 text-sm w-48"
+                    className="pl-9 h-11 text-base border-neo rounded-full"
                   />
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant={filterMode === 'all' ? 'default' : 'outline'}
-                    onClick={() => setFilterMode('all')}
-                    className="h-8"
-                  >
-                    全部
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={filterMode === 'attention' ? 'default' : 'outline'}
-                    onClick={() => setFilterMode('attention')}
-                    className="h-8"
-                  >
-                    ⚠ 需關注 (&lt;60%)
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={filterMode === 'top' ? 'default' : 'outline'}
-                    onClick={() => setFilterMode('top')}
-                    className="h-8"
-                  >
-                    ⭐ 優秀 (≥80%)
-                  </Button>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={pillBtn(filterMode === 'all')} onClick={() => setFilterMode('all')}>全部</button>
+                  <button type="button" className={pillBtn(filterMode === 'attention')} onClick={() => setFilterMode('attention')}>⚠ 需關注（&lt;60%）</button>
+                  <button type="button" className={pillBtn(filterMode === 'top')} onClick={() => setFilterMode('top')}>⭐ 優秀（≥80%）</button>
                 </div>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  顯示 <span className="font-bold text-foreground">{displayedSubmissions.length}</span> / {data!.submissions.length} 位
+                <span className="text-[0.9375rem] text-muted-foreground ml-auto">
+                  顯示 <span className="font-bold text-foreground">{displayedSubmissions.length}</span> / {dedupedSubmissions.length} 位
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
+              <div className="overflow-x-auto rounded-2xl border-neo">
+                <table className="w-full text-base">
+                  <thead className="bg-cream-deep">
+                    <tr className="border-b-[1.5px] border-ink text-left">
                       <SortHeader label="班級"     sortKey="class"        currentKey={sortKey} dir={sortDir} onClick={handleSort} />
                       <SortHeader label="座號"     sortKey="seatNumber"   currentKey={sortKey} dir={sortDir} onClick={handleSort} />
                       <SortHeader label="姓名"     sortKey="name"         currentKey={sortKey} dir={sortDir} onClick={handleSort} />
                       <SortHeader label="答對"     sortKey="correct"      currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
                       <SortHeader label="答對率"   sortKey="accuracy"     currentKey={sortKey} dir={sortDir} onClick={handleSort} align="center" />
-                      <SortHeader label="交卷時間" sortKey="submittedAt"  currentKey={sortKey} dir={sortDir} onClick={handleSort} className="text-xs" />
-                      <th className="py-2 px-2 w-8 print:hidden" aria-label="展開"></th>
+                      <SortHeader label="交卷時間" sortKey="submittedAt"  currentKey={sortKey} dir={sortDir} onClick={handleSort} />
+                      <th className="py-3 px-3 w-10 print:hidden" aria-label="展開"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayedSubmissions.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-muted-foreground text-sm">
+                        <td colSpan={7} className="py-10 text-center text-muted-foreground text-base">
                           {searchTerm || filterMode !== 'all' ? '沒有符合條件的學生' : '尚無資料'}
                         </td>
                       </tr>
                     ) : displayedSubmissions.map((s) => {
                       const acc = s.totalCount > 0 ? Math.round((s.correctCount / s.totalCount) * 100) : 0;
-                      const accColor = acc >= 80 ? 'text-green-600' : acc >= 60 ? 'text-orange-600' : 'text-red-600';
+                      const accColor = acc >= 80 ? 'text-green-700' : acc >= 60 ? 'text-orange-700' : 'text-red-700';
+                      const accBg = acc >= 80 ? 'bg-green-100' : acc >= 60 ? 'bg-orange-100' : 'bg-red-100';
                       const accIcon = acc >= 80 ? '⭐' : acc >= 60 ? '' : '⚠';
                       const ts = s.submittedAt
                         ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })
@@ -824,25 +755,26 @@ function DashboardInner() {
                       return (
                         <React.Fragment key={s.id}>
                           <tr
-                            className={`border-b hover:bg-muted/30 cursor-pointer ${isExpanded ? 'bg-muted/30' : ''}`}
+                            className={`border-b border-line hover:bg-cream cursor-pointer ${isExpanded ? 'bg-cream' : ''}`}
                             onClick={() => toggleExpand(s.id)}
                           >
-                            <td className="py-2 px-2">{s.studentInfo.class}</td>
-                            <td className="py-2 px-2">{s.studentInfo.seatNumber}</td>
-                            <td className="py-2 px-2 font-medium">{s.studentInfo.name}</td>
-                            <td className="py-2 px-2 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
-                            <td className={`py-2 px-2 text-center font-bold tabular-nums ${accColor}`}>
-                              {accIcon && <span className="mr-0.5" aria-hidden>{accIcon}</span>}
-                              {acc}%
+                            <td className="py-3 px-3">{s.studentInfo.class}</td>
+                            <td className="py-3 px-3 tabular-nums">{s.studentInfo.seatNumber}</td>
+                            <td className="py-3 px-3 font-bold">{s.studentInfo.name}</td>
+                            <td className="py-3 px-3 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
+                            <td className="py-3 px-3 text-center">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-extrabold tabular-nums ${accColor} ${accBg}`}>
+                                {accIcon && <span aria-hidden>{accIcon}</span>}{acc}%
+                              </span>
                             </td>
-                            <td className="py-2 px-2 text-xs text-muted-foreground">{ts}</td>
-                            <td className="py-2 px-2 text-muted-foreground print:hidden">
-                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">{ts}</td>
+                            <td className="py-3 px-3 text-muted-foreground print:hidden">
+                              {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                             </td>
                           </tr>
                           {isExpanded && (
-                            <tr className="bg-muted/20 border-b print:hidden">
-                              <td colSpan={7} className="px-4 py-3">
+                            <tr className="bg-cream border-b border-line print:hidden">
+                              <td colSpan={7} className="px-4 py-4">
                                 <ExpandedStudentDetail student={s} questions={data!.questions} />
                               </td>
                             </tr>
@@ -855,6 +787,72 @@ function DashboardInner() {
               </div>
             </CardContent>
           </Card>
+
+          {/* 逐題選項分布（迷思分析）— 題目資料缺失時隱藏 */}
+          {stats!.hasQuestions && (
+          <Card className={`print-avoid-break min-w-0 ${dashCard}`}>
+            <CardHeader>
+              <CardTitle className="text-[1.5rem]">逐題選項分布（迷思分析）</CardTitle>
+              <CardDescription className="text-[0.9375rem]">
+                看出學生卡在哪個誘答選項。
+                <span className="inline-block ml-1 align-middle">
+                  <span className="inline-block w-3.5 h-3.5 bg-green-500 rounded-sm mr-1 align-middle" />正解
+                  <span className="inline-block w-3.5 h-3.5 bg-gray-400 rounded-sm mx-1 align-middle" />干擾選項
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {stats!.perQuestion.map((q) => (
+                <div key={q.idx} className="border-b border-line pb-5 last:border-b-0 last:pb-0">
+                  <div className="mb-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-base">第 {q.idx} 題</span>
+                      <Badge variant="outline" className="text-sm" style={{ borderColor: q.color, color: q.color }}>
+                        {PIRLS_LEVEL_LABEL[q.pirlsLevel] ?? q.pirlsLevel}
+                      </Badge>
+                      <span className="text-[0.9375rem] text-muted-foreground ml-auto">
+                        答對率 <span className="font-extrabold" style={{ color: q.color }}>{q.accuracy}%</span> · {q.correct}/{q.answered}
+                        {q.skippedCount > 0 && <span className="ml-1 text-orange-700">· 略過 {q.skippedCount}</span>}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-base leading-relaxed text-foreground/85">{q.fullQuestion}</p>
+                  </div>
+                  <div className="space-y-2">
+                    {q.options.map((optText, optIdx) => {
+                      const cnt = q.optionCounts[optIdx];
+                      const pct = q.total > 0 ? Math.round((cnt / q.total) * 100) : 0;
+                      const isCorrect = optIdx === q.correctAnswerIndex;
+                      return (
+                        <div key={optIdx} className={`flex items-center gap-2.5 text-[0.9375rem] ${isCorrect ? 'font-bold' : ''}`}>
+                          <div className="w-8 shrink-0 flex items-center gap-0.5">
+                            {isCorrect && <span className="text-green-600" aria-label="正解">✓</span>}
+                            <span>{String.fromCharCode(65 + optIdx)}.</span>
+                          </div>
+                          <div className="flex-1 min-w-0 truncate" title={optText}>{optText}</div>
+                          <div className="w-28 sm:w-44 bg-gray-100 rounded-full h-4 relative overflow-hidden shrink-0 border border-line">
+                            <div
+                              className={`h-full rounded-full ${isCorrect ? 'bg-green-500' : 'bg-gray-400'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="w-20 text-right font-mono shrink-0 tabular-nums text-sm">
+                            {cnt} ({pct}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {q.skippedCount > 0 && (
+                      <div className="text-sm text-muted-foreground pl-10 italic">
+                        略過未答：{q.skippedCount} 人
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          )}
+          </div>
         </>
       )}
     </div>

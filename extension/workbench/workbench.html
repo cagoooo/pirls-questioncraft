@@ -78,7 +78,11 @@
         <section class="card result" id="resultCard" aria-labelledby="h-res">
           <h2 id="h-res"><span class="step">2</span> 檢查與修改題目</h2>
           <div id="resultEmpty" class="empty">
-            <p>出好的文章與題目會出現在這裡，每一個欄位都可以直接修改，改完會自動存起來（關掉分頁也不會不見）。</p>
+            <p id="resultEmptyText">出好的文章與題目會出現在這裡，每一個欄位都可以直接修改，改完會自動存起來（關掉分頁也不會不見）。</p>
+            <div id="prevBox" class="prev-box hidden">
+              <span>📦 上一份題組「<b id="prevTitle"></b>」已先收起來</span>
+              <button class="btn small" id="restorePrev" type="button">↩️ 還原上一份</button>
+            </div>
           </div>
           <div id="resultBody" class="hidden">
             <p class="muted" id="resultMeta"></p>

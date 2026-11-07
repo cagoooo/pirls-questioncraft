@@ -51,7 +51,7 @@ export interface DashboardChartsProps {
 
 function TextDataDetails({ summary, children }: { summary: string; children: React.ReactNode }) {
   return (
-    <details className="mt-3 text-xs text-muted-foreground">
+    <details className="mt-3 text-sm text-muted-foreground">
       <summary className="cursor-pointer hover:text-foreground select-none">
         📋 {summary}
       </summary>
@@ -73,26 +73,30 @@ export default function DashboardCharts({ scoreBins, perQuestion, radarData, has
     ? `共 ${perQuestion.length} 題，答對率最高第 ${[...perQuestion].sort((a, b) => b.accuracy - a.accuracy)[0]?.idx} 題（${[...perQuestion].sort((a, b) => b.accuracy - a.accuracy)[0]?.accuracy}%），最低第 ${[...perQuestion].sort((a, b) => a.accuracy - b.accuracy)[0]?.idx} 題（${[...perQuestion].sort((a, b) => a.accuracy - b.accuracy)[0]?.accuracy}%）。`
     : '';
 
+  const card = 'print-avoid-break border-neo rounded-[24px] shadow-neo bg-card';
+  const tick = { fontSize: 15, fill: '#5C4733' };
+
+  // 寬螢幕：分數分布＋四層次雷達並排，各題答對率佔滿整行（2026-11-07）
   return (
-    <>
+    <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
       {/* 分數分布直方圖 */}
-      <Card className="mb-6 print-avoid-break">
+      <Card className={card}>
         <CardHeader>
-          <CardTitle>班級分數分布</CardTitle>
-          <CardDescription>看出班上是「集中在某個區間」（單峰）還是「兩極化」（M 型）。</CardDescription>
+          <CardTitle className="text-[1.5rem]">班級分數分布</CardTitle>
+          <CardDescription className="text-[0.9375rem]">看出班上是「集中在某個區間」（單峰）還是「兩極化」（M 型）。</CardDescription>
         </CardHeader>
         <CardContent>
           <div role="img" aria-label={scoreSummary}>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart data={scoreBins}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis allowDecimals={false} label={{ value: '人數', angle: -90, position: 'insideLeft' }} />
+                <XAxis dataKey="range" tick={tick} />
+                <YAxis allowDecimals={false} tick={tick} label={{ value: '人數', angle: -90, position: 'insideLeft', style: tick }} />
                 <Tooltip
                   formatter={(value: any, _n: any, p: any) => [`${value} 人`, `分數 ${p.payload.range}`]}
                   labelFormatter={() => ''}
                 />
-                <Bar dataKey="count" name="人數">
+                <Bar dataKey="count" name="人數" radius={[8, 8, 0, 0]}>
                   {scoreBins.map((b, i) => <Cell key={i} fill={b.color} />)}
                 </Bar>
               </BarChart>
@@ -112,25 +116,28 @@ export default function DashboardCharts({ scoreBins, perQuestion, radarData, has
         </CardContent>
       </Card>
 
+      {/* PIRLS 四層次雷達圖 */}
+      <RadarCard radarData={radarData} radarSummary={radarSummary} card={card} tick={tick} />
+
       {/* 各題答對率 */}
       {hasQuestions && (
-        <Card className="mb-6 print-avoid-break">
+        <Card className={`${card} xl:col-span-2`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" /> 各題答對率
+            <CardTitle className="flex items-center gap-2 text-[1.5rem]">
+              <BarChart3 className="h-6 w-6" /> 各題答對率
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-[0.9375rem]">
               顏色對應 PIRLS 四層次（藍=訊息提取／綠=直接推論／橘=詮釋整合／紫=評估批判）。
-              <span className="block mt-0.5">答對率 = 答對人數 ÷ <strong>實際作答人數</strong>；hover 可看完成率。</span>
+              <span className="block mt-0.5">答對率 = 答對人數 ÷ <strong>實際作答人數</strong>；滑鼠移到長條上可看完成率。</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div role="img" aria-label={perQSummary}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={perQuestion}>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={perQuestion} margin={{ bottom: 14 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="idx" label={{ value: '題號', position: 'insideBottom', offset: -5 }} />
-                  <YAxis domain={[0, 100]} unit="%" />
+                  <XAxis dataKey="idx" tick={tick} label={{ value: '題號', position: 'insideBottom', offset: -10, style: tick }} />
+                  <YAxis domain={[0, 100]} unit="%" tick={tick} />
                   <Tooltip
                     formatter={(value: any, _name: any, p: any) => {
                       const q = p.payload;
@@ -141,7 +148,7 @@ export default function DashboardCharts({ scoreBins, perQuestion, radarData, has
                       return q ? `第 ${idx} 題 [${PIRLS_LEVEL_LABEL[q.pirlsLevel]}]\n${q.fullQuestion}` : `第 ${idx} 題`;
                     }}
                   />
-                  <Bar dataKey="accuracy" name="答對率">
+                  <Bar dataKey="accuracy" name="答對率" radius={[8, 8, 0, 0]}>
                     {perQuestion.map((q, i) => (
                       <Cell key={i} fill={q.color} />
                     ))}
@@ -164,36 +171,40 @@ export default function DashboardCharts({ scoreBins, perQuestion, radarData, has
         </Card>
       )}
 
-      {/* PIRLS 四層次雷達圖 */}
-      <Card className="mb-6 print-avoid-break">
-        <CardHeader>
-          <CardTitle>PIRLS 四層次班級平均答對率</CardTitle>
-          <CardDescription>看出班上整體在哪個閱讀素養層次強、哪個層次需要加強</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div role="img" aria-label={radarSummary}>
-            <ResponsiveContainer width="100%" height={350}>
-              <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="level" />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                <Radar name="班級平均" dataKey="accuracy" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.5} />
-                <Tooltip formatter={(v: any) => `${v}%`} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-          <TextDataDetails summary="顯示純文字數據">
-            <ul className="space-y-0.5">
-              {radarData.map(r => (
-                <li key={r.level}>
-                  {r.level}：<span className="font-mono tabular-nums font-bold">{r.accuracy}%</span>
-                </li>
-              ))}
-            </ul>
-          </TextDataDetails>
-        </CardContent>
-      </Card>
-    </>
+    </div>
+  );
+}
+
+function RadarCard({ radarData, radarSummary, card, tick }: { radarData: RadarPoint[]; radarSummary: string; card: string; tick: { fontSize: number; fill: string } }) {
+  return (
+    <Card className={card}>
+      <CardHeader>
+        <CardTitle className="text-[1.5rem]">PIRLS 四層次班級平均答對率</CardTitle>
+        <CardDescription className="text-[0.9375rem]">看出班上整體在哪個閱讀素養層次強、哪個層次需要加強</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div role="img" aria-label={radarSummary}>
+          <ResponsiveContainer width="100%" height={330}>
+            <RadarChart data={radarData} outerRadius="80%">
+              <PolarGrid />
+              <PolarAngleAxis dataKey="level" tick={{ ...tick, fontSize: 16, fontWeight: 700 }} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ ...tick, fontSize: 13 }} />
+              <Radar name="班級平均" dataKey="accuracy" stroke="#E89B7B" fill="#F5C9A8" fillOpacity={0.6} strokeWidth={2} />
+              <Tooltip formatter={(v: any) => `${v}%`} />
+              <Legend wrapperStyle={{ fontSize: 15 }} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+        <TextDataDetails summary="顯示純文字數據">
+          <ul className="space-y-0.5">
+            {radarData.map(r => (
+              <li key={r.level}>
+                {r.level}：<span className="font-mono tabular-nums font-bold">{r.accuracy}%</span>
+              </li>
+            ))}
+          </ul>
+        </TextDataDetails>
+      </CardContent>
+    </Card>
   );
 }

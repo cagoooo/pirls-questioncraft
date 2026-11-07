@@ -78,6 +78,7 @@ async function startCapture(tab) {
       await openWorkbench();
       return { ok: false, error: e?.message ?? String(e) };
     }
+    await archiveDraft();
     await addShot({ dataUrl, title: tab.title ?? '', url: tab.url ?? '', needsCrop: true, autoCrop: true });
     await chrome.storage.local.set({ sourceMode: 'image' });
     await openWorkbench();
@@ -88,6 +89,14 @@ async function startCapture(tab) {
     await openWorkbench().catch(() => {});
     return { ok: false, error: e?.message ?? String(e) };
   }
+}
+
+// 新素材進來時，把右邊的舊題組收進「上一份」並清空，避免新文章配到舊題目（工作台可一鍵還原）
+async function archiveDraft() {
+  const { [KEYS.draft]: draft } = await chrome.storage.local.get(KEYS.draft);
+  if (!draft?.data) return;
+  await chrome.storage.local.set({ prevDraft: { ...draft, archivedAt: Date.now() } });
+  await chrome.storage.local.remove(KEYS.draft);
 }
 
 async function notice(text) {
@@ -112,6 +121,7 @@ async function useSelection(info, tab) {
     });
     if (res?.result && res.result.trim().length >= text.trim().length * 0.8) text = res.result;
   } catch { /* PDF 等頁面拿不到，就用 selectionText */ }
+  await archiveDraft();
   await chrome.storage.local.set({
     [KEYS.text]: { text: text.trim(), title: tab?.title ?? '', url: tab?.url ?? '', ts: Date.now() },
     sourceMode: 'text',
@@ -141,6 +151,7 @@ async function readFullPage(tab) {
     await openWorkbench();
     return { ok: false, error: 'too-short' };
   }
+  await archiveDraft();
   await chrome.storage.local.set({
     [KEYS.text]: { text, title: result.title || tab.title || '', url: result.url || tab.url || '', ts: Date.now(), from: 'page' },
     sourceMode: 'text',

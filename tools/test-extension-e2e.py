@@ -415,6 +415,18 @@ with sync_playwright() as p:
     bench.wait_for_timeout(500)
     check("工作台顯示來源（讀取全文）", "讀取全文" in bench.inner_text("#textMeta") and bench.input_value("#sourceText") == txt, bench.inner_text("#textMeta"))
 
+    # 14b. 載入新素材時右邊舊題組要先收起來，可一鍵還原
+    check("讀取新文章後右邊舊題組被收起", bench.is_visible("#resultEmpty") and bench.is_hidden("#resultBody"))
+    check("顯示「還原上一份」", bench.is_visible("#restorePrev") and len(bench.inner_text("#prevTitle")) > 0, bench.inner_text("#resultEmpty")[:80])
+    check("狀態列說明已收起舊題目", "已先收起來" in bench.inner_text("#genStatus"), bench.inner_text("#genStatus")[:60])
+    bench.click("#restorePrev")
+    bench.wait_for_selector("#questions .q", timeout=5000)
+    check("按「還原上一份」找回題組", bench.locator("#questions .q").count() == 8 and bench.evaluate("chrome.storage.local.get('prevDraft').then(r => !r.prevDraft)"))
+    # 老師打字時不會被打斷（自己存檔不觸發重畫）
+    qa = bench.locator("#questions .q").first.locator("[data-f=question]")
+    qa.click(); qa.press("End"); qa.type("（補充）", delay=30); bench.wait_for_timeout(900)
+    check("打字中不會失去游標", bench.evaluate("document.activeElement && document.activeElement.dataset.f === 'question'") and qa.input_value().endswith("（補充）"))
+
     # 15. 長文提醒
     bench.fill("#sourceText", "一" * 5000)
     bench.wait_for_timeout(300)

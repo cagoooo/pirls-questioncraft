@@ -13,14 +13,16 @@ let shots = [];
 let draft = null; // { data, questionMode, languageMode, model, generatedAt, warnings, category, chapterFollowsTitle }
 let mode = 'image';
 let busy = false;
+let prevDraft = null; // 載入新素材時自動收起的上一份題組
 
 // ---------- 初始化 ----------
 async function init() {
   settings = await getSettings();
   const upgraded = upgradeDefaultModel(settings);
   if (upgraded) settings = await saveSettings({ model: upgraded });
-  const store = await chrome.storage.local.get([KEYS.draft, KEYS.text, 'sourceMode', 'lastNotice']);
+  const store = await chrome.storage.local.get([KEYS.draft, KEYS.text, 'sourceMode', 'lastNotice', 'prevDraft']);
   draft = store[KEYS.draft] ?? null;
+  prevDraft = store.prevDraft ?? null;
   shots = await getShots();
   mode = store.sourceMode === 'text' ? 'text' : 'image';
   $('sourceText').value = store[KEYS.text]?.text ?? '';
@@ -427,6 +429,9 @@ async function saveDraft(now) {
 function renderDraft() {
   const has = !!draft?.data;
   $('resultEmpty').classList.toggle('hidden', has);
+  const showPrev = !has && !!prevDraft?.data;
+  $('prevBox').classList.toggle('hidden', !showPrev);
+  if (showPrev) $('prevTitle').textContent = prevDraft.data.title || '未命名';
   $('resultBody').classList.toggle('hidden', !has);
   $('exportCard').classList.toggle('hidden', !has);
   if (!has) return;
@@ -586,6 +591,17 @@ $('sendChoice').addEventListener('click', () => sendToPagamo(false));
 $('dlGroup').addEventListener('click', () => exportFile(true));
 $('dlChoice').addEventListener('click', () => exportFile(false));
 
+$('restorePrev').addEventListener('click', async () => {
+  if (!prevDraft?.data) return;
+  const { archivedAt, ...restored } = prevDraft;
+  draft = restored;
+  prevDraft = null;
+  await chrome.storage.local.set({ [KEYS.draft]: draft });
+  await chrome.storage.local.remove('prevDraft');
+  renderDraft();
+  setStatus('', `↩️ 已還原上一份題組「${escapeHtml(draft.data.title || '未命名')}」。`);
+});
+
 $('newSet').addEventListener('click', async () => {
   if (!confirm('要清空目前的題目、截圖與文字，準備做下一篇嗎？（請先確認已經下載匯出檔）')) return;
   draft = null;
@@ -603,6 +619,18 @@ $('newSet').addEventListener('click', async () => {
 // ---------- 其他分頁（背景截圖、右鍵文字）的變動即時反映 ----------
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'local') return;
+  if (changes.prevDraft) prevDraft = changes.prevDraft.newValue ?? null;
+  // 只處理「背景程式清空了題組」：自己存檔（老師正在打字）時不重畫，免得打斷輸入
+  if (changes[KEYS.draft] && !changes[KEYS.draft].newValue && draft) {
+    draft = null;
+    clearTimeout(draftTimer);
+    renderDraft();
+    setStatus('', '📥 已載入新素材，右邊的舊題目已先收起來（可按「還原上一份」找回）。確認素材後按「開始出題」。');
+    const card = $('resultCard');
+    card.classList.remove('fresh'); void card.offsetWidth; card.classList.add('fresh');
+  } else if (changes.prevDraft && !draft) {
+    renderDraft();
+  }
   if (changes[KEYS.shots]) {
     shots = changes[KEYS.shots].newValue ?? [];
     renderShots();
@@ -610,6 +638,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   }
   if (changes[KEYS.text] && changes[KEYS.text].newValue?.text !== $('sourceText').value) {
     $('sourceText').value = changes[KEYS.text].newValue?.text ?? '';
+    $('sourceText').scrollTop = 0; // 新文章從開頭看起
     renderTextMeta(changes[KEYS.text].newValue ?? null);
     autoGrow($('sourceText'));
   }

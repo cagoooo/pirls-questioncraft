@@ -4,7 +4,7 @@
 
 > 📥 **下載與圖文安裝說明：<https://cagoooo.github.io/pirls-questioncraft/extension/>**
 >
-> 目前版本：v0.5.0（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
+> 目前版本：v0.5.1（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
 
 ## 一、安裝（第一次約 5 分鐘）
 
@@ -75,7 +75,7 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，73 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，78 項）。
 - 發布：改 `manifest.json` 版本時，同時在 `CHANGELOG.json` 最前面加一筆（版本不一致會讓建置失敗）。網站部署時 `tools/pack-extension.mjs` 會自動打包 ZIP 與 `version.json`，老師的擴充套件會收到新版提醒。
 - 安裝說明頁的截圖：`python -X utf8 tools/capture-extension-guide.py` 重新產生。
 
