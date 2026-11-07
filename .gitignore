@@ -72,3 +72,6 @@ functions/node_modules/
 # 擴充套件 ZIP 由 tools/pack-extension.mjs 在建置時產生
 /public/extension/*.zip
 /public/extension/version.json
+
+# 推廣素材（LINE 配圖等）不進版控
+/promo/
