@@ -1,0 +1,133 @@
+// 擴充套件的回歸測試：PaGamO 檔案必須與網站版完全一致、範本與提示詞不可與網站版分歧。
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const ts = require('typescript');
+const XLSX = require('xlsx');
+const root = path.resolve(__dirname, '..');
+const ext = (p) => path.join(root, 'extension', p);
+let checks = 0;
+
+// ---- 1. 範本同步 ----
+const tplJson = JSON.parse(fs.readFileSync(path.join(root, 'src/lib/pagamoTemplates.json'), 'utf8'));
+const extCtx = { XLSX, console };
+extCtx.globalThis = extCtx;
+vm.createContext(extCtx);
+vm.runInContext(fs.readFileSync(ext('lib/pagamoTemplates.js'), 'utf8'), extCtx);
+assert.deepEqual(JSON.parse(JSON.stringify(extCtx.PAGAMO_TEMPLATES)), tplJson, '擴充套件範本與網站不一致，請執行 node tools/sync-extension.cjs');
+checks++;
+vm.runInContext(fs.readFileSync(ext('lib/pagamo.js'), 'utf8'), extCtx);
+const { buildWorkbook, validate, toBytes } = extCtx.PirlsPagamo;
+
+// 內建的 SheetJS 版本要與網站相同
+const vendorSrc = fs.readFileSync(ext('vendor/xlsx.full.min.js'), 'utf8');
+assert.ok(vendorSrc.includes(`version="${XLSX.version}"`), `vendor/xlsx.full.min.js 不是 ${XLSX.version}`);
+checks++;
+
+// ---- 2. 載入網站版 buildPaGamOWorkbook ----
+const cache = new Map();
+function load(file) {
+  const full = path.resolve(root, file);
+  if (cache.has(full)) return cache.get(full);
+  const module = { exports: {} };
+  const js = ts.transpileModule(fs.readFileSync(full, 'utf8'), { compilerOptions: { esModuleInterop: true, target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
+  vm.runInNewContext(js, { module, exports: module.exports, console, require: (id) => {
+    if (id.endsWith('.json')) return require(path.resolve(path.dirname(full), id));
+    if (id.startsWith('.')) return load(path.relative(root, path.resolve(path.dirname(full), id + '.ts')));
+    return require(id);
+  } }, { filename: full });
+  cache.set(full, module.exports);
+  return module.exports;
+}
+const { buildPaGamOWorkbook } = load('src/lib/buildPaGamOWorkbook.ts');
+
+const roundtrip = (wb) => XLSX.read(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', bookSST: true }), { type: 'buffer' });
+const rowsOf = (wb) => XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, blankrows: true });
+const make = (count) => ({
+  title: '測試文章：小水滴的旅行',
+  articleContent: '第一段。\n第二段，含"引號"與😀。',
+  questions: Array.from({ length: count }, (_, i) => ({
+    question: `第${i + 1}題：中文，"引號"\n第二行`,
+    options: ['=SUM(1,2)', '+123', '-456', '@文字'],
+    correctAnswerIndex: i % 4,
+    explanation: `解析 ${i + 1}`,
+    pirlsLevel: 'locate & retrieve',
+  })),
+});
+
+for (const count of [8, 10]) {
+  for (const group of [false, true]) {
+    const data = make(count);
+    const site = roundtrip(buildPaGamOWorkbook(data, group));
+    const mine = roundtrip(buildWorkbook(data, { group, subject: '閱讀素養題組', book: '資訊冊', chapter: '資訊章' }));
+    assert.deepEqual(mine.SheetNames, site.SheetNames);
+    assert.deepEqual(rowsOf(mine), rowsOf(site), `${group ? '題組' : '選擇題'} ${count} 題與網站版不一致`);
+    assert.deepEqual(mine.Sheets[mine.SheetNames[0]]['!merges'], site.Sheets[site.SheetNames[0]]['!merges']);
+    for (const [addr, cell] of Object.entries(mine.Sheets[mine.SheetNames[0]])) if (!addr.startsWith('!')) assert.equal(cell.f, undefined, `${addr} 被當成公式`);
+    checks++;
+
+    // 自訂分類寫在正確欄位
+    const custom = rowsOf(roundtrip(buildWorkbook(data, { group, subject: '國語', book: '115上', chapter: data.title })));
+    const r = custom[10];
+    assert.deepEqual([r[1], r[2], r[3]], ['國語', '115上', data.title]);
+    if (group) {
+      assert.equal(r[5], data.title);
+      assert.equal(r[6], data.articleContent);
+      assert.equal(custom[11][0], '1_1');
+      assert.equal(custom.length, 10 + 1 + count);
+    } else {
+      assert.equal(custom.length, 10 + count);
+    }
+    // toBytes 產生的是合法 xlsx
+    const bytes = toBytes(data, { group });
+    assert.ok(bytes.byteLength > 1000);
+    assert.equal(rowsOf(XLSX.read(bytes, { type: 'array' })).length, custom.length);
+    checks++;
+  }
+}
+
+// 錯誤資料要被擋下
+const bad = make(8);
+bad.questions[2].options = ['a', 'b', 'c'];
+bad.questions[3].correctAnswerIndex = 4;
+assert.equal(validate(bad).length, 2);
+assert.throws(() => buildWorkbook(bad, {}));
+checks++;
+
+// ---- 3. 提示詞不可與網站後端分歧 ----
+function backendLines(file) {
+  const src = fs.readFileSync(path.join(root, file), 'utf8');
+  const body = src.slice(src.indexOf('prompt: `') + 9, src.indexOf('`,\n});'));
+  return body.replace(/\\`/g, '`').split('\n').map((l) => l.trim())
+    .filter((l) => l && !l.includes('{{') && !l.includes('{{{'));
+}
+
+(async () => {
+  const prompt = await import(path.join(root, 'extension/lib/prompt.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
+  const gemini = await import(path.join(root, 'extension/lib/gemini.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
+  const opts = [['8-questions', 'zh-TW'], ['10-questions', 'en']];
+  const imageAll = opts.map(([questionMode, languageMode]) => prompt.imagePrompt({ questionMode, languageMode })).join('\n');
+  const textAll = opts.map(([questionMode, languageMode]) => prompt.textPrompt({ text: 'X', questionMode, languageMode })).join('\n');
+  for (const line of backendLines('functions/src/flows/generate-from-images.ts')) assert.ok(imageAll.includes(line), `圖片提示詞少了：${line}`);
+  for (const line of backendLines('functions/src/flows/generate-from-text.ts')) assert.ok(textAll.includes(line), `文字提示詞少了：${line}`);
+  checks++;
+
+  // ---- 4. 結果檢查與模型排序 ----
+  const good = { title: 't', articleContent: 'a', questions: prompt.PIRLS_LEVELS.flatMap((l) => [0, 1].map(() => ({ question: 'q', options: ['1', '2', '3', '4'], correctAnswerIndex: 1, explanation: 'e', pirlsLevel: l }))) };
+  assert.deepEqual(gemini.checkResult(gemini.normalize(good), '8-questions'), { fatal: [], warnings: [] });
+  const tenWarn = gemini.checkResult(gemini.normalize(good), '10-questions');
+  assert.equal(tenWarn.fatal.length, 0);
+  assert.equal(tenWarn.warnings.length, 2);
+  const broken = JSON.parse(JSON.stringify(good));
+  broken.questions[0].options.pop();
+  broken.questions[1].pirlsLevel = 'guess';
+  assert.equal(gemini.checkResult(gemini.normalize(broken), '8-questions').fatal.length, 2);
+  checks++;
+
+  const sorted = gemini.sortModels(['gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-3.0-flash-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-embedding-001', 'gemma-3-27b-it']);
+  assert.deepEqual(sorted, ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-3.0-flash-preview', 'gemini-2.0-flash-lite', 'gemini-2.5-pro']);
+  checks++;
+
+  console.log(`Extension tests passed: ${checks} checks.`);
+})().catch((e) => { console.error(e); process.exit(1); });

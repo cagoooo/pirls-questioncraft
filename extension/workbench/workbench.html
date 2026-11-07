@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工作台｜PIRLS 閱讀題組小幫手</title>
+  <link rel="icon" href="../icons/icon-32.png">
+  <link rel="stylesheet" href="../ui/base.css">
+  <link rel="stylesheet" href="workbench.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="workbench.html">
+        <img src="../icons/icon-48.png" alt="" width="40" height="40">
+        <span><strong>PIRLS 閱讀題組小幫手</strong><small>工作台：素材 → 出題 → 檢查 → 匯出 PaGamO</small></span>
+      </a>
+      <nav><a class="btn" href="../options/options.html">⚙️ 設定與金鑰</a></nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="keyBanner" class="notice warn banner hidden">⚠️ 還沒設定 Gemini 金鑰，請先到 <a href="../options/options.html">設定頁</a> 貼上自己的免費金鑰（約 2 分鐘）。</div>
+    <div id="pageNotice" class="notice warn banner hidden" role="status"></div>
+
+    <div class="bench">
+      <!-- ① 素材 -->
+      <section class="card source" aria-labelledby="h-src">
+        <h2 id="h-src"><span class="step">1</span> 出題素材</h2>
+        <div class="tabs" role="tablist" aria-label="素材類型">
+          <button role="tab" id="tab-image" aria-controls="panel-image" class="tab" data-mode="image">📷 截圖 <b id="shotCount">0</b></button>
+          <button role="tab" id="tab-text" aria-controls="panel-text" class="tab" data-mode="text">📝 文字</button>
+        </div>
+
+        <div id="panel-image" role="tabpanel" aria-labelledby="tab-image">
+          <div id="shotEmpty" class="empty">
+            <p><b>怎麼加入截圖？</b></p>
+            <ul>
+              <li>到任何網頁（電子書、PDF、新聞），按工具列的 PIRLS 圖示，或按 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>，拖曳框選文章。</li>
+              <li>文章跨好幾頁：捲到下一段再框一次，依閱讀順序排好。</li>
+              <li>也可以在這個頁面直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 貼上圖片，或把圖片檔拖進來。</li>
+            </ul>
+          </div>
+          <ol id="shots" class="shots"></ol>
+          <div class="row-btns end">
+            <button class="btn small danger hidden" id="clearShots" type="button">🧹 清除全部截圖</button>
+          </div>
+        </div>
+
+        <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" class="hidden">
+          <label class="field"><span>文章內容（在網頁反白文字 → 右鍵「用這段文字出 PIRLS 題組」會自動帶進來）</span>
+            <textarea id="sourceText" rows="12" placeholder="把文章貼在這裡"></textarea>
+          </label>
+          <p class="muted" id="textMeta"></p>
+        </div>
+
+        <div class="gen-opts">
+          <div class="opt-group"><span class="opt-label">題數</span>
+            <div class="seg" role="radiogroup" aria-label="題數">
+              <label><input type="radio" name="qmode" value="8-questions"><span>8 題</span></label>
+              <label><input type="radio" name="qmode" value="10-questions"><span>10 題</span></label>
+            </div>
+          </div>
+          <div class="opt-group"><span class="opt-label">語言</span>
+            <div class="seg" role="radiogroup" aria-label="出題語言">
+              <label><input type="radio" name="lmode" value="zh-TW"><span>中文</span></label>
+              <label><input type="radio" name="lmode" value="en"><span>英文題目</span></label>
+            </div>
+          </div>
+        </div>
+        <button class="btn primary big full" id="generate" type="button">✨ 開始出題</button>
+        <div id="genStatus" class="gen-status hidden" role="status" aria-live="polite"></div>
+      </section>
+
+      <!-- ②③ 結果 -->
+      <div class="right">
+        <section class="card result" id="resultCard" aria-labelledby="h-res">
+          <h2 id="h-res"><span class="step">2</span> 檢查與修改題目</h2>
+          <div id="resultEmpty" class="empty">
+            <p>出好的文章與題目會出現在這裡，每一個欄位都可以直接修改，改完會自動存起來（關掉分頁也不會不見）。</p>
+          </div>
+          <div id="resultBody" class="hidden">
+            <p class="muted" id="resultMeta"></p>
+            <div id="resultWarn" class="notice warn hidden"></div>
+            <label class="field"><span>文章標題</span><input id="title" type="text"></label>
+            <label class="field"><span>文章內容（學生在 PaGamO 題組中會看到這段）</span><textarea id="article" rows="10"></textarea></label>
+            <div id="questions"></div>
+          </div>
+        </section>
+
+        <section class="card export hidden" id="exportCard" aria-labelledby="h-exp">
+          <h2 id="h-exp"><span class="step">3</span> 匯出到 PaGamO</h2>
+          <div class="grid3">
+            <label class="field"><span>科目</span><input id="catSubject" type="text"></label>
+            <label class="field"><span>冊次</span><input id="catBook" type="text"></label>
+            <label class="field"><span>章節</span><input id="catChapter" type="text"></label>
+          </div>
+          <div id="exportErr" class="notice error hidden"></div>
+          <div class="row-btns">
+            <button class="btn go big" id="dlGroup" type="button">⬇️ 下載 PaGamO 題組版（含文章，建議）</button>
+            <button class="btn" id="dlChoice" type="button">⬇️ 下載一般選擇題版</button>
+          </div>
+          <details class="howto">
+            <summary>下載後怎麼匯入 PaGamO？</summary>
+            <ol>
+              <li>打開 <a href="https://www.pagamo.org/api/teacher_console/questions/add_questions/batch" target="_blank" rel="noopener noreferrer">PaGamO 批量上傳頁</a>（教師後台 → 個人題庫 → 新增題目 → 批量上傳）。</li>
+              <li>「題型」選 <b>題組</b>（下載題組版時）或 <b>選擇題</b>（下載一般版時）。</li>
+              <li>把剛下載的 xlsx 拖進上傳區 → 按「上傳」。</li>
+              <li>到「題目總覽」確認題數與正解。</li>
+            </ol>
+            <p class="muted">下一版會把這幾步自動化：按一下就帶到 PaGamO、自動放好檔案。</p>
+          </details>
+          <div class="row-btns end">
+            <button class="btn small ghost" id="newSet" type="button">🆕 清空，準備下一篇</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div id="cropModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="h-crop">
+    <div class="modal-card">
+      <h2 id="h-crop">✂️ 框選要出題的範圍</h2>
+      <p class="muted">這個頁面無法直接框選，所以先截了整個畫面。請在圖上拖曳出文章範圍。</p>
+      <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
+      <div class="row-btns end">
+        <button class="btn" id="cropCancel" type="button">取消</button>
+        <button class="btn" id="cropFull" type="button">使用整張</button>
+        <button class="btn primary" id="cropOk" type="button" disabled>✔ 裁切這個範圍</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../vendor/xlsx.full.min.js"></script>
+  <script src="../lib/pagamoTemplates.js"></script>
+  <script src="../lib/pagamo.js"></script>
+  <script type="module" src="workbench.js"></script>
+</body>
+</html>

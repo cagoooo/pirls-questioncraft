@@ -1,0 +1,507 @@
+import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS } from '../lib/store.js';
+import { generateQuestions } from '../lib/gemini.js';
+import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
+import { renderFooter } from '../ui/footer.js';
+
+const $ = (id) => document.getElementById(id);
+const MAX_EDGE = 2000;
+const MAX_SHOTS = 10;
+
+let settings;
+let shots = [];
+let draft = null; // { data, questionMode, languageMode, model, generatedAt, warnings, category, chapterFollowsTitle }
+let mode = 'image';
+let busy = false;
+
+// ---------- 初始化 ----------
+async function init() {
+  settings = await getSettings();
+  const store = await chrome.storage.local.get([KEYS.draft, KEYS.text, 'sourceMode', 'lastNotice']);
+  draft = store[KEYS.draft] ?? null;
+  shots = await getShots();
+  mode = store.sourceMode === 'text' ? 'text' : 'image';
+  $('sourceText').value = store[KEYS.text]?.text ?? '';
+  renderTextMeta(store[KEYS.text]);
+  document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`).checked = true;
+  document.querySelector(`input[name=lmode][value="${settings.languageMode}"]`).checked = true;
+  if (store.lastNotice) showNotice(store.lastNotice);
+  renderKeyBanner();
+  renderMode();
+  renderShots();
+  renderDraft();
+  renderFooter();
+}
+
+function showNotice(text) {
+  const el = $('pageNotice');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  chrome.storage.local.remove('lastNotice');
+}
+
+function renderKeyBanner() {
+  $('keyBanner').classList.toggle('hidden', !!(settings.apiKey && settings.model));
+}
+
+// ---------- 素材：截圖 ----------
+function renderMode() {
+  for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t.dataset.mode === mode));
+  $('panel-image').classList.toggle('hidden', mode !== 'image');
+  $('panel-text').classList.toggle('hidden', mode !== 'text');
+}
+
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+  mode = t.dataset.mode;
+  chrome.storage.local.set({ sourceMode: mode });
+  renderMode();
+}));
+
+function renderShots() {
+  $('shotCount').textContent = shots.length;
+  $('shotEmpty').classList.toggle('hidden', shots.length > 0);
+  $('clearShots').classList.toggle('hidden', shots.length === 0);
+  const list = $('shots');
+  list.innerHTML = '';
+  shots.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'shot';
+    li.innerHTML = `
+      <span class="num" aria-label="第 ${i + 1} 張">${i + 1}</span>
+      <div>
+        <img alt="第 ${i + 1} 張截圖">
+        <div class="meta"></div>
+      </div>
+      <div class="tools">
+        <button class="icon-btn" data-act="up" title="往前移" aria-label="第 ${i + 1} 張往前移" ${i === 0 ? 'disabled' : ''}>⬆️</button>
+        <button class="icon-btn" data-act="down" title="往後移" aria-label="第 ${i + 1} 張往後移" ${i === shots.length - 1 ? 'disabled' : ''}>⬇️</button>
+        <button class="icon-btn" data-act="crop" title="重新裁切" aria-label="裁切第 ${i + 1} 張">✂️</button>
+        <button class="icon-btn" data-act="del" title="刪除" aria-label="刪除第 ${i + 1} 張">🗑️</button>
+      </div>`;
+    li.querySelector('img').src = s.dataUrl;
+    const meta = li.querySelector('.meta');
+    if (s.needsCrop) meta.innerHTML = '<span class="needs-crop">尚未裁切：按 ✂️ 框出文章範圍</span>';
+    else meta.textContent = s.title ? `來源：${s.title}` : `${s.width ?? ''}×${s.height ?? ''}`;
+    li.dataset.id = s.id;
+    list.appendChild(li);
+  });
+}
+
+$('shots').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const id = btn.closest('.shot').dataset.id;
+  const i = shots.findIndex((s) => s.id === id);
+  if (i < 0) return;
+  const act = btn.dataset.act;
+  if (act === 'del') shots.splice(i, 1);
+  if (act === 'up' && i > 0) [shots[i - 1], shots[i]] = [shots[i], shots[i - 1]];
+  if (act === 'down' && i < shots.length - 1) [shots[i + 1], shots[i]] = [shots[i], shots[i + 1]];
+  if (act === 'crop') return openCrop(shots[i]);
+  await setShots(shots);
+  renderShots();
+});
+
+$('clearShots').addEventListener('click', async () => {
+  if (!confirm(`確定要清除全部 ${shots.length} 張截圖嗎？`)) return;
+  shots = [];
+  await setShots(shots);
+  renderShots();
+});
+
+// 貼上或拖進圖片
+async function addImageFile(file) {
+  if (!file?.type?.startsWith('image/')) return;
+  if (shots.length >= MAX_SHOTS) return alert(`最多 ${MAX_SHOTS} 張截圖，請先刪掉一些。`);
+  const bmp = await createImageBitmap(file);
+  const out = await bitmapToJpeg(bmp, 0, 0, bmp.width, bmp.height);
+  bmp.close();
+  shots.push({ id: crypto.randomUUID(), ts: Date.now(), ...out, title: file.name || '貼上的圖片', needsCrop: false });
+  await setShots(shots);
+  mode = 'image';
+  chrome.storage.local.set({ sourceMode: mode });
+  renderMode();
+  renderShots();
+}
+
+document.addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  files.forEach(addImageFile);
+});
+document.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.body.classList.add('drop-hint'); } });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('drop-hint'); });
+document.addEventListener('drop', (e) => {
+  document.body.classList.remove('drop-hint');
+  const files = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  files.forEach(addImageFile);
+});
+
+async function bitmapToJpeg(bmp, sx, sy, sw, sh) {
+  const k = Math.min(1, MAX_EDGE / Math.max(sw, sh));
+  const w = Math.max(1, Math.round(sw * k));
+  const h = Math.max(1, Math.round(sh * k));
+  const c = new OffscreenCanvas(w, h);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, w, h);
+  const blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.88 });
+  const dataUrl = await new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.readAsDataURL(blob);
+  });
+  return { dataUrl, width: w, height: h };
+}
+
+// ---------- 裁切視窗（PDF 檢視器等無法直接框選的頁面） ----------
+let cropTarget = null;
+let cropImg = null;
+let cropSel = null;
+let cropDrag = null;
+let cropScale = 1;
+
+async function openCrop(shot) {
+  cropTarget = shot;
+  cropSel = null;
+  $('cropOk').disabled = true;
+  cropImg = await createImageBitmap(await (await fetch(shot.dataUrl)).blob());
+  $('cropModal').classList.remove('hidden');
+  const stage = document.querySelector('.crop-stage');
+  const canvas = $('cropCanvas');
+  cropScale = Math.min(1, (stage.clientWidth - 2) / cropImg.width);
+  canvas.width = Math.round(cropImg.width * cropScale);
+  canvas.height = Math.round(cropImg.height * cropScale);
+  drawCrop();
+  $('cropCancel').focus();
+}
+
+function drawCrop() {
+  const canvas = $('cropCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(cropImg, 0, 0, canvas.width, canvas.height);
+  if (!cropSel) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(61,46,30,.45)';
+  ctx.beginPath();
+  ctx.rect(0, 0, canvas.width, canvas.height);
+  ctx.rect(cropSel.x, cropSel.y, cropSel.w, cropSel.h);
+  ctx.fill('evenodd');
+  ctx.strokeStyle = '#F2DC83';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(cropSel.x, cropSel.y, cropSel.w, cropSel.h);
+  ctx.restore();
+}
+
+function canvasPoint(e) {
+  const r = $('cropCanvas').getBoundingClientRect();
+  const sx = $('cropCanvas').width / r.width;
+  return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sx };
+}
+
+$('cropCanvas').addEventListener('pointerdown', (e) => {
+  cropDrag = canvasPoint(e);
+  e.currentTarget.setPointerCapture(e.pointerId);
+});
+$('cropCanvas').addEventListener('pointermove', (e) => {
+  if (!cropDrag) return;
+  const p = canvasPoint(e);
+  cropSel = { x: Math.min(p.x, cropDrag.x), y: Math.min(p.y, cropDrag.y), w: Math.abs(p.x - cropDrag.x), h: Math.abs(p.y - cropDrag.y) };
+  drawCrop();
+});
+$('cropCanvas').addEventListener('pointerup', () => {
+  cropDrag = null;
+  $('cropOk').disabled = !(cropSel && cropSel.w > 12 && cropSel.h > 12);
+});
+
+function closeCrop() {
+  $('cropModal').classList.add('hidden');
+  cropImg?.close();
+  cropImg = null;
+  cropTarget = null;
+}
+$('cropCancel').addEventListener('click', closeCrop);
+$('cropModal').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCrop(); });
+
+async function applyCrop(full) {
+  const sel = full || !cropSel ? { x: 0, y: 0, w: cropImg.width, h: cropImg.height }
+    : { x: cropSel.x / cropScale, y: cropSel.y / cropScale, w: cropSel.w / cropScale, h: cropSel.h / cropScale };
+  const out = await bitmapToJpeg(cropImg, Math.round(sel.x), Math.round(sel.y), Math.round(sel.w), Math.round(sel.h));
+  const i = shots.findIndex((s) => s.id === cropTarget.id);
+  if (i >= 0) shots[i] = { ...shots[i], ...out, needsCrop: false };
+  await setShots(shots);
+  closeCrop();
+  renderShots();
+}
+$('cropOk').addEventListener('click', () => applyCrop(false));
+$('cropFull').addEventListener('click', () => applyCrop(true));
+
+// ---------- 素材：文字 ----------
+function renderTextMeta(src) {
+  const len = $('sourceText').value.trim().length;
+  $('textMeta').textContent = `${len} 字${src?.title ? `｜來源：${src.title}` : ''}`;
+}
+let textTimer;
+$('sourceText').addEventListener('input', () => {
+  renderTextMeta();
+  clearTimeout(textTimer);
+  textTimer = setTimeout(() => chrome.storage.local.set({ [KEYS.text]: { text: $('sourceText').value, ts: Date.now() } }), 400);
+});
+
+// ---------- 出題 ----------
+document.querySelectorAll('input[name=qmode],input[name=lmode]').forEach((r) => r.addEventListener('change', async () => {
+  settings = await saveSettings({
+    questionMode: document.querySelector('input[name=qmode]:checked').value,
+    languageMode: document.querySelector('input[name=lmode]:checked').value,
+  });
+}));
+
+function setStatus(kind, html) {
+  const el = $('genStatus');
+  el.className = `gen-status ${kind === 'error' ? 'error' : ''}`;
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+}
+
+function dataUrlToPart(dataUrl) {
+  const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+  return { mimeType: m[1], base64: m[2] };
+}
+
+$('generate').addEventListener('click', async () => {
+  if (busy) return;
+  settings = await getSettings();
+  if (!settings.apiKey || !settings.model) {
+    renderKeyBanner();
+    return setStatus('error', '⚠️ 還沒設定 Gemini 金鑰。請先到 <a href="../options/options.html">設定頁</a> 貼上金鑰並按「儲存並測試」。');
+  }
+  const questionMode = document.querySelector('input[name=qmode]:checked').value;
+  const languageMode = document.querySelector('input[name=lmode]:checked').value;
+  let images = [];
+  let text = '';
+  if (mode === 'image') {
+    if (!shots.length) return setStatus('error', '⚠️ 還沒有截圖。請到網頁上按 Alt+Shift+P 框選文章，或切到「文字」分頁貼上文章。');
+    if (shots.some((s) => s.needsCrop)) return setStatus('error', '⚠️ 有截圖還沒裁切，請先按該張的 ✂️ 框出文章範圍。');
+    images = shots.map((s) => dataUrlToPart(s.dataUrl));
+    const totalMB = images.reduce((a, p) => a + p.base64.length, 0) * 0.75 / 1024 / 1024;
+    if (totalMB > 15) return setStatus('error', `⚠️ 截圖總共約 ${totalMB.toFixed(1)} MB，太大了，請減少張數。`);
+  } else {
+    text = $('sourceText').value.trim();
+    if (text.length < 80) return setStatus('error', '⚠️ 文章太短了（至少約 80 字），PIRLS 題組需要一篇完整的文章。');
+  }
+  if (draft && !confirm('重新出題會取代目前的題目（包含你改過的內容），確定嗎？')) return;
+
+  busy = true;
+  $('generate').disabled = true;
+  const t0 = Date.now();
+  let label = 'AI 正在閱讀並出題…';
+  const tick = () => setStatus('', `<span class="spinner" aria-hidden="true"></span><span>${label}（已經 ${Math.round((Date.now() - t0) / 1000)} 秒，通常 20～60 秒）</span>`);
+  tick();
+  const timer = setInterval(tick, 1000);
+  try {
+    const res = await generateQuestions({
+      key: settings.apiKey, model: settings.model, images, text, questionMode, languageMode,
+      onStatus: (s) => { label = s; tick(); },
+    });
+    draft = {
+      data: res.data,
+      questionMode, languageMode,
+      model: res.model,
+      source: mode,
+      generatedAt: Date.now(),
+      warnings: res.warnings,
+      category: defaultCategory(res.data.title),
+      chapterFollowsTitle: settings.chapterMode === 'title',
+    };
+    await saveDraft(true);
+    renderDraft();
+    const sec = Math.round((Date.now() - t0) / 1000);
+    setStatus('', `✅ 完成！花了 ${sec} 秒。請在右邊逐題檢查，確認沒問題再匯出。`);
+    $('resultCard').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  } catch (e) {
+    setStatus('error', `❌ ${escapeHtml(e.message)}`);
+  } finally {
+    clearInterval(timer);
+    busy = false;
+    $('generate').disabled = false;
+  }
+});
+
+function defaultCategory(title) {
+  return {
+    subject: settings.subject || '閱讀素養題組',
+    book: settings.book || currentTerm(),
+    chapter: settings.chapterMode === 'title' ? (title || 'PIRLS閱讀理解') : (settings.chapter || 'PIRLS閱讀理解'),
+  };
+}
+
+// ---------- 題目編輯 ----------
+let draftTimer;
+async function saveDraft(now) {
+  clearTimeout(draftTimer);
+  const write = () => chrome.storage.local.set({ [KEYS.draft]: draft });
+  if (now) return write();
+  draftTimer = setTimeout(write, 400);
+}
+
+function renderDraft() {
+  const has = !!draft?.data;
+  $('resultEmpty').classList.toggle('hidden', has);
+  $('resultBody').classList.toggle('hidden', !has);
+  $('exportCard').classList.toggle('hidden', !has);
+  if (!has) return;
+  const d = draft.data;
+  const when = new Date(draft.generatedAt).toLocaleString('zh-TW', { hour12: false });
+  $('resultMeta').textContent = `${when} 產生｜${draft.questionMode === '10-questions' ? '10' : '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}｜模型 ${draft.model}`;
+  const warn = $('resultWarn');
+  warn.classList.toggle('hidden', !draft.warnings?.length);
+  warn.textContent = draft.warnings?.length ? `⚠️ ${draft.warnings.join(' ')} 可以直接修改層次或題目，或重新出題。` : '';
+  $('title').value = d.title;
+  $('article').value = d.articleContent;
+  autoGrow($('article'));
+  $('catSubject').value = draft.category.subject;
+  $('catBook').value = draft.category.book;
+  $('catChapter').value = draft.category.chapter;
+
+  const box = $('questions');
+  box.innerHTML = '';
+  d.questions.forEach((q, i) => {
+    const el = document.createElement('article');
+    el.className = 'q';
+    el.dataset.i = i;
+    const lv = Math.max(0, PIRLS_LEVELS.indexOf(q.pirlsLevel));
+    el.innerHTML = `
+      <header><b>第 ${i + 1} 題</b>
+        <select data-f="pirlsLevel" class="lv-${lv}" aria-label="第 ${i + 1} 題的 PIRLS 層次">
+          ${PIRLS_LEVELS.map((l) => `<option value="${l}" ${l === q.pirlsLevel ? 'selected' : ''}>${LEVEL_LABEL[l]}</option>`).join('')}
+        </select></header>
+      <textarea data-f="question" rows="2" aria-label="第 ${i + 1} 題題幹"></textarea>
+      <div class="opts" role="radiogroup" aria-label="第 ${i + 1} 題選項與正解">
+        ${[0, 1, 2, 3].map((j) => `
+          <label class="opt ${q.correctAnswerIndex === j ? 'correct' : ''}">
+            <input type="radio" name="ans-${i}" value="${j}" ${q.correctAnswerIndex === j ? 'checked' : ''} aria-label="選項 ${'ABCD'[j]} 是正解">
+            <span class="letter">${'ABCD'[j]}</span>
+            <input type="text" data-opt="${j}" aria-label="第 ${i + 1} 題選項 ${'ABCD'[j]}">
+          </label>`).join('')}
+      </div>
+      <label class="exp"><span>答後講解（學生作答後才看得到：線索、正解理由、其他選項錯在哪）</span><textarea data-f="explanation" rows="2"></textarea></label>`;
+    el.querySelector('[data-f=question]').value = q.question;
+    el.querySelector('[data-f=explanation]').value = q.explanation;
+    el.querySelectorAll('[data-opt]').forEach((inp) => { inp.value = q.options[Number(inp.dataset.opt)] ?? ''; });
+    box.appendChild(el);
+  });
+  box.querySelectorAll('textarea').forEach(autoGrow);
+}
+
+function autoGrow(t) {
+  t.style.height = 'auto';
+  t.style.height = `${Math.min(t.scrollHeight + 4, 900)}px`;
+}
+
+$('questions').addEventListener('input', (e) => {
+  const card = e.target.closest('.q');
+  if (!card) return;
+  const q = draft.data.questions[Number(card.dataset.i)];
+  const t = e.target;
+  if (t.dataset.f) q[t.dataset.f] = t.value;
+  if (t.dataset.opt) q.options[Number(t.dataset.opt)] = t.value;
+  if (t.tagName === 'TEXTAREA') autoGrow(t);
+  saveDraft();
+});
+$('questions').addEventListener('change', (e) => {
+  const card = e.target.closest('.q');
+  if (!card) return;
+  const q = draft.data.questions[Number(card.dataset.i)];
+  if (e.target.type === 'radio') {
+    q.correctAnswerIndex = Number(e.target.value);
+    card.querySelectorAll('.opt').forEach((o, j) => o.classList.toggle('correct', j === q.correctAnswerIndex));
+  }
+  if (e.target.dataset.f === 'pirlsLevel') {
+    q.pirlsLevel = e.target.value;
+    e.target.className = `lv-${PIRLS_LEVELS.indexOf(q.pirlsLevel)}`;
+  }
+  saveDraft();
+});
+$('title').addEventListener('input', (e) => {
+  draft.data.title = e.target.value;
+  if (draft.chapterFollowsTitle) {
+    draft.category.chapter = e.target.value;
+    $('catChapter').value = e.target.value;
+  }
+  saveDraft();
+});
+$('article').addEventListener('input', (e) => {
+  draft.data.articleContent = e.target.value;
+  autoGrow(e.target);
+  saveDraft();
+});
+[['catSubject', 'subject'], ['catBook', 'book'], ['catChapter', 'chapter']].forEach(([id, k]) => $(id).addEventListener('input', (e) => {
+  draft.category[k] = e.target.value;
+  if (k === 'chapter') draft.chapterFollowsTitle = false;
+  saveDraft();
+}));
+
+// ---------- 匯出 ----------
+function exportFile(group) {
+  const err = $('exportErr');
+  err.classList.add('hidden');
+  try {
+    const c = draft.category;
+    if (!c.subject.trim() || !c.book.trim() || !c.chapter.trim()) throw new Error('科目、冊次、章節都要填寫。');
+    const name = globalThis.PirlsPagamo.download(draft.data, {
+      group, subject: c.subject.trim(), book: c.book.trim(), chapter: c.chapter.trim(),
+    });
+    setStatus('', `✅ 已下載「${escapeHtml(name)}」。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
+  } catch (e) {
+    err.textContent = `❌ 無法匯出：${e.message}`;
+    err.classList.remove('hidden');
+    err.scrollIntoView({ block: 'center' });
+  }
+}
+$('dlGroup').addEventListener('click', () => exportFile(true));
+$('dlChoice').addEventListener('click', () => exportFile(false));
+
+$('newSet').addEventListener('click', async () => {
+  if (!confirm('要清空目前的題目、截圖與文字，準備做下一篇嗎？（請先確認已經下載匯出檔）')) return;
+  draft = null;
+  shots = [];
+  $('sourceText').value = '';
+  await chrome.storage.local.remove([KEYS.draft, KEYS.text]);
+  await setShots([]);
+  renderShots();
+  renderDraft();
+  renderTextMeta();
+  $('genStatus').classList.add('hidden');
+  window.scrollTo({ top: 0 });
+});
+
+// ---------- 其他分頁（背景截圖、右鍵文字）的變動即時反映 ----------
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local') return;
+  if (changes[KEYS.shots]) {
+    shots = changes[KEYS.shots].newValue ?? [];
+    renderShots();
+  }
+  if (changes[KEYS.text] && changes[KEYS.text].newValue?.text !== $('sourceText').value) {
+    $('sourceText').value = changes[KEYS.text].newValue?.text ?? '';
+    renderTextMeta(changes[KEYS.text].newValue);
+  }
+  if (changes.sourceMode) {
+    mode = changes.sourceMode.newValue === 'text' ? 'text' : 'image';
+    renderMode();
+  }
+  if (changes.lastNotice?.newValue) showNotice(changes.lastNotice.newValue);
+  if (changes[KEYS.settings]) {
+    settings = await getSettings();
+    renderKeyBanner();
+  }
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+init();

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>設定｜PIRLS 閱讀題組小幫手</title>
+  <link rel="icon" href="../icons/icon-32.png">
+  <link rel="stylesheet" href="../ui/base.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="../workbench/workbench.html">
+        <img src="../icons/icon-48.png" alt="" width="40" height="40">
+        <span><strong>PIRLS 閱讀題組小幫手</strong><small>設定與金鑰</small></span>
+      </a>
+      <nav><a class="btn" href="../workbench/workbench.html">📝 前往工作台</a></nav>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <div class="col-main">
+      <section class="card" aria-labelledby="h-key">
+        <h2 id="h-key">🔑 第一步：設定自己的 Gemini 金鑰</h2>
+        <p class="muted">每位老師用自己的免費金鑰出題，不會占用別人的額度。申請大約 2 分鐘。</p>
+        <ol class="steps">
+          <li>打開 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio 金鑰頁面</a>，用自己的 Google 帳號登入。</li>
+          <li>按「<b>Create API key</b>（建立 API 金鑰）」，複製產生的那一串字（通常以 <code>AIza</code> 或 <code>AQ.</code> 開頭）。</li>
+          <li>貼到下面，按「<b>儲存並測試</b>」。看到綠色「可以使用」就完成了。</li>
+        </ol>
+        <label class="field" for="key"><span>Gemini API 金鑰</span></label>
+        <div class="key-row">
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="貼上金鑰">
+          <button class="btn small ghost" id="toggle" type="button" aria-pressed="false">顯示</button>
+        </div>
+        <div class="row-btns">
+          <button class="btn primary" id="save" type="button">💾 儲存並測試</button>
+          <button class="btn danger" id="clear" type="button">🧹 清除金鑰</button>
+        </div>
+        <div id="keyStatus" class="notice hidden" role="status" aria-live="polite"></div>
+
+        <div id="modelBox" class="model-box hidden">
+          <label class="field" for="model"><span>使用的 AI 模型（已自動選好，通常不用改）</span>
+            <select id="model"></select>
+          </label>
+          <p class="muted">清單是依這把金鑰查到的可用模型排序：文字辨識與出題品質較好的 Flash 系列排前面。若出題常出現「額度用完」，可以改選 Flash-Lite。</p>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-cat">
+        <h2 id="h-cat">📂 PaGamO 題庫分類</h2>
+        <p class="muted">上傳到 PaGamO 後，題目會依這三層自動分類（沒有的分類 PaGamO 會自動建立）。</p>
+        <div class="grid3">
+          <label class="field"><span>科目</span><input id="subject" type="text" placeholder="閱讀素養題組"></label>
+          <label class="field"><span>冊次</span><input id="book" type="text"></label>
+          <div class="field">
+            <span class="label">章節</span>
+            <div class="seg" role="radiogroup" aria-label="章節名稱">
+              <label><input type="radio" name="chapterMode" value="title"><span>用文章標題</span></label>
+              <label><input type="radio" name="chapterMode" value="custom"><span>自訂</span></label>
+            </div>
+            <input id="chapter" type="text" class="mt8" placeholder="例：PIRLS閱讀理解">
+          </div>
+        </div>
+        <p class="preview">預覽：<b id="catPreview"></b></p>
+        <p id="catSaved" class="muted" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+
+    <aside class="col-side">
+      <section class="card" aria-labelledby="h-safe">
+        <h2 id="h-safe">🛡️ 金鑰安全小提醒</h2>
+        <ul class="safe">
+          <li><b>金鑰只存在這台電腦。</b>存在 Chrome 的擴充功能儲存區，不在資料夾裡，所以把擴充套件壓成 ZIP 分享給同事，不會把金鑰送出去。</li>
+          <li><b>共用電腦用完要清除。</b>教室、辦公室共用同一個 Chrome 時，下一位使用者也能用到你的金鑰，請按左邊「清除金鑰」。</li>
+          <li><b>把金鑰限定只能用 Gemini。</b>到 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud 憑證頁</a> 編輯金鑰 →「API 限制」選「Generative Language API」。萬一外流也不能拿去用別的服務。</li>
+          <li><b>不要截有學生個資的畫面。</b>依 Google 條款，免費方案送出的內容可能被用來改進產品。課本、新聞、繪本內容沒問題，姓名、成績、聯絡資料請不要截。</li>
+          <li><b>免費額度有上限。</b>每分鐘、每天能用的次數由 Google 決定，用完會出現「額度用完」，等一下或隔天就恢復。</li>
+        </ul>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

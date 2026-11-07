@@ -4,6 +4,8 @@
 
 > 📌 **目前版本：v0.3.1**（依據 `package.json`）
 
+🧩 **Chrome 擴充套件（v0.1.0）**：在任何網頁框選截圖或反白文字，用老師自己的免費 Gemini 金鑰出題、逐題修改，下載 PaGamO 批量上傳檔。安裝與使用說明見 [`extension/README.md`](extension/README.md)，開發規劃見 [`docs/CHROME_EXTENSION_PLAN.md`](docs/CHROME_EXTENSION_PLAN.md)。
+
 This is a NextJS starter in Firebase Studio.
 
 To get started, take a look at src/app/page.tsx.

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <title>PIRLS 閱讀題組小幫手</title>
+  <link rel="stylesheet" href="../ui/base.css">
+  <style>
+    body { width: 320px; padding: 16px; background: var(--cream); }
+    .head { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+    .head img { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); background: #fff; }
+    .head strong { display: block; font-size: var(--fs-base); }
+    .head small { color: var(--ink-soft); font-size: var(--fs-xs); }
+    .stack { display: grid; gap: 12px; }
+    .stack .btn { width: 100%; }
+    .count { font-size: var(--fs-xs); color: var(--ink-soft); text-align: center; margin: 2px 0 0; }
+    .notice { margin-top: 12px; }
+    .credit { margin: 14px 0 0; text-align: center; font-size: var(--fs-xs); color: var(--ink-soft); }
+    .credit a { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <img src="../icons/icon-48.png" alt="" width="40" height="40">
+    <div><strong>PIRLS 閱讀題組小幫手</strong><small>截圖 → 出題 → 匯出 PaGamO</small></div>
+  </div>
+  <div class="stack">
+    <button class="btn primary big" id="capture" type="button">📷 框選這個畫面</button>
+    <p class="count">快捷鍵 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></p>
+    <button class="btn" id="bench" type="button">📝 開啟工作台 <span id="n"></span></button>
+    <button class="btn ghost" id="opts" type="button">⚙️ 設定與金鑰</button>
+  </div>
+  <div id="warn" class="notice warn hidden">⚠️ 還沒設定 Gemini 金鑰，請先按「設定與金鑰」。</div>
+  <p class="credit">Made with <span aria-label="愛心">❤️</span> by <a href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5" target="_blank" rel="noopener noreferrer">阿凱老師</a></p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
