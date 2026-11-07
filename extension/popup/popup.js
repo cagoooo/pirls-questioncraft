@@ -1,4 +1,5 @@
 import { getSettings, getShots } from '../lib/store.js';
+import { checkUpdate } from '../lib/update.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -6,6 +7,11 @@ const $ = (id) => document.getElementById(id);
   const [s, shots] = await Promise.all([getSettings(), getShots()]);
   $('warn').classList.toggle('hidden', !!(s.apiKey && s.model));
   if (shots.length) $('n').textContent = `（${shots.length} 張截圖）`;
+  const info = await checkUpdate();
+  if (info) {
+    $('upd').innerHTML = `🆕 有新版本 v${info.version}，<a href="${info.install}#update" target="_blank" rel="noopener noreferrer">看更新方法</a>`;
+    $('upd').classList.remove('hidden');
+  }
 })();
 
 // ⚠️ 一定要等背景程式回覆後才關掉小視窗：太早關，指令會在半路掉了（v0.1.0 的「按了沒反應」就是這個原因）

@@ -19,6 +19,7 @@ export function renderFooter() {
       <nav class="footer-links" aria-label="快速連結">
         <a href="../workbench/workbench.html">📝 工作台</a>
         <a href="../options/options.html">⚙️ 設定與金鑰</a>
+        <a href="https://cagoooo.github.io/pirls-questioncraft/extension/" target="_blank" rel="noopener noreferrer">📘 安裝與使用說明</a>
         <a href="https://cagoooo.github.io/pirls-questioncraft/" target="_blank" rel="noopener noreferrer">🌐 網站版</a>
       </nav>
     </div>

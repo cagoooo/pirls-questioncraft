@@ -142,5 +142,19 @@ function backendLines(file) {
   assert.equal(gemini.upgradeDefaultModel({ apiKey: '', model: 'gemini-2.5-flash', models }), null);
   checks++;
 
+  // 版本比較
+  const upd = await import(path.join(root, 'extension/lib/update.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
+  assert.ok(upd.isNewer('0.10.0', '0.9.9'));
+  assert.ok(upd.isNewer('1.0', '0.9.9'));
+  assert.ok(!upd.isNewer('0.5.0', '0.5.0'));
+  assert.ok(!upd.isNewer('0.4.9', '0.5.0'));
+  checks++;
+
+  // ZIP 打包：版本要與 CHANGELOG 最新一筆一致
+  const manifest = JSON.parse(fs.readFileSync(ext('manifest.json'), 'utf8'));
+  const changelog = JSON.parse(fs.readFileSync(ext('CHANGELOG.json'), 'utf8'));
+  assert.equal(changelog[0].version, manifest.version, 'manifest 版本與 CHANGELOG.json 最新一筆不一致');
+  checks++;
+
   console.log(`Extension tests passed: ${checks} checks.`);
 })().catch((e) => { console.error(e); process.exit(1); });

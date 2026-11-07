@@ -69,3 +69,6 @@ public/version.json
 # functions build output
 functions/lib/
 functions/node_modules/
+# 擴充套件 ZIP 由 tools/pack-extension.mjs 在建置時產生
+/public/extension/*.zip
+/public/extension/version.json

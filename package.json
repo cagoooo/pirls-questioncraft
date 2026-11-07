@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
-    "prebuild": "node tools/generate-version.mjs",
+    "prebuild": "node tools/generate-version.mjs && node tools/pack-extension.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,7 +15,8 @@
     "generate:assets": "node tools/generate-assets.mjs",
     "generate:version": "node tools/generate-version.mjs",
     "test": "node tools/test-platform-exports.cjs && node tools/test-extension.cjs",
-    "sync:extension": "node tools/sync-extension.cjs"
+    "sync:extension": "node tools/sync-extension.cjs",
+    "pack:extension": "node tools/pack-extension.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

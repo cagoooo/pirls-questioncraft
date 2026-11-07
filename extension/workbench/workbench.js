@@ -2,6 +2,7 @@ import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS, logEr
 import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
+import { checkUpdate } from '../lib/update.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_EDGE = 2000;
@@ -34,6 +35,18 @@ async function init() {
   renderDraft();
   renderFooter();
   maybeAutoCrop();
+  renderUpdate();
+}
+
+async function renderUpdate() {
+  const info = await checkUpdate();
+  if (!info) return;
+  const el = $('updateBanner');
+  el.innerHTML = `🆕 <b>有新版本 v${escapeHtml(info.version)}</b>（你現在是 v${escapeHtml(info.current)}）`
+    + (info.notes?.length ? `：${info.notes.map(escapeHtml).join('；')}` : '')
+    + `　<a href="${escapeHtml(info.download)}" target="_blank" rel="noopener noreferrer">⬇️ 下載新版</a>`
+    + `　<a href="${escapeHtml(info.install)}#update" target="_blank" rel="noopener noreferrer">怎麼更新？</a>`;
+  el.classList.remove('hidden');
 }
 
 function showNotice(text) {

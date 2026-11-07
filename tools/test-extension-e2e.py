@@ -121,6 +121,11 @@ with sync_playwright() as p:
         page.on("console", lambda m: errors.append(f"{page.url[-40:]} console.{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"{page.url[-40:]} pageerror: {e}"))
     ctx.on("page", watch)
+    remote = {"version": "9.9.9"}
+    ctx.route("https://cagoooo.github.io/pirls-questioncraft/extension/version.json*", lambda r: r.fulfill(json={
+        "version": remote["version"], "notes": ["測試用新功能"], "date": "2026-11-07",
+        "download": "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip",
+        "install": "https://cagoooo.github.io/pirls-questioncraft/extension/"}))
     ctx.route("https://www.pagamo.org/**", pagamo_route)
     ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=BLOG_HTML if "blog" in r.request.url else ARTICLE_HTML, content_type="text/html; charset=utf-8"))
 
@@ -472,6 +477,17 @@ with sync_playwright() as p:
     pg_pagamo.goto("https://www.pagamo.org/")
     pg_pagamo.wait_for_timeout(1500)
     check("完成後不再攔截 PaGamO 的其他頁面", "add_questions" not in pg_pagamo.url, pg_pagamo.url)
+
+    # 19. 新版本提醒
+    bench.evaluate("chrome.storage.local.remove('updateCheck')")
+    bench.reload(); bench.wait_for_selector("#updateBanner:not(.hidden)", timeout=8000)
+    ub = bench.inner_text("#updateBanner")
+    check("網站有新版時工作台顯示提醒", "9.9.9" in ub and "下載新版" in ub, ub[:80])
+    check("提醒連到安裝說明的更新段落", bench.get_attribute("#updateBanner a:nth-of-type(2)", "href").endswith("/extension/#update"))
+    remote["version"] = bench.evaluate("chrome.runtime.getManifest().version")
+    bench.evaluate("chrome.storage.local.remove('updateCheck')")
+    bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(1200)
+    check("已是最新版時不顯示提醒", bench.is_hidden("#updateBanner"))
 
     # 16. 舊版設定（Flash）升級：打開工作台就自動換成 Flash-Lite；手動選過的不動
     bench.evaluate("""async () => { const r = await chrome.storage.local.get('settings');

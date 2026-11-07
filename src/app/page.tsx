@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Accordion } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -531,6 +532,12 @@ export default function PIRLSQuestionCraftPage() {
           </div>
           <div className="flex gap-2 shrink-0 flex-wrap">
             <HelpDialog />
+            <Link href="/extension/" title="Chrome 擴充套件：截圖、讀全文出題，一鍵送到 PaGamO">
+              <PillBtn color="bg-sky" sm className="!px-3.5">
+                <span aria-hidden>🧩</span>
+                <span className="font-extrabold whitespace-nowrap">Chrome 擴充套件</span>
+              </PillBtn>
+            </Link>
             <a
               href="https://cagoooo.github.io/Akai/?wish=1"
               target="_blank"
@@ -907,9 +914,9 @@ export default function PIRLSQuestionCraftPage() {
           <div className="min-w-0">
             <div className="text-base font-extrabold">PIRLS QuestionCraft PRO</div>
             <div className="text-[13px] opacity-75 mt-1">
-              Made with <span className="text-rose">❤</span> by{' '}
+              Made with <span aria-label="愛心">❤️</span> by{' '}
               <a
-                href="https://www.smes.tyc.edu.tw/"
+                href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold underline-offset-4 hover:underline"

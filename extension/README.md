@@ -2,11 +2,13 @@
 
 在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後下載 PaGamO 批量上傳檔。
 
-> 目前版本：v0.4.0（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
+> 📥 **下載與圖文安裝說明：<https://cagoooo.github.io/pirls-questioncraft/extension/>**
+>
+> 目前版本：v0.5.0（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
 
 ## 一、安裝（第一次約 5 分鐘）
 
-1. 下載 ZIP，**解壓到固定的位置**，例如 `D:\PIRLS擴充套件`。
+1. 到上面的下載頁按「下載擴充套件（ZIP）」，**解壓到固定的位置**，例如 `D:\PIRLS擴充套件`。
    ⚠️ 之後**不要搬動或改名**這個資料夾。Chrome 是用資料夾位置認得這個擴充套件，搬家會被當成新的，金鑰與設定都會不見。
 2. Chrome 網址列輸入 `chrome://extensions`，打開右上角「**開發人員模式**」。
 3. 按「**載入未封裝項目**」，選剛剛解壓的資料夾（裡面要直接看得到 `manifest.json`）。
@@ -49,7 +51,9 @@
 
 ## 四、更新到新版
 
-1. 下載新版 ZIP，**解壓覆蓋到原本同一個資料夾**。
+有新版時，工作台上方會出現「🆕 有新版本」提醒。
+
+1. 到下載頁下載新版 ZIP，**解壓覆蓋到原本同一個資料夾**。
 2. 到 `chrome://extensions`，在這個擴充套件上按 ⟳（重新載入）。
 
 同一個位置就會保留金鑰與設定。
@@ -71,7 +75,9 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，70 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，73 項）。
+- 發布：改 `manifest.json` 版本時，同時在 `CHANGELOG.json` 最前面加一筆（版本不一致會讓建置失敗）。網站部署時 `tools/pack-extension.mjs` 會自動打包 ZIP 與 `version.json`，老師的擴充套件會收到新版提醒。
+- 安裝說明頁的截圖：`python -X utf8 tools/capture-extension-guide.py` 重新產生。
 
 ---
 
