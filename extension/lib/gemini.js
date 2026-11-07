@@ -180,6 +180,7 @@ export function checkResult(data, questionMode) {
 const FORMAT_HINT = `JSON 格式：{"title": 文章標題, "articleContent": 文章全文, "questions": [{"question": 題幹, "options": [四個選項], "correctAnswerIndex": 正解索引 0～3, "explanation": 解析, "pirlsLevel": ${PIRLS_LEVELS.map((l) => `"${l}"`).join(' | ')}}]}`;
 
 const FORMAT_HINT_TEXT = FORMAT_HINT.replace('"articleContent": 文章全文, ', '');
+const OPTION_ORDER_NOTE = '（補充說明：題目上傳到 PaGamO 後，選項順序會被隨機打亂。所以 explanation 裡不要用 A、B、C、D 或「第幾個選項」來指稱選項，請直接寫出選項的內容，例如「答案是『重新綁好再試』」。）';
 const TEXT_MODE_NOTE = '（補充說明：這次不需要輸出 articleContent 欄位，系統會自動放入上方 <ARTICLE> 的原文。請直接輸出 title 與 questions，把心力放在出好題目。）';
 const TEXT_SCHEMA = {
   ...RESPONSE_SCHEMA,
@@ -203,6 +204,8 @@ export async function generateQuestions({ key, model, images = [], text = '', qu
     { text: prompt },
     // 文字模式：原文由程式自己放回，不讓 AI 逐字抄一遍（長文章可省下大量時間）
     ...(isText ? [{ text: TEXT_MODE_NOTE }] : []),
+    // PaGamO 預設打亂選項順序：講解不能用 A／B／C／D 代稱
+    { text: OPTION_ORDER_NOTE },
   ];
   const schema = isText ? TEXT_SCHEMA : RESPONSE_SCHEMA;
   const hint = isText ? FORMAT_HINT_TEXT : FORMAT_HINT;

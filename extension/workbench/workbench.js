@@ -26,6 +26,7 @@ async function init() {
   renderTextMeta(store[KEYS.text]);
   document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`).checked = true;
   document.querySelector(`input[name=lmode][value="${settings.languageMode}"]`).checked = true;
+  document.querySelector(`input[name=optorder][value="${settings.randomOptions === false ? 'fixed' : 'random'}"]`).checked = true;
   if (store.lastNotice) showNotice(store.lastNotice);
   renderKeyBanner();
   renderMode();
@@ -460,7 +461,7 @@ $('article').addEventListener('input', (e) => {
 function exportOpts(group) {
   const c = draft.category;
   if (!c.subject.trim() || !c.book.trim() || !c.chapter.trim()) throw new Error('科目、冊次、章節都要填寫。');
-  return { group, subject: c.subject.trim(), book: c.book.trim(), chapter: c.chapter.trim() };
+  return { group, subject: c.subject.trim(), book: c.book.trim(), chapter: c.chapter.trim(), randomOptions: settings.randomOptions !== false };
 }
 
 function showExportOk(html) {
@@ -510,6 +511,10 @@ async function sendToPagamo(group) {
     showExportError(e);
   }
 }
+
+document.querySelectorAll('input[name=optorder]').forEach((r) => r.addEventListener('change', async () => {
+  settings = await saveSettings({ randomOptions: document.querySelector('input[name=optorder]:checked').value === 'random' });
+}));
 
 $('sendGroup').addEventListener('click', () => sendToPagamo(true));
 $('sendChoice').addEventListener('click', () => sendToPagamo(false));

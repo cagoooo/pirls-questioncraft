@@ -2,7 +2,7 @@
 
 在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後下載 PaGamO 批量上傳檔。
 
-> 目前版本：v0.3.0（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
+> 目前版本：v0.3.1（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁）
 
 ## 一、安裝（第一次約 5 分鐘）
 
@@ -27,6 +27,7 @@
 4. 按提示框的「前往工作台出題」→ 選 8／10 題、中文／英文 →「開始出題」。
 5. **逐題檢查、修改**：題幹、選項、正解、解析、PIRLS 層次都能直接改，改完自動儲存。
 6. 按「**🚀 送到 PaGamO（題組版）**」：會先下載一份備份，接著自動打開 PaGamO 批量上傳頁、選好「題組」、放好檔案。確認後按頁面上閃爍的「**上傳**」就完成（擴充套件不會替你按上傳）。
+   - **選項順序預設「隨機」**：每位學生看到的選項順序都不同，不能靠記「答案是第幾個」猜題。少數題目需要固定順序（例如選項是「以上皆是」）時，可在匯出區切到「固定」。
    - 還沒登入 PaGamO：先登入，登入後會自動回到批量上傳頁並放好檔案（10 分鐘內有效）。
    - 自動放檔沒成功：工作台下方有「只下載檔案」和手動匯入步驟。
 
@@ -69,7 +70,7 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，60 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，64 項）。
 
 ---
 

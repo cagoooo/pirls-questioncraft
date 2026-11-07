@@ -231,7 +231,8 @@ with sync_playwright() as p:
     gen = [c for c in calls[n_before:] if ":generateContent" in c["url"]]
     body = json.loads(gen[-1]["body"]) if gen else {}
     parts = body.get("contents", [{}])[0].get("parts", [])
-    check("出題請求附上 2 張圖片＋提示詞", sum(1 for x in parts if "inline_data" in x) == 2 and "PIRLS" in parts[-1].get("text", ""))
+    check("出題請求附上 2 張圖片＋提示詞", sum(1 for x in parts if "inline_data" in x) == 2 and "PIRLS" in parts[2].get("text", ""))
+    check("提醒 AI 講解不要用 ABCD 代稱選項", "不要用 A、B、C、D" in parts[-1].get("text", ""))
     check("出題要求 JSON schema", body.get("generationConfig", {}).get("responseMimeType") == "application/json")
     check("顯示 8 題", bench.locator("#questions .q").count() == 8)
     check("分類預設：科目改成國語、冊次 115上、章節＝標題",
@@ -261,6 +262,7 @@ with sync_playwright() as p:
     r12 = [c.value for c in ws[12]]
     check("題組檔第 11 列是文章列", r11[0] == 1 and r11[1:4] == ["國語", "115上", "小水滴的旅行（修訂）"] and r11[5] == "小水滴的旅行（修訂）", str(r11[:7]))
     check("第 12 列是改過的第 1 題、正解 C", r12[0] == "1_1" and str(r12[8]).startswith("老師改過") and r12[20] == "C", str([r12[0], r12[8], r12[20]]))
+    check("題組檔預設選項隨機排列（v）", all(ws.cell(row=i, column=24).value == "v" for i in range(12, 20)), str([ws.cell(row=i, column=24).value for i in range(12, 20)]))
     check("題組檔共 10+1+8 列", ws.max_row == 19, str(ws.max_row))
     check("檔名", dl.value.suggested_filename == "PIRLS_PaGamO_題組_小水滴的旅行（修訂）.xlsx", dl.value.suggested_filename)
     with bench.expect_download() as dl2:
@@ -270,6 +272,16 @@ with sync_playwright() as p:
     ws2 = openpyxl.load_workbook(path2).active
     r = [c.value for c in ws2[11]]
     check("選擇題版第 11 列是第 1 題", r[0] == 1 and r[1:4] == ["國語", "115上", "小水滴的旅行（修訂）"] and r[17] == "C", str(r[:6]))
+    check("選擇題檔預設選項隨機排列（v）", r[20] == "v", str(r[20]))
+    # 切到「固定」再下載：要寫 x
+    bench.click("label:has(input[name=optorder][value=fixed])")
+    bench.wait_for_timeout(300)
+    with bench.expect_download() as dl_fixed:
+        bench.click("#dlChoice")
+    pf = OUT / ("fixed_" + dl_fixed.value.suggested_filename); dl_fixed.value.save_as(str(pf))
+    check("切換「固定」後寫 x", openpyxl.load_workbook(pf).active.cell(row=11, column=21).value == "x")
+    bench.click("label:has(input[name=optorder][value=random])")
+    bench.wait_for_timeout(300)
 
     # 9. 匯出前檢查：清空一個選項要被擋
     q1.locator("[data-opt='1']").fill("")
@@ -299,7 +311,7 @@ with sync_playwright() as p:
     gen = [c for c in calls[n_before:] if ":generateContent" in c["url"]]
     body = json.loads(gen[-1]["body"]) if gen else {}
     parts = body.get("contents", [{}])[0].get("parts", [])
-    check("文字出題用 <ARTICLE> 提示詞、沒有圖片", len(parts) == 2 and "<ARTICLE>" in parts[0]["text"] and article in parts[0]["text"] and "不需要輸出 articleContent" in parts[1]["text"])
+    check("文字出題用 <ARTICLE> 提示詞、沒有圖片", len(parts) == 3 and "<ARTICLE>" in parts[0]["text"] and article in parts[0]["text"] and "不需要輸出 articleContent" in parts[1]["text"])
     sch = body.get("generationConfig", {}).get("responseSchema", {})
     check("文字模式不讓 AI 抄回原文（格式不含 articleContent）", "articleContent" not in sch.get("properties", {}) and "questions" in sch.get("properties", {}))
     check("文字模式保留原文", bench.input_value("#article") == article)

@@ -79,6 +79,11 @@ for (const count of [8, 10]) {
     } else {
       assert.equal(custom.length, 10 + count);
     }
+    // 選項隨機：v 寫在「選項排列」欄；預設（不給）是 x，與網站版相同
+    const randomRows = rowsOf(roundtrip(buildWorkbook(data, { group, randomOptions: true })));
+    const col = group ? 23 : 20;
+    assert.ok(randomRows.slice(group ? 11 : 10).every((row) => row[col] === 'v'));
+    assert.ok(custom.slice(group ? 11 : 10).every((row) => row[col] === 'x'));
     // toBytes 產生的是合法 xlsx
     const bytes = toBytes(data, { group });
     assert.ok(bytes.byteLength > 1000);

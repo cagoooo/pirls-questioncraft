@@ -23,7 +23,8 @@
 
   /**
    * @param data { title, articleContent, questions[] }
-   * @param opts { group, subject, book, chapter, title, article }
+   * @param opts { group, subject, book, chapter, title, article, randomOptions }
+   *   randomOptions：true＝PaGamO 打亂選項順序（v）；預設 false＝固定順序（x，與網站版相同）
    */
   function buildWorkbook(data, opts) {
     var XLSX = global.XLSX;
@@ -58,7 +59,7 @@
       q.options.forEach(function (option, j) { row[(group ? 10 : 7) + j * 2] = option; });
       row[group ? 20 : 17] = 'ABCD'[q.correctAnswerIndex];
       row[group ? 21 : 18] = q.explanation;
-      row[group ? 23 : 20] = 'x'; // 保留老師排好的選項順序（不隨機）
+      row[group ? 23 : 20] = opts.randomOptions ? 'v' : 'x'; // 官方範本：v＝選項隨機排列、x＝固定順序
       rows.push(row);
     });
     var sheet = XLSX.utils.aoa_to_sheet(rows);

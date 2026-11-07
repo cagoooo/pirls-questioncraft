@@ -95,6 +95,13 @@
             <label class="field"><span>冊次</span><input id="catBook" type="text"></label>
             <label class="field"><span>章節</span><input id="catChapter" type="text"></label>
           </div>
+          <div class="opt-group order-row"><span class="opt-label">選項順序</span>
+            <div class="seg" role="radiogroup" aria-label="PaGamO 選項順序">
+              <label><input type="radio" name="optorder" value="random"><span>隨機（建議）</span></label>
+              <label><input type="radio" name="optorder" value="fixed"><span>固定</span></label>
+            </div>
+            <span class="muted">隨機：每位學生看到的選項順序不同，比較不會互相看答案</span>
+          </div>
           <div id="exportErr" class="notice error hidden"></div>
           <div id="exportOk" class="notice ok hidden" role="status" aria-live="polite"></div>
           <div class="row-btns">
