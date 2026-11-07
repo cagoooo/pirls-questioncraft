@@ -42,21 +42,21 @@ export function QuestionCard({ questionItem, questionNumber, className, style, .
               meta.bg
             )}
           >
-            <div className="text-[9px] opacity-70 leading-none">Q</div>
-            <div className="text-[17px] leading-none mt-0.5">{questionNumber}</div>
+            <div className="text-[0.6875rem] opacity-70 leading-none">Q</div>
+            <div className="text-[1.125rem] leading-none mt-0.5">{questionNumber}</div>
           </div>
 
           {/* 中段：層次徽章 + 題幹 */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={cn('inline-flex items-center gap-1 border-neo rounded-full px-2.5 py-0.5 text-[11px] font-extrabold', meta.bg)}>
+              <span className={cn('inline-flex items-center gap-1 border-neo rounded-full px-2.5 py-0.5 text-[0.8125rem] font-extrabold', meta.bg)}>
                 <span>{meta.emoji}</span> {meta.label}
               </span>
-              <span className="font-mono text-[11px] text-muted-foreground border border-line rounded-full px-2 py-0.5">
+              <span className="font-mono text-[0.8125rem] text-muted-foreground border border-line rounded-full px-2 py-0.5">
                 PIRLS · {meta.short}
               </span>
             </div>
-            <div className="text-[15px] sm:text-base leading-[1.55] font-semibold text-ink">
+            <div className="text-[1rem] sm:text-base leading-[1.55] font-semibold text-ink">
               {questionItem.question}
             </div>
           </div>
@@ -99,7 +99,7 @@ export function QuestionCard({ questionItem, questionNumber, className, style, .
 
         {/* 黃色解析框 */}
         <div className="bg-lemon/55 border-neo rounded-[14px] px-4 py-3.5">
-          <div className="text-xs font-extrabold mb-1 flex items-center gap-1.5">
+          <div className="text-sm font-extrabold mb-1 flex items-center gap-1.5">
             <span>💡</span> 解析說明
           </div>
           <div className="text-sm leading-[1.7] text-ink-soft whitespace-pre-wrap">

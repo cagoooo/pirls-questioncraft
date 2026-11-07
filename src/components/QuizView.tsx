@@ -511,8 +511,8 @@ export function QuizView({
                     )}
                     {result.explanation && (
                       <div className="mt-2">
-                        <p className="font-semibold text-xs text-muted-foreground mb-1">答後講解：</p>
-                        <CardDescription className="text-xs whitespace-pre-wrap p-3 bg-muted/60 dark:bg-muted/30 rounded-md border border-dashed">
+                        <p className="font-semibold text-sm text-muted-foreground mb-1">答後講解：</p>
+                        <CardDescription className="text-sm leading-relaxed whitespace-pre-wrap p-3 bg-muted/60 dark:bg-muted/30 rounded-md border border-dashed">
                           {result.explanation}
                         </CardDescription>
                       </div>
@@ -675,7 +675,7 @@ export function QuizView({
                     <p className={cn("font-bold text-sm", isAnswerCorrect ? "text-green-700 dark:text-green-300" : "text-destructive dark:text-red-300")}>
                         {isAnswerCorrect ? '恭喜答對！' : `答錯了！正確答案是 ${optionLabels[currentQuestion.correctAnswerIndex]}`}
                     </p>
-                    <div className="text-xs text-muted-foreground whitespace-pre-wrap pt-2 border-t border-dashed">
+                    <div className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap pt-2 border-t border-dashed">
                         <p className="font-semibold flex items-center gap-1"><Sparkles className="h-3 w-3" />答後講解：</p>
                         {currentQuestion.explanation}
                     </div>

@@ -514,10 +514,10 @@ export default function PIRLSQuestionCraftPage() {
 
   return (
     <div className="min-h-screen px-5 sm:px-9 pt-7 pb-20 text-ink">
-      <div className="max-w-[1240px] mx-auto">
+      <div className="max-w-[min(1560px,94vw)] mx-auto">
 
         {/* ===== Top Nav ===== */}
-        <nav className="flex justify-between items-center gap-3 px-5 sm:px-[22px] py-3.5 bg-card border-neo rounded-full shadow-neo flex-wrap">
+        <nav className="flex justify-between items-center gap-3 px-5 sm:px-[22px] py-3.5 bg-card border-neo rounded-[28px] md:rounded-full shadow-neo flex-wrap">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-xl bg-cream border-neo flex items-center justify-center p-1 overflow-hidden shrink-0">
               <PirlsLogo className="w-full h-full" />
@@ -525,17 +525,17 @@ export default function PIRLSQuestionCraftPage() {
             <div className="min-w-0">
               <div className="text-base font-extrabold leading-tight flex items-center gap-1.5 flex-wrap">
                 QuestionCraft
-                <span className="bg-lemon border-neo rounded-md px-2 py-px text-[11px] leading-tight font-extrabold">PRO</span>
+                <span className="bg-lemon border-neo rounded-md px-2 py-px text-[0.8125rem] leading-tight font-extrabold">PRO</span>
               </div>
-              <div className="text-[12px] text-muted-foreground mt-0.5">石門國小 · PIRLS 閱讀理解四層次出題助手</div>
+              <div className="text-[0.875rem] text-muted-foreground mt-0.5">石門國小 · PIRLS 閱讀理解四層次出題助手</div>
             </div>
           </div>
-          <div className="flex gap-2 shrink-0 flex-wrap">
+          <div className="flex gap-2 flex-wrap max-w-full">
             <HelpDialog />
             <Link href="/extension/" title="Chrome 擴充套件：截圖、讀全文出題，一鍵送到 PaGamO">
               <PillBtn color="bg-sky" sm className="!px-3.5">
                 <span aria-hidden>🧩</span>
-                <span className="font-extrabold whitespace-nowrap">Chrome 擴充套件</span>
+                <span className="font-extrabold whitespace-nowrap"><span className="hidden sm:inline">Chrome </span>擴充套件</span>
               </PillBtn>
             </Link>
             <a
@@ -548,7 +548,7 @@ export default function PIRLSQuestionCraftPage() {
               <PillBtn color="bg-peach" sm className="!gap-1.5 !px-3.5">
                 <MessageSquareHeart className="h-4 w-4 shrink-0" />
                 <span className="font-extrabold whitespace-nowrap">使用回饋</span>
-                <span className="inline-flex items-center gap-0.5 ml-0.5 text-amber-500">
+                <span className="hidden sm:inline-flex items-center gap-0.5 ml-0.5 text-amber-500">
                   <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
                   <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
                   <StarIcon className="h-3 w-3 fill-current" strokeWidth={2.2} />
@@ -571,12 +571,12 @@ export default function PIRLSQuestionCraftPage() {
             <Star size={20} color="#F0A6B5" className="hidden md:block absolute bottom-20 right-[260px] animate-pirls-bob [animation-delay:0.5s]" />
             <Spark size={22} color="#3D2E1E" className="hidden md:block absolute top-[200px] right-12 animate-pirls-bob [animation-delay:0.8s]" />
 
-            <div className="relative z-[2] max-w-[720px]">
-              <span className="inline-flex items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1.5 text-xs font-bold mb-5">
+            <div className="relative z-[2] max-w-[52rem] xl:max-w-[calc(100%-28rem)]">
+              <span className="inline-flex items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1.5 text-sm font-bold mb-5">
                 <Sparkles className="h-3.5 w-3.5" />
                 AI 自動出題 · 三步驟完成
               </span>
-              <h1 className="m-0 font-extrabold tracking-tight leading-[1.05] text-[40px] sm:text-[52px] md:text-[60px]">
+              <h1 className="m-0 font-extrabold tracking-tight leading-[1.05] text-[2.5rem] sm:text-[3.25rem] md:text-[3.75rem]">
                 把任何文章，<br />
                 變成
                 <span
@@ -588,7 +588,7 @@ export default function PIRLSQuestionCraftPage() {
                 </span>
                 的題目。
               </h1>
-              <p className="mt-4 text-[15px] sm:text-[17px] leading-[1.7] text-ink-soft max-w-[560px]">
+              <p className="mt-4 text-[1rem] sm:text-[1.125rem] leading-[1.7] text-ink-soft max-w-[42rem]">
                 上傳一張課文照片或貼上一段文字，AI 會依據 PIRLS 國際閱讀素養架構，自動為您設計選擇題、干擾選項與詳細解析。
               </p>
               <div className="flex gap-2.5 mt-6 sm:mt-7 flex-wrap">
@@ -609,18 +609,33 @@ export default function PIRLSQuestionCraftPage() {
                 ))}
               </div>
             </div>
+
+            {/* 大螢幕：右側放 Chrome 擴充套件介紹卡，善用空間 */}
+            <Link
+              href="/extension/"
+              className="hidden xl:flex flex-col gap-3 absolute right-12 top-1/2 -translate-y-1/2 z-[2] w-[25rem] bg-card border-neo rounded-[22px] shadow-neo-lg p-6 text-ink no-underline neo-hover-lift"
+            >
+              <span className="self-start inline-flex items-center gap-1.5 bg-sky border-neo rounded-full px-3 py-1 text-sm font-extrabold">🧩 新功能・Chrome 擴充套件</span>
+              <span className="text-[1.375rem] font-extrabold leading-snug">在任何網頁截圖或讀全文，<br />一分鐘變成 PIRLS 題組</span>
+              <span className="flex flex-col gap-1.5 text-base">
+                <span>📷 電子書、PDF 截圖就能出題</span>
+                <span>📖 部落格、新聞一鍵讀全文</span>
+                <span>🚀 一鍵送到 PaGamO 題庫</span>
+              </span>
+              <span className="self-start inline-flex items-center gap-1.5 bg-lemon border-neo rounded-full px-4 py-2 text-base font-extrabold shadow-neo-sm mt-1">免費下載與安裝說明 →</span>
+            </Link>
           </NeoCard>
         )}
 
         {/* ===== Workflow：Upload + Settings（idle 階段） ===== */}
         {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-5">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-5 xl:gap-7">
             {/* Upload card */}
             <NeoCard className="p-6">
               <div className="flex justify-between items-center flex-wrap gap-3 mb-5">
                 <div>
-                  <div className="text-[11px] font-extrabold tracking-[0.15em] text-muted-foreground mb-1">STEP 01</div>
-                  <div className="text-[22px] font-extrabold">提供素材</div>
+                  <div className="text-[0.8125rem] font-extrabold tracking-[0.15em] text-muted-foreground mb-1">STEP 01</div>
+                  <div className="text-[1.4375rem] font-extrabold">提供素材</div>
                 </div>
                 {/* TabPills */}
                 <div className="inline-flex bg-cream border-neo rounded-full p-1">
@@ -653,10 +668,10 @@ export default function PIRLSQuestionCraftPage() {
                     placeholder="請在此貼上您想出題的文章內容…"
                     value={inputText}
                     onChange={handleInputTextChange}
-                    className="w-full min-h-[220px] bg-cream border-[2px] border-ink rounded-[18px] p-4 text-[15px] leading-[1.7] text-ink resize-y focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="w-full min-h-[220px] bg-cream border-[2px] border-ink rounded-[18px] p-4 text-[1rem] leading-[1.7] text-ink resize-y focus-visible:ring-0 focus-visible:ring-offset-0"
                     disabled={isLoading}
                   />
-                  <div className="mt-2.5 flex justify-between text-xs text-muted-foreground">
+                  <div className="mt-2.5 flex justify-between text-sm text-muted-foreground">
                     <span>支援 PDF / Word / 網頁複製貼上</span>
                     <span className="font-mono">{inputText.length} 字</span>
                   </div>
@@ -722,7 +737,7 @@ export default function PIRLSQuestionCraftPage() {
             className={cn(
               'mt-6 w-full px-6 py-6 rounded-[24px] border-neo shadow-neo-lg',
               'flex items-center justify-center gap-3',
-              'text-[20px] sm:text-[22px] font-extrabold transition-all',
+              'text-[1.3125rem] sm:text-[1.4375rem] font-extrabold transition-all',
               'hover:-translate-y-0.5 hover:shadow-neo-xl active:translate-y-1 active:shadow-neo-none',
               ready && !isLoading
                 ? 'bg-coral text-white cursor-pointer'
@@ -736,7 +751,7 @@ export default function PIRLSQuestionCraftPage() {
               </>
             ) : (
               <>
-                <span className="text-[24px] sm:text-[26px]">🚀</span>
+                <span className="text-[1.5625rem] sm:text-[1.6875rem]">🚀</span>
                 {ready ? '開始生成 PIRLS 四層次題目' : '請先提供素材（上傳圖片或貼上文本）'}
               </>
             )}
@@ -755,10 +770,10 @@ export default function PIRLSQuestionCraftPage() {
                   🧠
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[17px] font-extrabold">AI 努力思考中…</div>
-                  <div className="text-[13px] text-muted-foreground mt-0.5 truncate">{loadingMessage}</div>
+                  <div className="text-[1.125rem] font-extrabold">AI 努力思考中…</div>
+                  <div className="text-[0.875rem] text-muted-foreground mt-0.5 truncate">{loadingMessage}</div>
                 </div>
-                <div className="font-mono text-[22px] font-extrabold tabular-nums">{Math.round(loadingProgress)}%</div>
+                <div className="font-mono text-[1.4375rem] font-extrabold tabular-nums">{Math.round(loadingProgress)}%</div>
               </div>
               <div className="h-3.5 bg-cream border-neo rounded-full overflow-hidden">
                 <div
@@ -802,7 +817,7 @@ export default function PIRLSQuestionCraftPage() {
                     style={{ width: `${fileGenerationProgress}%` }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">{fileGenerationMessage}</p>
+                <p className="text-sm text-muted-foreground mt-2">{fileGenerationMessage}</p>
               </NeoCard>
             )}
 
@@ -812,13 +827,13 @@ export default function PIRLSQuestionCraftPage() {
                 <NeoCard className="p-6">
                   <div className="flex justify-between items-center flex-wrap gap-4">
                     <div className="min-w-0">
-                      <span className="inline-flex items-center gap-2 bg-sage/55 border-neo rounded-full px-3 py-1 text-xs font-extrabold mb-2.5">
+                      <span className="inline-flex items-center gap-2 bg-sage/55 border-neo rounded-full px-3 py-1 text-sm font-extrabold mb-2.5">
                         <span>✓</span> 已生成 {generatedQuestionsOutput.questions.length} 題
                       </span>
-                      <div className="text-[20px] sm:text-[24px] font-extrabold truncate">
+                      <div className="text-[1.3125rem] sm:text-[1.5625rem] font-extrabold truncate">
                         {generatedQuestionsOutput.title || 'AI 自動生成題組'}
                       </div>
-                      <div className="text-[13px] text-muted-foreground mt-1">
+                      <div className="text-[0.875rem] text-muted-foreground mt-1">
                         由 AI 自動分析文章內容生成 · 涵蓋 PIRLS 四層次
                       </div>
                     </div>
@@ -832,10 +847,10 @@ export default function PIRLSQuestionCraftPage() {
                             {m.emoji}
                           </div>
                           <div className="min-w-0">
-                            <div className="text-[11px] text-muted-foreground font-bold">{m.label}</div>
-                            <div className="text-[18px] font-extrabold font-mono tabular-nums">
+                            <div className="text-[0.8125rem] text-muted-foreground font-bold">{m.label}</div>
+                            <div className="text-[1.1875rem] font-extrabold font-mono tabular-nums">
                               {distribution[k] || 0}
-                              <span className="text-[11px] text-muted-foreground ml-0.5">題</span>
+                              <span className="text-[0.8125rem] text-muted-foreground ml-0.5">題</span>
                             </div>
                           </div>
                         </div>
@@ -847,7 +862,7 @@ export default function PIRLSQuestionCraftPage() {
                 {/* Action bar */}
                 <NeoCard className="p-4">
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="text-[13px] font-bold text-muted-foreground mr-1">匯出 / 分享 →</div>
+                    <div className="text-[0.875rem] font-bold text-muted-foreground mr-1">匯出 / 分享 →</div>
                     <PillBtn onClick={handleStartQuiz} color="bg-sage" sm disabled={isAnyDownloading}>
                       ▶ 開始線上測驗
                     </PillBtn>
@@ -894,7 +909,7 @@ export default function PIRLSQuestionCraftPage() {
                 isGeneratingQuizResultsPdf={isGeneratingQuizResultsPdf}
               />
             ) : (
-              <Accordion type="single" collapsible className="w-full flex flex-col gap-3.5">
+              <Accordion type="single" collapsible className="w-full grid grid-cols-1 xl:grid-cols-2 gap-3.5 items-start">
                 {generatedQuestionsOutput.questions.map((q, index) => (
                   <QuestionCard
                     key={index}
@@ -913,7 +928,7 @@ export default function PIRLSQuestionCraftPage() {
         <footer className="mt-14 bg-ink text-cream rounded-[24px] px-7 py-7 flex justify-between items-center flex-wrap gap-4">
           <div className="min-w-0">
             <div className="text-base font-extrabold">PIRLS QuestionCraft PRO</div>
-            <div className="text-[13px] opacity-75 mt-1">
+            <div className="text-[0.875rem] opacity-75 mt-1">
               Made with <span aria-label="愛心">❤️</span> by{' '}
               <a
                 href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
@@ -976,8 +991,8 @@ function SettingCard({
           {emoji}
         </div>
         <div>
-          <div className="text-[10px] font-extrabold tracking-[0.15em] text-muted-foreground">STEP {step}</div>
-          <div className="font-extrabold text-[17px]">{title}</div>
+          <div className="text-[0.8125rem] font-extrabold tracking-[0.15em] text-muted-foreground">STEP {step}</div>
+          <div className="font-extrabold text-[1.125rem]">{title}</div>
         </div>
       </div>
       <div className="flex flex-col gap-2 mt-3.5">
@@ -998,7 +1013,7 @@ function SettingCard({
             >
               <div className="min-w-0">
                 <div className="font-bold text-sm text-ink">{o.t}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{o.d}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">{o.d}</div>
               </div>
               <div
                 className={cn(

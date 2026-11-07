@@ -130,7 +130,7 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
         )}
       >
         <DialogHeader className="space-y-2 text-left">
-          <div className="inline-flex w-fit items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.15em]">
+          <div className="inline-flex w-fit items-center gap-2 bg-cream border-neo rounded-full px-3.5 py-1 text-[0.8125rem] font-extrabold uppercase tracking-[0.15em]">
             <BookOpen className="h-3.5 w-3.5" />
             Quick Start
           </div>
@@ -156,7 +156,7 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
                   s.color
                 )}
               >
-                <div className="text-[8px] font-mono font-bold opacity-70 leading-none">STEP</div>
+                <div className="text-[0.6875rem] font-mono font-bold opacity-70 leading-none">STEP</div>
                 <div className="text-base font-extrabold leading-none mt-0.5">{i + 1}</div>
               </div>
               {/* 內容 */}
@@ -165,7 +165,7 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
                   <span aria-hidden>{s.emoji}</span>
                   {s.title}
                 </div>
-                <p className="text-[13.5px] leading-[1.7] text-ink-soft mt-1">{s.desc}</p>
+                <p className="text-[0.9375rem] leading-[1.7] text-ink-soft mt-1">{s.desc}</p>
               </div>
             </div>
           ))}
@@ -179,14 +179,14 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
           </div>
           <ul className="space-y-1.5">
             {TIPS.map((t, i) => (
-              <li key={i} className="text-[13px] leading-[1.7] text-ink-soft">
+              <li key={i} className="text-[0.875rem] leading-[1.7] text-ink-soft">
                 {t}
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="mt-4 text-[12px] text-muted-foreground text-center leading-[1.7]">
+        <p className="mt-4 text-[0.8125rem] text-muted-foreground text-center leading-[1.7]">
           之後想再看這份說明，隨時點右上角的「📖 使用說明」即可。
           <br />
           有問題或建議？歡迎按「💬 使用回饋 ⭐⭐⭐」告訴阿凱老師。

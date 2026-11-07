@@ -4,7 +4,6 @@
 import type { ChangeEvent, DragEvent } from 'react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { XCircle, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
@@ -363,18 +362,18 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
             </>
           ) : !canUploadMore ? (
             <>
-              <div className="w-[76px] h-[76px] rounded-full bg-sage border-[2px] border-ink flex items-center justify-center text-[38px] mb-4 shadow-neo-sm">
+              <div className="w-[76px] h-[76px] rounded-full bg-sage border-[2px] border-ink flex items-center justify-center text-[2.375rem] mb-4 shadow-neo-sm">
                 <CheckCircle2 className="h-9 w-9" />
               </div>
-              <p className="text-[20px] font-extrabold mb-1">已達上限 (4 張)</p>
+              <p className="text-[1.3125rem] font-extrabold mb-1">已達上限 (4 張)</p>
               <p className="text-sm text-muted-foreground">您可以清除部分圖片後再試</p>
             </>
           ) : (
             <>
-              <div className="w-[76px] h-[76px] rounded-full bg-peach border-[2px] border-ink flex items-center justify-center text-[38px] mb-4 shadow-neo-sm">
+              <div className="w-[76px] h-[76px] rounded-full bg-peach border-[2px] border-ink flex items-center justify-center text-[2.375rem] mb-4 shadow-neo-sm">
                 📷
               </div>
-              <p className="text-[20px] font-extrabold mb-1">
+              <p className="text-[1.3125rem] font-extrabold mb-1">
                 {isDraggingOver ? '放開即可上傳' : '拖曳圖片到這裡'}
               </p>
               <p className="text-sm text-muted-foreground">
@@ -391,7 +390,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
                 <div
                   key={i}
                   className={cn(
-                    'w-16 h-16 rounded-[14px] flex items-center justify-center text-[11px] overflow-hidden relative bg-card',
+                    'w-16 h-16 rounded-[14px] flex items-center justify-center text-[0.8125rem] overflow-hidden relative bg-card',
                     hasFile
                       ? 'border-[1.5px] border-ink'
                       : 'border-[1.5px] border-dashed border-ink text-muted-foreground'
@@ -414,7 +413,8 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           </div>
         </label>
 
-        <Input
+        {/* 原生 input：shadcn Input 的 w-full 會蓋過 sr-only，讓隱藏欄位撐出畫面造成左右捲動 */}
+        <input
           id="imageUpload"
           ref={fileInputRef}
           type="file"
@@ -430,7 +430,7 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-extrabold text-ink">已選圖片預覽：</h3>
-              <span className="text-xs text-muted-foreground font-mono">{selectedFiles.length}/4</span>
+              <span className="text-sm text-muted-foreground font-mono">{selectedFiles.length}/4</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {imagePreviews.map((previewUrl, index) => (

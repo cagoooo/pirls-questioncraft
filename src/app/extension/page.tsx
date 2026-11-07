@@ -34,7 +34,7 @@ function Step({ n, title, children, shot }: { n: number; title: string; children
           <span className="grid place-items-center w-10 h-10 rounded-full bg-lemon border-neo font-extrabold text-lg shrink-0">{n}</span>
           <h3 className="text-xl font-extrabold">{title}</h3>
         </div>
-        <div className="mt-3 text-[16px] leading-8 text-ink/90 space-y-2">{children}</div>
+        <div className="mt-3 text-[1.0625rem] leading-8 text-ink/90 space-y-2">{children}</div>
       </div>
       {shot}
     </li>
@@ -45,14 +45,14 @@ export default function ExtensionGuidePage() {
   const latest = changelog[0];
   return (
     <div className="min-h-screen bg-cream text-ink">
-      <div className="mx-auto w-full max-w-[1280px] px-4 sm:px-8 py-6">
+      <div className="mx-auto w-full max-w-[min(1560px,94vw)] px-4 sm:px-8 py-6">
         {/* 頁首 */}
         <nav className="flex items-center justify-between gap-3 flex-wrap">
           <Link href="/" className="flex items-center gap-3 no-underline text-ink">
             <span className="w-11 h-11 rounded-xl bg-cream border-neo p-1 overflow-hidden shrink-0"><PirlsLogo className="w-full h-full" /></span>
-            <span className="font-extrabold leading-tight">QuestionCraft PRO<br /><span className="text-[13px] font-medium text-muted-foreground">PIRLS 閱讀理解生成站</span></span>
+            <span className="font-extrabold leading-tight">QuestionCraft PRO<br /><span className="text-[0.875rem] font-medium text-muted-foreground">PIRLS 閱讀理解生成站</span></span>
           </Link>
-          <Link href="/" className={`${pill} bg-card px-4 py-2 text-[14px]`}>← 回網站版</Link>
+          <Link href="/" className={`${pill} bg-card px-4 py-2 text-[0.9375rem]`}>← 回網站版</Link>
         </nav>
 
         {/* Hero */}
@@ -61,14 +61,14 @@ export default function ExtensionGuidePage() {
           <div aria-hidden className="hidden md:block absolute -bottom-16 right-40 w-36 h-36 rounded-full bg-sky opacity-50" />
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] items-center">
             <div>
-              <p className="inline-flex items-center gap-2 bg-lemon border-neo rounded-full px-3 py-1 text-[13px] font-extrabold">🧩 Chrome 擴充套件　v{manifest.version}</p>
+              <p className="inline-flex items-center gap-2 bg-lemon border-neo rounded-full px-3 py-1 text-[0.875rem] font-extrabold">🧩 Chrome 擴充套件　v{manifest.version}</p>
               <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold leading-tight">PIRLS 閱讀題組小幫手</h1>
               <p className="mt-4 text-lg leading-8">在任何網頁<b>截圖</b>、<b>讀取全文</b>或<b>反白文字</b>，用自己的免費 Gemini 金鑰，一分鐘產生 PIRLS 四層次閱讀理解題組，檢查後<b>一鍵送到 PaGamO</b>。</p>
               <div id="download" className="mt-6 flex flex-wrap gap-3">
-                <a href={ZIP} download className={`${pill} bg-sage px-6 py-3.5 text-[17px]`}>⬇️ 下載擴充套件（ZIP）</a>
-                <a href="#install" className={`${pill} bg-card px-5 py-3.5 text-[16px]`}>📘 看安裝步驟</a>
+                <a href={ZIP} download className={`${pill} bg-sage px-6 py-3.5 text-[1.125rem]`}>⬇️ 下載擴充套件（ZIP）</a>
+                <a href="#install" className={`${pill} bg-card px-5 py-3.5 text-[1.0625rem]`}>📘 看安裝步驟</a>
               </div>
-              <p className="mt-3 text-[14px] text-muted-foreground">免費・不用登入・金鑰只存在自己的電腦｜最後更新 {latest.date}</p>
+              <p className="mt-3 text-[0.9375rem] text-muted-foreground">免費・不用登入・金鑰只存在自己的電腦｜最後更新 {latest.date}</p>
             </div>
             <Shot name="step-send" alt="工作台的「送到 PaGamO」按鈕" />
           </div>
@@ -96,7 +96,7 @@ export default function ExtensionGuidePage() {
             <Step n={1} title="下載並解壓縮到固定位置">
               <p>按上方「<b>下載擴充套件（ZIP）</b>」，在下載的檔案上按右鍵 →「<b>解壓縮全部</b>」。</p>
               <p>把解壓出來的「<b>PIRLS閱讀題組小幫手</b>」資料夾放到固定位置，例如 <code className="bg-cream-deep border border-line rounded px-1.5">D:\PIRLS閱讀題組小幫手</code>。</p>
-              <p className="bg-peach/40 border-neo rounded-xl px-4 py-3 text-[15px]">⚠️ 之後<b>不要搬動或改名</b>這個資料夾。Chrome 是用資料夾位置認得擴充套件，搬家會被當成新的，金鑰和設定都會不見。</p>
+              <p className="bg-peach/40 border-neo rounded-xl px-4 py-3 text-[1rem]">⚠️ 之後<b>不要搬動或改名</b>這個資料夾。Chrome 是用資料夾位置認得擴充套件，搬家會被當成新的，金鑰和設定都會不見。</p>
             </Step>
             <Step n={2} title="打開 Chrome 的「開發人員模式」" shot={<Shot name="step-devmode" alt="chrome://extensions 頁面右上角的開發人員模式開關與載入未封裝項目按鈕" />}>
               <p>在 Chrome 網址列輸入 <code className="bg-cream-deep border border-line rounded px-1.5">chrome://extensions</code> 按 Enter。</p>
@@ -130,7 +130,7 @@ export default function ExtensionGuidePage() {
             </Step>
             <Step n={3} title="逐題檢查、修改" shot={<Shot name="step-review" alt="工作台：檢查與修改題目" />}>
               <p>題幹、選項、正解、答後講解、PIRLS 層次都能直接改，改完自動儲存，關掉分頁也不會不見。</p>
-              <p className="bg-lemon/50 border-neo rounded-xl px-4 py-3 text-[15px]">🤖 AI 出的題一定要老師看過再派給學生。</p>
+              <p className="bg-lemon/50 border-neo rounded-xl px-4 py-3 text-[1rem]">🤖 AI 出的題一定要老師看過再派給學生。</p>
             </Step>
             <Step n={4} title="一鍵送到 PaGamO" shot={<Shot name="step-send" alt="匯出到 PaGamO 區塊" />}>
               <p>按「<b>🚀 送到 PaGamO（題組版）</b>」：先下載一份備份，接著自動打開 PaGamO 批量上傳頁、選好「題組」、放好檔案。</p>
@@ -143,13 +143,13 @@ export default function ExtensionGuidePage() {
         <section className="mt-10 grid gap-6 lg:grid-cols-2">
           <NeoCard className="p-6 sm:p-8" id="update">
             <h2 className="text-2xl font-extrabold">🔄 更新到新版</h2>
-            <p className="mt-2 text-[15px] text-muted-foreground">有新版時，工作台上方會出現「🆕 有新版本」提醒。</p>
+            <p className="mt-2 text-[1rem] text-muted-foreground">有新版時，工作台上方會出現「🆕 有新版本」提醒。</p>
             <ol className="mt-4 list-decimal pl-6 space-y-2 leading-7">
               <li>下載新版 ZIP，解壓縮。</li>
               <li>把新版資料夾裡的檔案<b>全部複製，覆蓋</b>到原本的資料夾（同一個位置）。</li>
               <li>到 <code className="bg-cream-deep border border-line rounded px-1.5">chrome://extensions</code>，在擴充套件卡片上按 <b>⟳</b> 重新載入。</li>
             </ol>
-            <p className="mt-3 text-[15px]">放在同一個位置，金鑰和設定都會保留。</p>
+            <p className="mt-3 text-[1rem]">放在同一個位置，金鑰和設定都會保留。</p>
           </NeoCard>
           <NeoCard className="p-6 sm:p-8" id="safety">
             <h2 className="text-2xl font-extrabold">🛡️ 金鑰與個資安全</h2>
@@ -186,7 +186,7 @@ export default function ExtensionGuidePage() {
           <ul className="mt-4 space-y-4 list-none p-0">
             {changelog.map((c) => (
               <li key={c.version} className="grid gap-1 sm:grid-cols-[150px_minmax(0,1fr)]">
-                <div><span className="inline-block bg-lemon border-neo rounded-full px-3 py-0.5 text-[13px] font-extrabold">v{c.version}</span> <span className="text-[13px] text-muted-foreground">{c.date}</span></div>
+                <div><span className="inline-block bg-lemon border-neo rounded-full px-3 py-0.5 text-[0.875rem] font-extrabold">v{c.version}</span> <span className="text-[0.875rem] text-muted-foreground">{c.date}</span></div>
                 <ul className="list-disc pl-5 leading-7">{c.notes.map((n) => <li key={n}>{n}</li>)}</ul>
               </li>
             ))}
@@ -199,7 +199,7 @@ export default function ExtensionGuidePage() {
           <div className="grid gap-8 px-6 sm:px-10 py-8 md:grid-cols-2 lg:grid-cols-[1.1fr_2fr_1fr]">
             <div className="flex items-center gap-4">
               <span className="w-12 h-12 rounded-xl bg-cream border-neo shadow-neo-sm p-1 overflow-hidden shrink-0"><PirlsLogo className="w-full h-full" /></span>
-              <div><div className="font-extrabold text-lg">PIRLS 閱讀題組小幫手</div><div className="text-[14px] text-ink/75">截圖、讀全文，一鍵變成 PIRLS 題組</div></div>
+              <div><div className="font-extrabold text-lg">PIRLS 閱讀題組小幫手</div><div className="text-[0.9375rem] text-ink/75">截圖、讀全文，一鍵變成 PIRLS 題組</div></div>
             </div>
             <ul className="grid gap-4 sm:grid-cols-3 list-none p-0 md:col-span-2 lg:col-span-1">
               {[
@@ -209,24 +209,24 @@ export default function ExtensionGuidePage() {
               ].map(([i, t, d]) => (
                 <li key={t} className="flex gap-3">
                   <span className="grid place-items-center w-10 h-10 rounded-xl bg-white border-neo shrink-0" aria-hidden>{i}</span>
-                  <div><div className="font-extrabold text-[15px]">{t}</div><div className="text-[14px] text-ink/75 leading-6">{d}</div></div>
+                  <div><div className="font-extrabold text-[1rem]">{t}</div><div className="text-[0.9375rem] text-ink/75 leading-6">{d}</div></div>
                 </li>
               ))}
             </ul>
             <nav aria-label="快速連結" className="flex lg:flex-col flex-wrap gap-2.5 items-start">
-              <a href={ZIP} download className={`${pill} bg-white px-3.5 py-1.5 text-[14px]`}>⬇️ 下載 ZIP</a>
-              <a href="#install" className={`${pill} bg-white px-3.5 py-1.5 text-[14px]`}>📘 安裝步驟</a>
-              <Link href="/" className={`${pill} bg-white px-3.5 py-1.5 text-[14px]`}>🌐 網站版</Link>
+              <a href={ZIP} download className={`${pill} bg-white px-3.5 py-1.5 text-[0.9375rem]`}>⬇️ 下載 ZIP</a>
+              <a href="#install" className={`${pill} bg-white px-3.5 py-1.5 text-[0.9375rem]`}>📘 安裝步驟</a>
+              <Link href="/" className={`${pill} bg-white px-3.5 py-1.5 text-[0.9375rem]`}>🌐 網站版</Link>
             </nav>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/15 px-6 sm:px-10 py-4 text-[14px] text-ink/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/15 px-6 sm:px-10 py-4 text-[0.9375rem] text-ink/80">
             <p className="m-0 text-center sm:text-left">
               Made with <span aria-label="愛心">❤️</span> by{' '}
               <a href={TEACHER_URL} target="_blank" rel="noopener noreferrer" className="text-inherit no-underline border-b border-dotted border-current hover:text-coral">阿凱老師</a>
               <span className="hidden sm:inline mx-1.5" aria-hidden>・</span>
               <span className="block sm:inline">桃園市龍潭區石門國民小學</span>
             </p>
-            <p className="m-0 text-[13px] font-extrabold bg-white/70 border border-line rounded-full px-3 py-0.5">v{manifest.version}</p>
+            <p className="m-0 text-[0.875rem] font-extrabold bg-white/70 border border-line rounded-full px-3 py-0.5">v{manifest.version}</p>
           </div>
         </footer>
       </div>

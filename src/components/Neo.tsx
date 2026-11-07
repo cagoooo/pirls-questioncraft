@@ -66,7 +66,7 @@ export const PillBtn = React.forwardRef<HTMLButtonElement, PillBtnProps>(
           'hover:-translate-y-px hover:shadow-neo',
           'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-neo-sm',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          sm ? 'px-3.5 py-2 text-[13px]' : 'px-[18px] py-[11px] text-sm',
+          sm ? 'px-3.5 py-2 text-[0.875rem]' : 'px-[18px] py-[11px] text-sm',
           dark ? 'bg-ink text-cream' : color,
           dark ? '' : 'text-ink',
           className
