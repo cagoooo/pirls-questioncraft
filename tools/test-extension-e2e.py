@@ -166,50 +166,81 @@ with sync_playwright() as p:
     check("設定頁手機版沒有水平捲動", opts.evaluate("document.scrollingElement.scrollWidth <= innerWidth + 1"))
     opts.screenshot(path=str(OUT / "options-mobile.png"), full_page=True)
 
-    # 4. 在文章頁框選截圖
+    # 4. 截取畫面（v0.4.0 新流程）：小視窗按「截取這個畫面」→ 截圖 → 跳到工作台分頁 → 自動打開裁切視窗
     art = ctx.new_page()
     art.goto("https://pirls-test.example/article.html")
-    bench = ctx.new_page()
-    bench.goto(f"{base}/workbench/workbench.html")
-    bench.wait_for_selector("#shotCount")
+    def open_popup_for(url_pattern):
+        pg = ctx.new_page()
+        pg.goto(f"{base}/popup/popup.html")
+        pg.wait_for_selector("#capture")
+        pg.evaluate("""async (pat) => {
+          const [t] = await chrome.tabs.query({ url: pat });
+          // 模擬「小視窗屬於這個分頁」：把 query 指到測試網頁
+          chrome.tabs.query = async () => [t];
+        }""", url_pattern)
+        return pg
+    pg = open_popup_for("https://pirls-test.example/article*")
     art.bring_to_front()
+    with ctx.expect_page() as newbench:
+        pg.click("#capture", no_wait_after=True)
+    bench = newbench.value
+    check("截取後自動開新分頁到工作台", "workbench.html" in bench.url, bench.url)
+    bench.wait_for_selector("#cropModal:not(.hidden)", timeout=8000)
+    check("工作台自動打開裁切視窗", True)
+    check("工作台分頁在最前面", bench.evaluate("document.visibilityState") == "visible")
+    full_w = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots[0].width || 0)")
+    def drag_canvas(fx0, fy0, fx1, fy1):
+        b = bench.locator("#cropCanvas").bounding_box()
+        bench.mouse.move(b["x"] + b["width"] * fx0, b["y"] + b["height"] * fy0); bench.mouse.down()
+        bench.mouse.move(b["x"] + b["width"] * fx1, b["y"] + b["height"] * fy1, steps=8); bench.mouse.up()
+    drag_canvas(0.02, 0.04, 0.5, 0.4)
+    bench.screenshot(path=str(OUT / "crop-modal.png"))
+    check("拖曳後才能按裁切", not bench.is_disabled("#cropOk") and not bench.is_disabled("#cropGo"))
+    bench.click("#cropOk")
+    bench.wait_for_selector("#cropModal.hidden", state="attached", timeout=5000)
+    shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
+    dpr = art.evaluate("devicePixelRatio")
+    check("裁切後有 1 張截圖、寬度約為畫面的 48%", len(shots) == 1 and not shots[0]["needsCrop"] and abs(shots[0]["width"] - 1440 * dpr * 0.48) <= 20 * dpr,
+          f"{[ (s['width'], s['needsCrop']) for s in shots]} dpr={dpr}")
+    check("裁切後提示「還要截下一段？」", "下一段" in bench.inner_text("#genStatus"), bench.inner_text("#genStatus"))
+    pathlib.Path(OUT / "shot1.jpg").write_bytes(base64.b64decode(shots[0]["dataUrl"].split(",")[1]))
+
     def start_capture():
+        art.bring_to_front()
         bench.evaluate("""async () => {
-          const [t] = await chrome.tabs.query({ url: 'https://pirls-test.example/*' });
+          const [t] = await chrome.tabs.query({ url: 'https://pirls-test.example/article*' });
           return chrome.runtime.sendMessage({ type: 'START_CAPTURE', tab: t });
         }""")
+    # 第二張：使用整張
     start_capture()
-    art.wait_for_timeout(800)
-    art.mouse.move(30, 30); art.mouse.down(); art.mouse.move(400, 200, steps=8); art.mouse.move(700, 330, steps=8); art.mouse.up()
-    art.wait_for_timeout(1500)
+    bench.wait_for_selector("#cropModal:not(.hidden)", timeout=8000)
+    check("再截一次會跳回同一個工作台分頁", len([p for p in ctx.pages if "workbench.html" in p.url]) == 1 and bench.evaluate("document.visibilityState") == "visible")
+    bench.click("#cropFull")
+    bench.wait_for_timeout(600)
     shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
-    check("框選後新增 1 張截圖", len(shots) == 1, str(len(shots)))
-    if shots:
-        dpr = art.evaluate("devicePixelRatio")
-        check("裁切尺寸正確（約 670×300 CSS px）", abs(shots[0]["width"] - 670 * dpr) <= 4 and abs(shots[0]["height"] - 300 * dpr) <= 4, f"{shots[0]['width']}x{shots[0]['height']} dpr={dpr}")
-        pathlib.Path(OUT / "shot1.jpg").write_bytes(base64.b64decode(shots[0]["dataUrl"].split(",")[1]))
-    # Esc 取消
-    start_capture(); art.wait_for_timeout(700); art.keyboard.press("Escape"); art.wait_for_timeout(500)
+    check("「使用整張」保留整個畫面", len(shots) == 2 and shots[1]["width"] == min(2000, round(1440 * dpr)), str([s.get("width") for s in shots]))
+    # 第三張：稍後再裁 → 留在清單、不會一直跳出 → 刪掉
+    start_capture()
+    bench.wait_for_selector("#cropModal:not(.hidden)", timeout=8000)
+    bench.click("#cropCancel")
+    bench.wait_for_timeout(500)
+    bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(800)
+    check("稍後再裁：留在清單，重新整理也不會再自動跳出", bench.is_hidden("#cropModal") and bench.locator(".needs-crop").count() == 1)
+    bench.once("dialog", lambda d: d.accept())
+    bench.click(".shot:nth-child(3) [data-act=del]")
+    bench.wait_for_timeout(400)
     shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
-    check("Esc 取消不會新增截圖", len(shots) == 1)
-    # Enter 擷取整個畫面
-    start_capture(); art.wait_for_timeout(700); art.keyboard.press("Enter"); art.wait_for_timeout(1500)
-    shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
-    check("Enter 擷取整個畫面", len(shots) == 2 and shots[1]["width"] >= 1400, str([s.get("width") for s in shots]))
-    art.screenshot(path=str(OUT / "article-toast.png"))
-    # 提示框還在時立刻再截一張：新截圖右下角不可有提示框
-    from PIL import Image
-    import io
-    start_capture(); art.wait_for_timeout(700); art.keyboard.press("Enter"); art.wait_for_timeout(1500)
-    shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
-    im = Image.open(io.BytesIO(base64.b64decode(shots[-1]["dataUrl"].split(",")[1]))).convert("RGB")
-    px = im.getpixel((im.width - int(im.width * 0.1), im.height - int(im.height * 0.08)))
-    check("連續截圖不會拍到上一張的提示框", min(px) > 235, str(px))
-    # 框選畫面還開著又按一次：不會卡住，拖曳後只新增一張
-    start_capture(); art.wait_for_timeout(600); start_capture(); art.wait_for_timeout(800)
-    art.mouse.move(50, 50); art.mouse.down(); art.mouse.move(300, 200, steps=6); art.mouse.up(); art.wait_for_timeout(1500)
-    n = len(bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])"))
-    check("框選中重按一次仍正常", n == len(shots) + 1, f"{n} vs {len(shots)}+1")
+    check("刪除截圖", len(shots) == 2)
+    # 裁切並開始出題：直接觸發出題
+    start_capture()
+    bench.wait_for_selector("#cropModal:not(.hidden)", timeout=8000)
+    drag_canvas(0.02, 0.04, 0.6, 0.3)
+    n_before_go = len(calls)
+    bench.click("#cropGo")
+    bench.wait_for_selector("#genStatus.gen-status", timeout=5000)
+    bench.wait_for_timeout(1500)
+    check("「裁切並開始出題」會直接出題", any(":generateContent" in c["url"] for c in calls[n_before_go:]) or "金鑰" in bench.inner_text("#genStatus"),
+          bench.inner_text("#genStatus")[:60])
     # 收回到 2 張，讓後面的測試不變
     bench.evaluate("chrome.storage.local.get('shots').then(r => chrome.storage.local.set({ shots: r.shots.slice(0, 2) }))")
     shots = bench.evaluate("chrome.storage.local.get('shots').then(r => r.shots || [])")
@@ -353,24 +384,14 @@ with sync_playwright() as p:
     pop.screenshot(path=str(OUT / "popup.png"))
 
 
-    # 13. 從工具列小視窗按「框選這個畫面」（v0.1.0 按了沒反應的那條路）
-    def open_popup_for(url_pattern):
-        pg = ctx.new_page()
-        pg.goto(f"{base}/popup/popup.html")
-        pg.wait_for_selector("#capture")
-        pg.evaluate("""async (pat) => {
-          const [t] = await chrome.tabs.query({ url: pat });
-          // 模擬「小視窗屬於這個分頁」：把 query 指到測試網頁
-          chrome.tabs.query = async () => [t];
-        }""", url_pattern)
-        return pg
-    art.bring_to_front()
-    pg = open_popup_for("https://pirls-test.example/article*")
-    pg.click("#capture", no_wait_after=True)
-    art.wait_for_selector("[data-pirls-host]", state="attached", timeout=5000)
-    check("小視窗按「框選這個畫面」會出現框選畫面", art.locator("[data-pirls-host]").count() == 1)
-    art.keyboard.press("Escape")
-    art.wait_for_timeout(400)
+    # 13. 截圖失敗要看得到原因，並寫進錯誤紀錄本
+    bench.evaluate("chrome.runtime.sendMessage({ type: 'START_CAPTURE', tab: { id: 987654, windowId: 987654, title: '不存在的分頁' } })")
+    bench.wait_for_selector("#pageNotice:not(.hidden)", timeout=5000)
+    check("截圖失敗時工作台顯示原因", "不允許截圖" in bench.inner_text("#pageNotice"), bench.inner_text("#pageNotice"))
+    logp = ctx.new_page(); logp.goto(f"{base}/options/options.html"); logp.wait_for_selector("#logList li", timeout=5000)
+    check("錯誤紀錄本記下截圖失敗", "截圖" in logp.inner_text("#logList"), logp.inner_text("#logList")[:80])
+    logp.click("#logClear"); logp.wait_for_selector("#logEmpty:not(.hidden)")
+    logp.close()
 
     # 14. 讀取部落格全文
     blog = ctx.new_page()

@@ -50,3 +50,17 @@ export async function getShots() {
 export async function setShots(shots) {
   await chrome.storage.local.set({ [KEYS.shots]: shots });
 }
+
+// 錯誤紀錄本：任何失敗都記下來（最多 20 筆），設定頁可以看到並複製給資訊組
+export async function logError(where, e) {
+  try {
+    const { errorLog = [] } = await chrome.storage.local.get('errorLog');
+    errorLog.unshift({
+      at: new Date().toLocaleString('zh-TW', { hour12: false }),
+      where,
+      message: String(e?.message ?? e).slice(0, 500),
+      version: chrome.runtime.getManifest().version,
+    });
+    await chrome.storage.local.set({ errorLog: errorLog.slice(0, 20) });
+  } catch { /* 紀錄失敗不能再影響主流程 */ }
+}

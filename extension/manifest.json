@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PIRLS 閱讀題組小幫手",
   "short_name": "PIRLS 小幫手",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "框選截圖、讀取全文或反白文字，用自己的 Gemini 金鑰產生 PIRLS 閱讀理解題組，一鍵送到 PaGamO 批量上傳頁。",
   "icons": {
     "16": "icons/icon-16.png",
@@ -39,7 +39,7 @@
       "suggested_key": {
         "default": "Alt+Shift+P"
       },
-      "description": "框選目前網頁的截圖來出題"
+      "description": "截取目前網頁畫面，到工作台框選範圍出題"
     }
   },
   "content_security_policy": {

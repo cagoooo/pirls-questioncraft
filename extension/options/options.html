@@ -66,6 +66,18 @@
         <p class="preview">預覽：<b id="catPreview"></b></p>
         <p id="catSaved" class="muted" role="status" aria-live="polite"></p>
       </section>
+
+      <section class="card" aria-labelledby="h-log">
+        <h2 id="h-log">🧾 錯誤紀錄本</h2>
+        <p class="muted">擴充套件出問題時會記在這裡（最多 20 筆，只存在這台電腦）。回報問題時按「複製紀錄」貼給資訊組，比描述現象快很多。</p>
+        <div id="logEmpty" class="notice ok">目前沒有錯誤紀錄 👍</div>
+        <ol id="logList" class="log-list hidden"></ol>
+        <div class="row-btns">
+          <button class="btn small" id="logCopy" type="button">📋 複製紀錄</button>
+          <button class="btn small ghost" id="logClear" type="button">🧹 清除紀錄</button>
+        </div>
+        <p id="logMsg" class="muted" role="status" aria-live="polite"></p>
+      </section>
     </div>
 
     <aside class="col-side">

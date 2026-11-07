@@ -12,6 +12,9 @@ code { background: var(--cream-deep); border: 1px solid var(--line); border-radi
 .mt8 { margin-top: 8px; }
 .preview { margin: 4px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--cream-deep); font-size: var(--fs-sm); }
 .safe { margin: 0; padding-left: 1.2em; }
+.log-list { margin: 8px 0 0; padding-left: 1.4em; font-size: var(--fs-sm); max-height: 320px; overflow: auto; }
+.log-list li { margin-bottom: 8px; word-break: break-word; }
+.log-list b { color: var(--danger); }
 .safe li { margin-bottom: 12px; font-size: var(--fs-sm); line-height: 1.7; }
 @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .grid3 { grid-template-columns: 1fr; } }

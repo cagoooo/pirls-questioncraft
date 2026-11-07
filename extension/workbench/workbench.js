@@ -1,4 +1,4 @@
-import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS } from '../lib/store.js';
+import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS, logError } from '../lib/store.js';
 import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
@@ -33,6 +33,7 @@ async function init() {
   renderShots();
   renderDraft();
   renderFooter();
+  maybeAutoCrop();
 }
 
 function showNotice(text) {
@@ -160,26 +161,53 @@ async function bitmapToJpeg(bmp, sx, sy, sw, sh) {
   return { dataUrl, width: w, height: h };
 }
 
-// ---------- 裁切視窗（PDF 檢視器等無法直接框選的頁面） ----------
+// ---------- 裁切視窗：截圖進來後自動打開，在這裡框選文章範圍 ----------
 let cropTarget = null;
 let cropImg = null;
 let cropSel = null;
 let cropDrag = null;
 let cropScale = 1;
+let cropOpening = false;
 
 async function openCrop(shot) {
-  cropTarget = shot;
-  cropSel = null;
-  $('cropOk').disabled = true;
-  cropImg = await createImageBitmap(await (await fetch(shot.dataUrl)).blob());
-  $('cropModal').classList.remove('hidden');
-  const stage = document.querySelector('.crop-stage');
-  const canvas = $('cropCanvas');
-  cropScale = Math.min(1, (stage.clientWidth - 2) / cropImg.width);
-  canvas.width = Math.round(cropImg.width * cropScale);
-  canvas.height = Math.round(cropImg.height * cropScale);
-  drawCrop();
-  $('cropCancel').focus();
+  if (cropTarget || cropOpening) return;
+  cropOpening = true;
+  try {
+    cropTarget = shot;
+    cropSel = null;
+    setCropButtons();
+    cropImg = await createImageBitmap(await (await fetch(shot.dataUrl)).blob());
+    $('cropSource').textContent = shot.title ? `來源：${shot.title}` : '';
+    $('cropModal').classList.remove('hidden');
+    const stage = document.querySelector('.crop-stage');
+    const canvas = $('cropCanvas');
+    // 整張圖放得進視窗：同時看寬度與高度
+    const maxH = Math.max(240, window.innerHeight - 260);
+    cropScale = Math.min(1, (stage.clientWidth - 2) / cropImg.width, maxH / cropImg.height);
+    canvas.width = Math.round(cropImg.width * cropScale);
+    canvas.height = Math.round(cropImg.height * cropScale);
+    drawCrop();
+    $('cropCancel').focus();
+  } finally {
+    cropOpening = false;
+  }
+}
+
+// 有剛截好、還沒裁切的圖就自動打開裁切視窗
+function maybeAutoCrop() {
+  if (cropTarget || cropOpening) return;
+  const next = shots.find((s) => s.needsCrop && s.autoCrop);
+  if (next) {
+    mode = 'image';
+    renderMode();
+    openCrop(next);
+  }
+}
+
+function setCropButtons() {
+  const ok = !!(cropSel && cropSel.w > 12 && cropSel.h > 12);
+  $('cropOk').disabled = !ok;
+  $('cropGo').disabled = !ok;
 }
 
 function drawCrop() {
@@ -200,9 +228,10 @@ function drawCrop() {
 }
 
 function canvasPoint(e) {
-  const r = $('cropCanvas').getBoundingClientRect();
-  const sx = $('cropCanvas').width / r.width;
-  return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sx };
+  const c = $('cropCanvas');
+  const r = c.getBoundingClientRect();
+  const sx = c.width / r.width;
+  return { x: Math.min(Math.max((e.clientX - r.left) * sx, 0), c.width), y: Math.min(Math.max((e.clientY - r.top) * sx, 0), c.height) };
 }
 
 $('cropCanvas').addEventListener('pointerdown', (e) => {
@@ -217,29 +246,50 @@ $('cropCanvas').addEventListener('pointermove', (e) => {
 });
 $('cropCanvas').addEventListener('pointerup', () => {
   cropDrag = null;
-  $('cropOk').disabled = !(cropSel && cropSel.w > 12 && cropSel.h > 12);
+  setCropButtons();
 });
 
-function closeCrop() {
+async function closeCrop() {
+  const id = cropTarget?.id;
   $('cropModal').classList.add('hidden');
   cropImg?.close();
   cropImg = null;
   cropTarget = null;
+  // 取消時不再自動跳出（留在清單上，之後可按 ✂️ 再裁）
+  const i = shots.findIndex((s) => s.id === id);
+  if (i >= 0 && shots[i].autoCrop) {
+    shots[i] = { ...shots[i], autoCrop: false };
+    await setShots(shots);
+    renderShots();
+  }
 }
 $('cropCancel').addEventListener('click', closeCrop);
-$('cropModal').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCrop(); });
+$('cropModal').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeCrop();
+  if (e.key === 'Enter' && !$('cropOk').disabled) applyCrop(false);
+});
 
-async function applyCrop(full) {
+async function applyCrop(full, thenGenerate = false) {
   const sel = full || !cropSel ? { x: 0, y: 0, w: cropImg.width, h: cropImg.height }
     : { x: cropSel.x / cropScale, y: cropSel.y / cropScale, w: cropSel.w / cropScale, h: cropSel.h / cropScale };
   const out = await bitmapToJpeg(cropImg, Math.round(sel.x), Math.round(sel.y), Math.round(sel.w), Math.round(sel.h));
   const i = shots.findIndex((s) => s.id === cropTarget.id);
-  if (i >= 0) shots[i] = { ...shots[i], ...out, needsCrop: false };
+  if (i >= 0) shots[i] = { ...shots[i], ...out, needsCrop: false, autoCrop: false };
   await setShots(shots);
-  closeCrop();
+  $('cropModal').classList.add('hidden');
+  cropImg?.close();
+  cropImg = null;
+  cropTarget = null;
   renderShots();
+  if (thenGenerate) {
+    $('generate').click();
+  } else {
+    setStatus('', `✅ 已加入第 ${i + 1} 張截圖。文章還有下一段？回到原網頁捲下去，再按一次工具列圖示「截取這個畫面」。都好了就按「開始出題」。`);
+    maybeAutoCrop();
+  }
 }
 $('cropOk').addEventListener('click', () => applyCrop(false));
+$('cropGo').addEventListener('click', () => applyCrop(false, true));
 $('cropFull').addEventListener('click', () => applyCrop(true));
 
 // ---------- 素材：文字 ----------
@@ -295,7 +345,7 @@ $('generate').addEventListener('click', async () => {
   let images = [];
   let text = '';
   if (mode === 'image') {
-    if (!shots.length) return setStatus('error', '⚠️ 還沒有截圖。請到網頁上按 Alt+Shift+P 框選文章，或切到「文字」分頁貼上文章。');
+    if (!shots.length) return setStatus('error', '⚠️ 還沒有截圖。請到要出題的網頁按工具列圖示「截取這個畫面」（或 Alt+Shift+P），或切到「文字」分頁貼上文章。');
     if (shots.some((s) => s.needsCrop)) return setStatus('error', '⚠️ 有截圖還沒裁切，請先按該張的 ✂️ 框出文章範圍。');
     images = shots.map((s) => dataUrlToPart(s.dataUrl));
     const totalMB = images.reduce((a, p) => a + p.base64.length, 0) * 0.75 / 1024 / 1024;
@@ -335,6 +385,7 @@ $('generate').addEventListener('click', async () => {
     setStatus('', `✅ 完成！花了 ${sec} 秒。請在右邊逐題檢查，確認沒問題再匯出。`);
     $('resultCard').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   } catch (e) {
+    logError('出題', e);
     setStatus('error', `❌ ${escapeHtml(e.message)}`);
   } finally {
     clearInterval(timer);
@@ -470,6 +521,7 @@ function showExportOk(html) {
 }
 
 function showExportError(e) {
+  logError('匯出', e);
   $('exportOk').classList.add('hidden');
   const err = $('exportErr');
   err.textContent = `❌ 無法匯出：${e.message}`;
@@ -541,6 +593,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   if (changes[KEYS.shots]) {
     shots = changes[KEYS.shots].newValue ?? [];
     renderShots();
+    maybeAutoCrop();
   }
   if (changes[KEYS.text] && changes[KEYS.text].newValue?.text !== $('sourceText').value) {
     $('sourceText').value = changes[KEYS.text].newValue?.text ?? '';

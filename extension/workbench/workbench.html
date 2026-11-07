@@ -36,7 +36,7 @@
           <div id="shotEmpty" class="empty">
             <p><b>怎麼加入截圖？</b></p>
             <ul>
-              <li>到任何網頁（電子書、PDF、新聞），按工具列的 PIRLS 圖示，或按 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>，拖曳框選文章。</li>
+              <li>到任何網頁（電子書、PDF、新聞），按工具列的 PIRLS 圖示 →「截取這個畫面」，或按 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>。會自動跳回這裡讓你框出文章範圍。</li>
               <li>文章跨好幾頁：捲到下一段再框一次，依閱讀順序排好。</li>
               <li>也可以在這個頁面直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 貼上圖片，或把圖片檔拖進來。</li>
             </ul>
@@ -133,13 +133,14 @@
 
   <div id="cropModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="h-crop">
     <div class="modal-card">
-      <h2 id="h-crop">✂️ 框選要出題的範圍</h2>
-      <p class="muted">這個頁面無法直接框選，所以先截了整個畫面。請在圖上拖曳出文章範圍。</p>
+      <h2 id="h-crop">✂️ 拖曳框出要出題的文章範圍</h2>
+      <p class="muted"><span id="cropSource"></span>　按住滑鼠拖曳出方框；不需要裁切就按「使用整張」。</p>
       <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
       <div class="row-btns end">
-        <button class="btn" id="cropCancel" type="button">取消</button>
+        <button class="btn" id="cropCancel" type="button">稍後再裁</button>
         <button class="btn" id="cropFull" type="button">使用整張</button>
-        <button class="btn primary" id="cropOk" type="button" disabled>✔ 裁切這個範圍</button>
+        <button class="btn" id="cropOk" type="button" disabled>✔ 裁切（還要截下一段）</button>
+        <button class="btn primary" id="cropGo" type="button" disabled>✨ 裁切並開始出題</button>
       </div>
     </div>
   </div>

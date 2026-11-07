@@ -106,4 +106,34 @@ function scheduleSave() {
 ['subject', 'book', 'chapter'].forEach((id) => $(id).addEventListener('input', scheduleSave));
 document.querySelectorAll('input[name=chapterMode]').forEach((r) => r.addEventListener('change', scheduleSave));
 
+async function renderLog() {
+  const { errorLog = [] } = await chrome.storage.local.get('errorLog');
+  $('logEmpty').classList.toggle('hidden', errorLog.length > 0);
+  $('logList').classList.toggle('hidden', errorLog.length === 0);
+  $('logList').innerHTML = '';
+  for (const r of errorLog) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="muted"></span> <b></b>：<span></span>`;
+    li.children[0].textContent = `${r.at}（v${r.version}）`;
+    li.children[1].textContent = r.where;
+    li.children[2].textContent = r.message;
+    $('logList').appendChild(li);
+  }
+  return errorLog;
+}
+$('logCopy').addEventListener('click', async () => {
+  const log = await renderLog();
+  const text = [`PIRLS 閱讀題組小幫手 v${chrome.runtime.getManifest().version}｜${navigator.userAgent}`,
+    ...log.map((r) => `${r.at}｜v${r.version}｜${r.where}｜${r.message}`)].join(String.fromCharCode(10));
+  await navigator.clipboard.writeText(text);
+  $('logMsg').textContent = log.length ? `✔ 已複製 ${log.length} 筆紀錄` : '✔ 已複製（目前沒有錯誤）';
+});
+$('logClear').addEventListener('click', async () => {
+  await chrome.storage.local.remove('errorLog');
+  await renderLog();
+  $('logMsg').textContent = '✔ 已清除';
+});
+chrome.storage.onChanged.addListener((c, area) => { if (area === 'local' && c.errorLog) renderLog(); });
+
 init();
+renderLog();
