@@ -2,7 +2,7 @@ import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS, logEr
 import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
-import { checkUpdate } from '../lib/update.js';
+import { checkUpdate, STORE_URL } from '../lib/update.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_EDGE = 2000;
@@ -40,14 +40,16 @@ async function init() {
   renderUpdate();
 }
 
+// 只有手動安裝版會走到這裡；商店安裝由 Chrome 自動更新，checkUpdate() 直接回傳 null
 async function renderUpdate() {
   const info = await checkUpdate();
   if (!info) return;
   const el = $('updateBanner');
-  el.innerHTML = `🆕 <b>有新版本 v${escapeHtml(info.version)}</b>（你現在是 v${escapeHtml(info.current)}）`
+  el.innerHTML = `🆕 <b>有新版本 v${escapeHtml(info.version)}</b>（你現在是手動安裝的 v${escapeHtml(info.current)}）`
     + (info.notes?.length ? `：${info.notes.map(escapeHtml).join('；')}` : '')
     + `　<a href="${escapeHtml(info.download)}" target="_blank" rel="noopener noreferrer">⬇️ 下載新版</a>`
-    + `　<a href="${escapeHtml(info.install)}#update" target="_blank" rel="noopener noreferrer">怎麼更新？</a>`;
+    + `　<a href="${escapeHtml(info.install)}#update" target="_blank" rel="noopener noreferrer">怎麼更新？</a>`
+    + `　<a href="${STORE_URL}" target="_blank" rel="noopener noreferrer">改從 Chrome 商店安裝，之後自動更新</a>`;
   el.classList.remove('hidden');
 }
 

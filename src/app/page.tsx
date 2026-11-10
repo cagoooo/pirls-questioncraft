@@ -532,7 +532,7 @@ export default function PIRLSQuestionCraftPage() {
           </div>
           <div className="flex gap-2 flex-wrap max-w-full">
             <HelpDialog />
-            <Link href="/extension/" title="Chrome 擴充套件：截圖、讀全文出題，一鍵送到 PaGamO">
+            <Link href="/extension/" title="Chrome 擴充套件（已上架 Chrome 商店）：截圖、讀全文出題，一鍵送到 PaGamO">
               <PillBtn color="bg-sky" sm className="!px-3.5">
                 <span aria-hidden>🧩</span>
                 <span className="font-extrabold whitespace-nowrap"><span className="hidden sm:inline">Chrome </span>擴充套件</span>
@@ -617,14 +617,15 @@ export default function PIRLSQuestionCraftPage() {
               href="/extension/"
               className="pointer-events-auto flex flex-col gap-3 w-[25rem] bg-card border-neo rounded-[22px] shadow-neo-lg p-6 text-ink no-underline neo-hover-lift"
             >
-              <span className="self-start inline-flex items-center gap-1.5 bg-sky border-neo rounded-full px-3 py-1 text-sm font-extrabold">🧩 新功能・Chrome 擴充套件</span>
+              <span className="self-start inline-flex items-center gap-1.5 bg-sky border-neo rounded-full px-3 py-1 text-sm font-extrabold">🧩 Chrome 擴充套件・已上架商店</span>
               <span className="text-[1.375rem] font-extrabold leading-snug">在任何網頁截圖或讀全文，<br />一分鐘變成 PIRLS 題組</span>
               <span className="flex flex-col gap-1.5 text-base">
                 <span>📷 電子書、PDF 截圖就能出題</span>
                 <span>📖 部落格、新聞一鍵讀全文</span>
                 <span>🚀 一鍵送到 PaGamO 題庫</span>
+                <span>🔄 從商店安裝，Chrome 自動更新</span>
               </span>
-              <span className="self-start inline-flex items-center gap-1.5 bg-lemon border-neo rounded-full px-4 py-2 text-base font-extrabold shadow-neo-sm mt-1">免費下載與安裝說明 →</span>
+              <span className="self-start inline-flex items-center gap-1.5 bg-lemon border-neo rounded-full px-4 py-2 text-base font-extrabold shadow-neo-sm mt-1">免費加到 Chrome・看安裝說明 →</span>
             </Link>
             </div>
           </NeoCard>

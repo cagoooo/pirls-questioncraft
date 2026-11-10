@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
   const [s, shots] = await Promise.all([getSettings(), getShots()]);
   $('warn').classList.toggle('hidden', !!(s.apiKey && s.model));
   if (shots.length) $('n').textContent = `（${shots.length} 張截圖）`;
-  const info = await checkUpdate();
+  const info = await checkUpdate(); // 商店安裝會自動更新，不提醒
   if (info) {
     $('upd').innerHTML = `🆕 有新版本 v${info.version}，<a href="${info.install}#update" target="_blank" rel="noopener noreferrer">看更新方法</a>`;
     $('upd').classList.remove('hidden');
@@ -23,7 +23,7 @@ async function send(type, busyText, btn) {
     // 背景程式 10 秒沒回應就直接說明，不再默默沒反應
     const res = await Promise.race([
       chrome.runtime.sendMessage({ type, tab }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('背景程式沒有回應。請到 chrome://extensions 按這個擴充套件的 ⟳ 重新載入後再試。')), 10000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('背景程式沒有回應。請把 Chrome 全部關掉再重新打開後再試一次。')), 10000)),
     ]);
     if (res && res.ok === false && res.error && !/too-short/.test(res.error)) {
       // 失敗時背景程式通常已經打開工作台並寫好說明；這裡也留一行訊息

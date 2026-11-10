@@ -150,6 +150,13 @@ function backendLines(file) {
   assert.ok(!upd.isNewer('0.4.9', '0.5.0'));
   checks++;
 
+  // 商店安裝判斷：商店版不查網站版號（Chrome 會自動更新），手動載入的才提醒
+  assert.ok(upd.isStoreInstall({ update_url: 'https://clients2.google.com/service/update2/crx' }, 'someotherid'));
+  assert.ok(upd.isStoreInstall({}, upd.STORE_ID));
+  assert.ok(!upd.isStoreInstall({}, 'abcdefghijklmnopabcdefghijklmnop'));
+  assert.equal(upd.STORE_URL, 'https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp');
+  checks++;
+
   // ZIP 打包：版本要與 CHANGELOG 最新一筆一致
   const manifest = JSON.parse(fs.readFileSync(ext('manifest.json'), 'utf8'));
   const changelog = JSON.parse(fs.readFileSync(ext('CHANGELOG.json'), 'utf8'));

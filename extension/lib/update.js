@@ -1,7 +1,16 @@
-// 新版本提醒：讀網站上的 version.json（GitHub Pages 允許跨網站讀取，不需要額外權限），最多 12 小時查一次。
+// 新版本提醒：只給「手動安裝」（載入未封裝項目）的老師用。
+// 從 Chrome 線上應用程式商店安裝的，Chrome 會自動更新，不再查網站版號、也不顯示「下載新版」，避免叫老師去下載 ZIP。
+// 手動安裝版讀網站上的 version.json（GitHub Pages 允許跨網站讀取，不需要額外權限），最多 12 小時查一次。
 export const VERSION_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/version.json';
 export const INSTALL_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/';
+export const STORE_ID = 'cfbehdinangicblpbnockoofeccmoidp';
+export const STORE_URL = `https://chromewebstore.google.com/detail/${STORE_ID}`;
 const EVERY_MS = 12 * 60 * 60 * 1000;
+
+/** 商店安裝的擴充套件，Chrome 會在 manifest 補上 update_url；未封裝載入的沒有，ID 也不同。 */
+export function isStoreInstall(manifest = chrome.runtime.getManifest(), id = chrome.runtime.id) {
+  return id === STORE_ID || !!manifest.update_url;
+}
 
 export function isNewer(latest, current) {
   const a = String(latest).split('.').map(Number);
@@ -14,8 +23,9 @@ export function isNewer(latest, current) {
   return false;
 }
 
-/** 有新版回傳 version.json 內容；沒有新版或查不到回傳 null（查不到不打擾老師）。 */
+/** 手動安裝版有新版時回傳 version.json 內容；商店安裝、沒有新版或查不到都回傳 null（不打擾老師）。 */
 export async function checkUpdate({ force = false } = {}) {
+  if (isStoreInstall()) return null;
   const current = chrome.runtime.getManifest().version;
   const { updateCheck } = await chrome.storage.local.get('updateCheck');
   let info = updateCheck?.info ?? null;

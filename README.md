@@ -4,7 +4,7 @@
 
 > 📌 **目前版本：v0.3.1**（依據 `package.json`）
 
-🧩 **Chrome 擴充套件（v0.5.1）**：［[下載與安裝說明](https://cagoooo.github.io/pirls-questioncraft/extension/)］在任何網頁框選截圖、讀取整頁全文或反白文字，用老師自己的免費 Gemini 金鑰出題、逐題修改，一鍵送到 PaGamO 批量上傳頁（自動選題型、放好檔案）。安裝與使用說明見 [`extension/README.md`](extension/README.md)，開發規劃見 [`docs/CHROME_EXTENSION_PLAN.md`](docs/CHROME_EXTENSION_PLAN.md)。
+🧩 **Chrome 擴充套件（v0.5.1，已上架 Chrome 線上應用程式商店）**：［[➕ 加到 Chrome（免費）](https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp)］［[圖文安裝與使用說明](https://cagoooo.github.io/pirls-questioncraft/extension/)］從商店安裝後 Chrome 會自動更新。在任何網頁框選截圖、讀取整頁全文或反白文字，用老師自己的免費 Gemini 金鑰出題、逐題修改，一鍵送到 PaGamO 批量上傳頁（自動選題型、放好檔案）。安裝與使用說明見 [`extension/README.md`](extension/README.md)，開發規劃見 [`docs/CHROME_EXTENSION_PLAN.md`](docs/CHROME_EXTENSION_PLAN.md)。
 
 This is a NextJS starter in Firebase Studio.
 

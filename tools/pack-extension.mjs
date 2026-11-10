@@ -1,6 +1,7 @@
-// 把 extension/ 打包成給老師下載的 ZIP，放到 public/extension/（網站建置前自動執行，產物不進 git）。
-// - ZIP 內是一個「PIRLS閱讀題組小幫手」資料夾，老師解壓後直接「載入未封裝項目」選它
-// - 同時產生 public/extension/version.json，給擴充套件的「新版本提醒」讀取
+// 把 extension/ 打包成「手動安裝」用的 ZIP，放到 public/extension/（網站建置前自動執行，產物不進 git）。
+// 老師主要從 Chrome 線上應用程式商店安裝（Chrome 自動更新）；這個 ZIP 只給商店被學校擋住、需要離線安裝的人備用。
+// - ZIP 內是一個「PIRLS閱讀題組小幫手」資料夾，解壓後「載入未封裝項目」選它
+// - 同時產生 public/extension/version.json，只給手動安裝版的「新版本提醒」讀取（商店版不讀）
 // - manifest.json 的版本必須等於 CHANGELOG.json 最新一筆，否則建置失敗（避免忘了寫更新紀錄）
 // 不用任何套件：自己寫最小的 ZIP（deflate + CRC32 + UTF-8 檔名）。
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
@@ -14,6 +15,7 @@ const OUT_DIR = join(ROOT, 'public', 'extension');
 const ZIP_NAME = 'pirls-helper-extension.zip';
 const TOP = 'PIRLS閱讀題組小幫手';
 const INSTALL_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/';
+const STORE_URL = 'https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp';
 // 只給開發測試用、老師不需要的檔案
 const EXCLUDE = new Set(['lib/package.json']);
 
@@ -48,16 +50,19 @@ const DOS_DATE = ((2026 - 1980) << 9) | (11 << 5) | 7;
 
 const readme = `PIRLS 閱讀題組小幫手 v${manifest.version}
 
-圖文安裝說明（請先看這個）：
+建議改從 Chrome 線上應用程式商店安裝（按「加到 Chrome」就好，之後 Chrome 會自動更新）：
+${STORE_URL}
+
+圖文安裝說明：
 ${INSTALL_URL}
 
-快速安裝：
+這個 ZIP 是「手動安裝」備用版，只有學校電腦打不開商店、或需要離線安裝時才用：
 1. 把這個資料夾放到固定位置（例如 D:\\${TOP}），之後不要搬動或改名。
 2. Chrome 網址列輸入 chrome://extensions ，打開右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選這個資料夾（裡面看得到 manifest.json）。
 4. 照自動打開的設定頁，貼上自己的免費 Gemini 金鑰。
 
-更新：下載新版 ZIP，解壓「覆蓋」到同一個資料夾，再到 chrome://extensions 按 ⟳。
+更新：手動安裝版不會自動更新。下載新版 ZIP，解壓「覆蓋」到同一個資料夾，再到 chrome://extensions 按 ⟳。
 `;
 
 const files = walk(SRC)
