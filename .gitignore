@@ -75,3 +75,6 @@ functions/node_modules/
 
 # 推廣素材（LINE 配圖等）不進版控
 /promo/
+
+# 商店上架打包產物（由 release/release.ps1 產生）
+/release/dist/

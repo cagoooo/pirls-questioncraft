@@ -1,0 +1,65 @@
+名稱：PIRLS 閱讀題組小幫手
+簡短名稱：PIRLS 小幫手
+版本：0.5.1
+語言：繁體中文（台灣）
+類別：教育
+可見度：公開（所有人都可以在商店搜尋到並安裝）
+價格：免費
+地區：所有地區
+支援電子郵件：cagooo@gmail.com
+官方網站：https://cagoooo.github.io/pirls-questioncraft/extension/
+
+商店摘要（若可編輯；否則用套件內建說明）：
+框選截圖、讀取全文或反白文字，用自己的 Gemini 金鑰產生 PIRLS 閱讀理解題組，一鍵送到 PaGamO。
+
+詳細說明：
+PIRLS 閱讀題組小幫手讓老師在任何網頁截圖、讀取全文或反白文字，用自己的免費 Gemini 金鑰，快速產生符合 PIRLS 四層次的閱讀理解選擇題，檢查修改後一鍵送到 PaGamO 批量上傳頁。
+
+主要功能：
+• 截圖就能出題：電子書、PDF、學習單都可以截取畫面，在工作台框出文章範圍，由 AI 辨識文字出題。
+• 部落格或新聞可一鍵讀取全文：自動去掉廣告、選單、留言，只留下正文。
+• 也可以反白一段文字，按右鍵出題。
+• 逐題檢查與修改：題幹、選項、正解、答後講解、PIRLS 層次都能改，改完自動儲存。
+• 一鍵送到 PaGamO：自動打開批量上傳頁、選好「題組」、放好檔案。選項順序預設隨機。套件不會代你按下「上傳」。
+• 金鑰只存在自己電腦的 Chrome，不會寫進資料夾，也不會送到開發者的伺服器。
+
+使用提醒：
+請用自己的 Google 帳號到 Google AI Studio 申請免費 Gemini 金鑰，貼到設定頁並按「儲存並測試」。請不要截取含學生姓名、成績等個人資料的畫面。
+
+開發：阿凱老師，桃園市龍潭區石門國民小學。
+圖文安裝與更新說明：https://cagoooo.github.io/pirls-questioncraft/extension/
+
+單一用途：
+讓老師從網頁截圖、讀取全文或反白文字，用自己的 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，並匯出成可上傳到 PaGamO 的檔案。
+
+權限說明：
+• activeTab：只在老師操作當下的分頁截圖或讀取內容。
+• storage、unlimitedStorage：在本機儲存金鑰、設定、截圖與題組草稿；截圖較大所以需要較大容量。
+• contextMenus：在網頁上提供右鍵「用這段文字出題」或「讀取這頁全文」。
+• scripting：在老師指定的網頁擷取正文，以及在 PaGamO 批量上傳頁放入檔案。
+• https://generativelanguage.googleapis.com/*：用老師自己的金鑰呼叫 Google Gemini 出題。
+• https://www.pagamo.org/*：打開 PaGamO 批量上傳頁並放入檔案，不會代按上傳。
+
+遠端程式碼：無。所有程式都在套件內，內容安全政策只允許 script-src 'self'。
+
+資料使用：
+• 不把資料送到開發者伺服器，也沒有分析追蹤。
+• 出題時會把老師選取的截圖或文字，連同金鑰送到 Google Gemini。
+• 每 12 小時最多向 https://cagoooo.github.io/pirls-questioncraft/extension/version.json 查一次是否有新版。
+• 金鑰、設定、草稿、錯誤紀錄都只存在這台電腦的 Chrome。
+
+審查員測試說明：
+1. 安裝後會打開設定頁。出題功能需要一組 Google Gemini 應用程式介面金鑰；請用審查員自己的測試金鑰，貼到設定頁後按「儲存並測試」。沒有金鑰時仍可查看設定頁與工作台介面。
+2. 打開任一公開文章網頁（例如新聞或維基百科），按工具列圖示選擇「讀取這頁全文」或「截取這個畫面」（快捷鍵 Alt+Shift+P）。
+3. 工作台產生題組後可修改，再按「送到 PaGamO（題組版）」。套件會下載備份並打開批量上傳頁、放入檔案，但不會代按「上傳」。
+4. Chrome 設定頁、新分頁、擴充功能商店不允許截圖，請在一般網頁測試。
+5. 本套件不會把金鑰或文章送到開發者伺服器。
+
+截圖檔（請依序上傳）：
+/workspace/chrome-store-gempirls/assets/01-options.jpg  設定頁與金鑰測試成功
+/workspace/chrome-store-gempirls/assets/02-select.jpg  框選文章範圍
+/workspace/chrome-store-gempirls/assets/03-workbench.jpg  工作台準備出題
+/workspace/chrome-store-gempirls/assets/04-questions.jpg  題組結果與逐題修改
+/workspace/chrome-store-gempirls/assets/05-export.jpg  送到 PaGamO
+商店圖示：/workspace/chrome-store-gempirls/assets/icon128.png
+套件壓縮檔：/workspace/chrome-store-gempirls/extension-v0.5.1.zip
