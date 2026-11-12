@@ -126,11 +126,11 @@ export default function ExtensionGuidePage() {
             <Step n={3} title="貼上自己的免費 Gemini 金鑰" shot={<Shot name="step-key" alt="設定頁：貼上金鑰並按儲存並測試" />}>
               <p id="key">裝好後會自動打開設定頁（沒有的話，在工具列圖示上按右鍵 →「設定（Gemini 金鑰）」）。</p>
               <ol className="list-decimal pl-6 space-y-1">
-                <li>打開 <a className="text-sky-deep underline" href="https://aistudio.google.com/apikey" {...ext}>Google AI Studio 金鑰頁面</a>，用自己的 Google 帳號登入。</li>
+                <li>打開 <a className="text-sky-deep underline" href="https://aistudio.google.com/apikey" {...ext}>Google AI Studio 金鑰頁面</a>，用<b>個人 Gmail 帳號</b>登入。<b>不要用學校信箱</b>，用個人帳號申請才能使用免費額度。</li>
                 <li>按畫面上的「<b>Create API key</b>」（建立金鑰）按鈕，複製那串字（以 <code>AIza</code> 或 <code>AQ.</code> 開頭）。</li>
                 <li>貼到設定頁，按「<b>儲存並測試</b>」，看到綠色「可以使用」就完成了。</li>
               </ol>
-              <p className="bg-lemon/50 border-neo rounded-xl px-4 py-3 text-[1rem]">💡 請用自己的 Google 帳號申請免費金鑰。每位老師用自己的金鑰，不會占用學校或別人的額度。</p>
+              <p className="bg-lemon/50 border-neo rounded-xl px-4 py-3 text-[1rem]">💡 請用<b>個人 Gmail 帳號</b>申請免費金鑰，<b>不要用學校信箱</b>：用學校帳號申請的金鑰沒有免費額度。每位老師用自己的金鑰，不會占用別人的額度。</p>
             </Step>
           </ol>
         </NeoCard>

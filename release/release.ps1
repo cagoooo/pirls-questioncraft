@@ -17,7 +17,10 @@ param(
 
     [switch]$Publish,
 
-    [switch]$Defer
+    [switch]$Defer,
+
+    # 只把商店上已上傳的草稿送審，不改版本、不打包、不上傳
+    [switch]$PublishOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -113,10 +116,11 @@ from pathlib import Path
 path = Path(sys.argv[1])
 new_ver = sys.argv[2]
 text = path.read_text(encoding="utf-8")
-new_text, n = re.subn(r'("version"\s*:\s*")([^"]+)(")', r"\1" + new_ver + r"\3", text, count=1)
+new_text, n = re.subn(r'("version"\s*:\s*")([^"]+)(")', r"\g<1>" + new_ver + r"\g<3>", text, count=1)
 if n != 1:
     raise SystemExit("找不到唯一的 version 欄位，沒有改檔。")
-path.write_text(new_text, encoding="utf-8")
+with open(path, "w", encoding="utf-8", newline="\n") as f:
+    f.write(new_text)
 print(new_ver)
 '@
     Invoke-Python -Code $code -ArgsList @((Join-Path $ExtensionDir 'manifest.json'), $NewVersion) | Out-Null
@@ -148,7 +152,8 @@ if data and data[0].get("version") == version:
     data[0] = entry
 else:
     data.insert(0, entry)
-path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+with open(path, "w", encoding="utf-8", newline="\n") as f:
+    f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 '@
     try {
         Invoke-Python -Code $code -ArgsList @((Join-Path $ExtensionDir 'CHANGELOG.json'), $NewVersion, $DateText, $notesJsonPath) | Out-Null
@@ -406,7 +411,7 @@ function Wait-Upload([string]$PublisherId, [string]$Token, $Initial) {
     $state = $Initial.uploadState
     $result = $Initial
     $tries = 0
-    while ($state -eq 'UPLOAD_IN_PROGRESS' -and $tries -lt 20) {
+    while ($state -match 'IN_PROGRESS' -and $tries -lt 20) {
         Start-Sleep -Seconds 3
         $uri = "https://chromewebstore.googleapis.com/v2/publishers/$PublisherId/items/${ItemId}:fetchStatus"
         $result = Invoke-StoreApi -Method Get -Uri $uri -Token $Token
@@ -418,10 +423,11 @@ function Wait-Upload([string]$PublisherId, [string]$Token, $Initial) {
             # SUCCESS 以外再檢查一次常見成功值
         }
     }
-    if ($state -eq 'UPLOAD_IN_PROGRESS') {
+    if ($state -match 'IN_PROGRESS') {
         throw '上傳仍在處理中。請稍後到開發人員資訊主頁查看套件頁。'
     }
-    if ($state -and ($state -notmatch 'SUCCESS')) {
+    # 第 1 版介面回傳 SUCCESS，第 2 版回傳 SUCCEEDED
+    if ($state -and ($state -notmatch '^(UPLOAD_)?(SUCCESS|SUCCEEDED)$')) {
         throw ("上傳狀態不成功：" + $state)
     }
     return $result
@@ -436,10 +442,18 @@ function Publish-Item([string]$PublisherId, [string]$Token) {
 }
 
 # ===== 主流程 =====
+if ($PublishOnly) {
+    $auth = Get-AccessToken
+    if (-not $auth) { throw ('還沒有設定商店介面金鑰，請到套件頁手動送審：' + $DashboardPackageUrl) }
+    Write-Info $(if ($Defer) { '正在把商店草稿送審，並設定為審核通過後先暫緩發布。' } else { '正在把商店草稿送審，審核通過後會依目前的能見度發布。' })
+    $published = Publish-Item -PublisherId $auth.PublisherId -Token $auth.Token
+    if ($published.state) { Write-Info ('送審狀態：' + $published.state) } else { Write-Info '已送出審核。' }
+    return
+}
 if ($Publish -and $DryRun) {
     throw '試跑模式不會上傳或送審，請不要同時加 -Publish。'
 }
-if ($Defer -and -not $Publish) {
+if ($Defer -and -not ($Publish -or $PublishOnly)) {
     throw '延後發布只在加上 -Publish 時有效。'
 }
 

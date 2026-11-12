@@ -24,7 +24,7 @@ PIRLS 閱讀題組小幫手讓老師在任何網頁截圖、讀取全文或反�
 • 金鑰只存在自己電腦的 Chrome，不會寫進資料夾，也不會送到開發者的伺服器。
 
 使用提醒：
-請用自己的 Google 帳號到 Google AI Studio 申請免費 Gemini 金鑰，貼到設定頁並按「儲存並測試」。請不要截取含學生姓名、成績等個人資料的畫面。
+請用個人 Gmail 帳號（不要用學校信箱，用個人帳號申請才能使用免費額度）到 Google AI Studio 申請免費 Gemini 金鑰，貼到設定頁並按「儲存並測試」。請不要截取含學生姓名、成績等個人資料的畫面。
 
 開發：阿凱老師，桃園市龍潭區石門國民小學。
 圖文安裝與更新說明：https://cagoooo.github.io/pirls-questioncraft/extension/

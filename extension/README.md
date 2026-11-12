@@ -19,7 +19,7 @@
 
 ### 申請免費 Gemini 金鑰
 
-1. 打開 <https://aistudio.google.com/apikey>，用自己的 Google 帳號登入。
+1. 打開 <https://aistudio.google.com/apikey>，用**個人 Gmail 帳號**登入。**不要用學校信箱**，用個人帳號申請才能使用免費額度。
 2. 按畫面上的「Create API key」（建立金鑰）按鈕，複製那串字（通常以 `AIza` 或 `AQ.` 開頭）。
 3. 貼到擴充套件設定頁 →「儲存並測試」→ 看到綠色「可以使用」就完成。
 

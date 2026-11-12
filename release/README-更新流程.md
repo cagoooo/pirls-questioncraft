@@ -23,6 +23,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "H:\GemPIRLS\release\release
 
 4. 打包成功後，壓縮檔會寫到 `H:\GemPIRLS\release\dist\PIRLS閱讀題組小幫手-v版本.zip`。這個資料夾已列入忽略清單，不會被送進版控。
 5. 若已經完成文末的一次性金鑰設定，腳本會自動把壓縮檔上傳成商店草稿，但不會直接送審。加上 `-Publish` 才會送審；再加上 `-Defer`，會在審核通過後先暫緩發布，要由你再按一次發布，而且必須在 30 天內完成，否則會退回草稿並要重審。
+   - 已經上傳成草稿、只差送審時（例如上次沒加 `-Publish`），用 `-PublishOnly`：不改版本、不打包、不上傳，只把商店上的草稿送審。
 6. 若還沒設定金鑰，或加上 `-NoUpload`，腳本只負責打包，並會顯示套件頁網址，請到這裡手動上傳後再按送出審核：
 
 `https://chrome.google.com/u/1/webstore/devconsole/3836d2de-c36d-4d91-b06d-43cfa9aa3137/cfbehdinangicblpbnockoofeccmoidp/edit/package`
