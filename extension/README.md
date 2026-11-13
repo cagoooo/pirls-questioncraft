@@ -1,6 +1,6 @@
 # PIRLS 閱讀題組小幫手（Chrome 擴充套件）
 
-在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後下載 PaGamO 批量上傳檔。
+在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後一鍵送到 PaGamO 批量上傳頁，或下載 LoiLoNote 測驗卡匯入檔。
 
 > ➕ **加到 Chrome（免費，Chrome 線上應用程式商店）：<https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp>**
 >
@@ -36,6 +36,10 @@
    - **選項順序預設「隨機」**：每位學生看到的選項順序都不同，不能靠記「答案是第幾個」猜題。少數題目需要固定順序（例如選項是「以上皆是」）時，可在匯出區切到「固定」。
    - 還沒登入 PaGamO：先登入，登入後會自動回到批量上傳頁並放好檔案（10 分鐘內有效）。
    - 自動放檔沒成功：工作台下方有「只下載檔案」和手動匯入步驟。
+7. 用 **LoiLoNote** 的老師：在匯出區下方的「🃏 LoiLoNote 測驗卡」選一種下載，再到 LoiLoNote 測驗卡點「…」→「**文件匯入**」，預覽確認後按「**使用此文件創建**」。
+   - **⬇️ 下載 LoiLoNote 題組檔**：和網站「匯出 Loilonote」相同的九欄格式，只有題目，文章要另外發給學生。
+   - **⬇️ 含文章版（新版格式）**：LoiLoNote 新版範本（v1.2.0），文章當作「只閱讀、不作答」的項目放在最前面，後面接著題目；文章超過 1000 字會自動分成幾段。
+   - 檔名就是文章標題，LoiLoNote 會用它當測驗卡標題。圖片要在 LoiLoNote 裡另外加入。
 
 其他用法：
 
@@ -88,7 +92,7 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁，78 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁與 LoiLoNote 匯出，87 項）。
 - 發布：改 `manifest.json` 版本時，同時在 `CHANGELOG.json` 最前面加一筆（版本不一致會讓建置失敗）。商店版要另外打包上傳到 Chrome 開發人員資訊主頁送審，通過後 Chrome 會自動更新老師的擴充套件。
 - 網站部署時 `tools/pack-extension.mjs` 會自動打包手動安裝用的 ZIP 與 `version.json`。`lib/update.js` 只在**手動安裝版**（沒有商店的 `update_url`、ID 不是 `cfbehdinangicblpbnockoofeccmoidp`）讀 `version.json` 顯示新版提醒；商店版不查網站版號。
 - 安裝說明頁的截圖：`python -X utf8 tools/capture-extension-guide.py` 重新產生。

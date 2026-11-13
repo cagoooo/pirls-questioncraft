@@ -309,6 +309,28 @@ with sync_playwright() as p:
     r = [c.value for c in ws2[11]]
     check("選擇題版第 11 列是第 1 題", r[0] == 1 and r[1:4] == ["國語", "115上", "小水滴的旅行（修訂）"] and r[17] == "C", str(r[:6]))
     check("選擇題檔預設選項隨機排列（v）", r[20] == "v", str(r[20]))
+    # LoiLoNote 題組檔（與網站相同的九欄）：第 1 列欄名、第 2 列起題目
+    with bench.expect_download() as dl_l9:
+        bench.click("#dlLoilo")
+    p9 = OUT / ("loilo9_" + dl_l9.value.suggested_filename); dl_l9.value.save_as(str(p9))
+    ws9 = openpyxl.load_workbook(p9).active
+    h9, q9 = [c.value for c in ws9[1]], [c.value for c in ws9[2]]
+    check("LoiLoNote 九欄：欄名與網站相同", h9[0] == "問題（請勿編輯標題）" and h9[5:9] == ["選項1", "選項2", "選項3", "選項4"] and len([v for v in h9 if v]) == 9, str(h9[:2]))
+    check("LoiLoNote 九欄：第 2 列是改過的第 1 題、正解 3", str(q9[0]).startswith("老師改過") and q9[1:4] == [1, 1, 3], str(q9[:4])[:80])
+    check("LoiLoNote 九欄：共 1+8 列", ws9.max_row == 9, str(ws9.max_row))
+    # LoiLoNote 含文章版（v1.2.0）：A1 版本、第 3 列文章 questionOnly、第 4 列起單選題
+    with bench.expect_download() as dl_loilo:
+        bench.click("#dlLoiloArticle")
+    pl = OUT / ("loilo_" + dl_loilo.value.suggested_filename); dl_loilo.value.save_as(str(pl))
+    wl = openpyxl.load_workbook(pl)
+    wsl = wl["Import"] if "Import" in wl.sheetnames else wl.active
+    l1, l3, l4 = [c.value for c in wsl[1]], [c.value for c in wsl[3]], [c.value for c in wsl[4]]
+    check("LoiLoNote 檔名＝文章標題", dl_loilo.value.suggested_filename == "小水滴的旅行（修訂）.xlsx", dl_loilo.value.suggested_filename)
+    check("LoiLoNote A1 是 v1.2.0、工作表 Import", l1[0] == "v1.2.0" and wsl.title == "Import", str([l1[0], wsl.title]))
+    check("LoiLoNote 第 3 列是文章（questionOnly）", l3[0] == "questionOnly" and "小水滴的旅行（修訂）" in str(l3[1]), str(l3[:2])[:80])
+    check("LoiLoNote 第 4 列是改過的第 1 題、正解 3", l4[0] == "radio" and str(l4[1]).startswith("老師改過") and l4[2:5] == [1, 1, 3], str(l4[:5])[:80])
+    check("LoiLoNote 共 2+1+8 列", wsl.max_row == 11, str(wsl.max_row))
+    check("LoiLoNote 下載後在按鈕下方顯示匯入說明", bench.is_visible("#loiloMsg") and "文件匯入" in bench.inner_text("#loiloMsg"), bench.inner_text("#loiloMsg"))
     # 切到「固定」再下載：要寫 x
     bench.click("label:has(input[name=optorder][value=fixed])")
     bench.wait_for_timeout(300)

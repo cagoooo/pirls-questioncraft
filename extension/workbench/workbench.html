@@ -13,7 +13,7 @@
     <div class="wrap">
       <a class="brand" href="workbench.html">
         <img src="../icons/icon-48.png" alt="" width="40" height="40">
-        <span><strong>PIRLS 閱讀題組小幫手</strong><small>工作台：素材 → 出題 → 檢查 → 匯出 PaGamO</small></span>
+        <span><strong>PIRLS 閱讀題組小幫手</strong><small>工作台：素材 → 出題 → 檢查 → 匯出 PaGamO／LoiLoNote</small></span>
       </a>
       <nav><a class="btn" href="../options/options.html">⚙️ 設定與金鑰</a></nav>
     </div>
@@ -88,13 +88,13 @@
             <p class="muted" id="resultMeta"></p>
             <div id="resultWarn" class="notice warn hidden"></div>
             <label class="field"><span>文章標題</span><input id="title" type="text"></label>
-            <label class="field"><span>文章內容（學生在 PaGamO 題組中會看到這段）</span><textarea id="article" rows="10"></textarea></label>
+            <label class="field"><span>文章內容（學生在 PaGamO／LoiLoNote 題組中會看到這段）</span><textarea id="article" rows="10"></textarea></label>
             <div id="questions"></div>
           </div>
         </section>
 
         <section class="card export hidden" id="exportCard" aria-labelledby="h-exp">
-          <h2 id="h-exp"><span class="step">3</span> 匯出到 PaGamO</h2>
+          <h2 id="h-exp"><span class="step">3</span> 匯出到 PaGamO／LoiLoNote</h2>
           <div class="grid3">
             <label class="field"><span>科目</span><input id="catSubject" type="text"></label>
             <label class="field"><span>冊次</span><input id="catBook" type="text"></label>
@@ -128,6 +128,24 @@
               <li>到「題目總覽」確認題數與正解。</li>
             </ol>
           </details>
+          <div class="loilo-box">
+            <h3>🃏 LoiLoNote 測驗卡</h3>
+            <div class="row-btns">
+              <button class="btn" id="dlLoilo" type="button">⬇️ 下載 LoiLoNote 題組檔</button>
+              <button class="btn" id="dlLoiloArticle" type="button">⬇️ 含文章版（新版格式）</button>
+            </div>
+            <p class="muted">題組檔：與網站「匯出 Loilonote」相同的格式，只有題目，文章請另外發給學生。<br>含文章版：用 LoiLoNote 新版範本（v1.2.0），文章放在最前面（只閱讀、不作答），後面接著題目。</p>
+            <div id="loiloMsg" class="notice hidden" role="status" aria-live="polite"></div>
+            <details class="howto">
+              <summary>怎麼匯入 LoiLoNote？</summary>
+              <ol>
+                <li>在 LoiLoNote 建立一張<b>測驗卡</b>，進入編輯頁面。</li>
+                <li>點「…」→ 選「<b>文件匯入</b>」，選剛下載的 xlsx 檔。</li>
+                <li>在預覽畫面確認題數與正確答案，再按「<b>使用此文件創建</b>」。</li>
+              </ol>
+              <p class="muted">檔名就是文章標題，LoiLoNote 會用它當測驗卡標題（卡片已有標題時保留原標題）。圖片要在 LoiLoNote 裡另外加入。含文章版的文章超過 1000 字時，會自動分成幾段，依序排在題目前面。</p>
+            </details>
+          </div>
           <div class="row-btns end">
             <button class="btn small ghost" id="newSet" type="button">🆕 清空，準備下一篇</button>
           </div>
@@ -153,6 +171,7 @@
   <script src="../vendor/xlsx.full.min.js"></script>
   <script src="../lib/pagamoTemplates.js"></script>
   <script src="../lib/pagamo.js"></script>
+  <script src="../lib/loilo.js"></script>
   <script type="module" src="workbench.js"></script>
 </body>
 </html>

@@ -593,6 +593,24 @@ $('sendChoice').addEventListener('click', () => sendToPagamo(false));
 $('dlGroup').addEventListener('click', () => exportFile(true));
 $('dlChoice').addEventListener('click', () => exportFile(false));
 
+// LoiLoNote 測驗卡：題組檔＝與網站相同的九欄格式；含文章版＝v1.2.0（文章＋單選題）。不需要 PaGamO 的科目／冊次／章節
+function exportLoilo(withArticle) {
+  const msg = $('loiloMsg');
+  try {
+    const name = globalThis.PirlsLoilo.download(draft.data, { legacy: !withArticle });
+    const parts = withArticle ? globalThis.PirlsLoilo.passageItems(draft.data.title, draft.data.articleContent).length : 0;
+    const note = parts > 1 ? `文章較長，已分成 ${parts} 段放在題目前面。` : '';
+    msg.className = 'notice ok';
+    msg.innerHTML = `✅ 已下載「${escapeHtml(name)}」。${note}到 LoiLoNote 測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。`;
+  } catch (e) {
+    logError('匯出 LoiLoNote', e);
+    msg.className = 'notice error';
+    msg.textContent = `❌ 無法匯出：${e.message}`;
+  }
+}
+$('dlLoilo').addEventListener('click', () => exportLoilo(false));
+$('dlLoiloArticle').addEventListener('click', () => exportLoilo(true));
+
 $('restorePrev').addEventListener('click', async () => {
   if (!prevDraft?.data) return;
   const { archivedAt, ...restored } = prevDraft;

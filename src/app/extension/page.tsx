@@ -93,13 +93,14 @@ export default function ExtensionGuidePage() {
         </NeoCard>
 
         {/* 功能摘要 */}
-        <section className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-5" aria-label="主要功能">
+        <section className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-label="主要功能">
           {[
             ['📷', '截圖就能出題', '電子書、PDF、學習單都可以，截取畫面後在工作台框出文章範圍，AI 自動辨識文字出題。'],
             ['📖', '一鍵讀取全文', '新聞、部落格按「讀取這頁全文」，自動去掉廣告、選單、留言，只留下正文。'],
             ['🖍️', '反白文字出題', '反白一段文章，按右鍵選「用這段文字出 PIRLS 題組」就開始。'],
             ['✏️', '逐題檢查修改', '題幹、選項、正解、答後講解、PIRLS 層次都能直接改，改完自動儲存。'],
             ['🚀', '一鍵送到 PaGamO', '自動打開批量上傳頁、選好「題組」、放好檔案，選項順序預設隨機；最後的「上傳」由老師自己按。'],
+            ['🃏', '也能匯出 LoiLoNote', '下載 LoiLoNote 測驗卡匯入檔：題組檔與網站「匯出 Loilonote」格式相同；含文章版會把文章放在題目前面。'],
           ].map(([icon, t, d]) => (
             <NeoCard key={t} shadow="md" className="p-6">
               <div className="text-3xl" aria-hidden>{icon}</div>
@@ -162,6 +163,7 @@ export default function ExtensionGuidePage() {
               </ol>
               <p>還沒登入 PaGamO 的話，先登入，登入後會自動回到批量上傳頁接著做。</p>
               <p>選項順序預設<b>隨機</b>，學生不能靠記「答案是第幾個」猜題；需要固定順序時，在匯出區切到「固定」。</p>
+              <p className="bg-sky/40 border-neo rounded-xl px-4 py-3 text-[1rem]">🃏 <b>用 LoiLoNote？</b>同一區下方按「<b>⬇️ 下載 LoiLoNote 題組檔</b>」（只有題目）或「<b>含文章版（新版格式）</b>」，再到 LoiLoNote 測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。</p>
             </Step>
           </ol>
         </NeoCard>

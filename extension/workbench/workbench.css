@@ -85,3 +85,6 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
 @media (prefers-reduced-motion: reduce) { .fresh { animation: none; } }
 .order-row { flex-wrap: wrap; margin-bottom: 14px; }
 .dl-only { align-items: center; margin-top: 10px; }
+.loilo-box { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line); }
+.loilo-box h3 { margin: 0 0 6px; font-size: var(--fs-md, 1.05rem); }
+.loilo-box p { margin: 10px 0; }

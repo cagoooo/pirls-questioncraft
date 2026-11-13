@@ -100,6 +100,70 @@ assert.equal(validate(bad).length, 2);
 assert.throws(() => buildWorkbook(bad, {}));
 checks++;
 
+// ---- 2b. LoiLoNote 測驗卡（v1.2.0 題組：questionOnly 文章＋radio 單選題）----
+vm.runInContext(fs.readFileSync(ext('lib/loilo.js'), 'utf8'), extCtx);
+const loilo = extCtx.PirlsLoilo;
+const LOILO_OFFICIAL_HEADERS = ['Question Type', 'Question', 'Answer Required', 'Score', 'Correct answer(s)', 'Explanation',
+  'Choices or Correct Answer 1', 'Choices or Correct Answer 2', 'Choices or Correct Answer 3', 'Choices or Correct Answer 4', '…'];
+{
+  const data = make(8);
+  const wb = roundtrip(loilo.buildWorkbook(data));
+  assert.deepEqual(wb.SheetNames, ['Import']);
+  const rows = rowsOf(wb);
+  assert.equal(rows[0][0], 'v1.2.0', 'A1 要是官方版本字串');
+  assert.deepEqual(rows[1], LOILO_OFFICIAL_HEADERS, '第 2 列要與官方範例檔欄名相同');
+  assert.equal(rows.length, 2 + 1 + 8);
+  assert.equal(rows[2][0], 'questionOnly');
+  assert.ok(rows[2][1].includes(data.title) && rows[2][1].includes(data.articleContent), '文章項目要含標題與全文');
+  assert.ok(rows[2].slice(2).every((v) => v === null), 'questionOnly 只填 B 欄');
+  data.questions.forEach((q, i) => {
+    const r = rows[3 + i];
+    assert.deepEqual(r.slice(0, 10), ['radio', q.question, 1, 1, q.correctAnswerIndex + 1, q.explanation, ...q.options]);
+    assert.equal(typeof r[4], 'number', '正確答案要是數字');
+  });
+  for (const [addr, cell] of Object.entries(wb.Sheets.Import)) if (!addr.startsWith('!')) assert.equal(cell.f, undefined, `LoiLoNote ${addr} 被當成公式`);
+  assert.equal(loilo.fileName(data), '測試文章：小水滴的旅行.xlsx');
+  checks++;
+
+  // 長文章：自動分段，每段少於 1000 字，內容不遺漏
+  const para = '小水滴從海面升起，變成雲，又落到山上。'.repeat(12);
+  const longData = { ...make(8), articleContent: Array.from({ length: 8 }, (_, k) => `第${k + 1}段：${para}`).join('\n') };
+  const longRows = rowsOf(roundtrip(loilo.buildWorkbook(longData)));
+  const passages = longRows.filter((r) => r[0] === 'questionOnly').map((r) => r[1]);
+  assert.ok(passages.length >= 2, '長文要分成多段');
+  assert.ok(passages.every((p) => p.length <= 999), '每段都要少於 1000 字');
+  const joined = passages.join('').replace(/\s/g, '');
+  longData.articleContent.split('\n').forEach((line) => assert.ok(joined.includes(line.replace(/\s/g, '')), '分段後漏了文章內容'));
+  assert.equal(longRows.length, 2 + passages.length + 8);
+  assert.ok(longRows.slice(2, 2 + passages.length).every((r) => r[0] === 'questionOnly'), '文章要排在所有題目前面');
+  checks++;
+
+  // 題組檔（九欄）：必須與網站「匯出 Loilonote」逐格相同
+  const { buildPlatformWorkbook, LOILO_HEADERS } = load('src/lib/platformExports.ts');
+  assert.equal(JSON.stringify(loilo.LEGACY_HEADERS), JSON.stringify(LOILO_HEADERS), '九欄欄名與網站不一致');
+  for (const count of [8, 10]) {
+    const d = make(count);
+    const site = roundtrip(buildPlatformWorkbook(d, 'loilonote'));
+    const mine = roundtrip(loilo.buildLegacyWorkbook(d));
+    assert.deepEqual(mine.SheetNames, site.SheetNames);
+    assert.deepEqual(rowsOf(mine), rowsOf(site), `LoiLoNote 九欄 ${count} 題與網站版不一致`);
+    for (const [addr, cell] of Object.entries(mine.Sheets[mine.SheetNames[0]])) if (!addr.startsWith('!')) assert.equal(cell.f, undefined, `九欄 ${addr} 被當成公式`);
+  }
+  assert.throws(() => loilo.buildLegacyWorkbook(bad));
+  checks++;
+
+  // 沒有文章就不放 questionOnly；錯誤資料要擋下
+  const noArticle = rowsOf(roundtrip(loilo.buildWorkbook({ ...make(3), articleContent: '' })));
+  assert.equal(noArticle.length, 2 + 3);
+  assert.equal(noArticle[2][0], 'radio');
+  assert.equal(loilo.validate(bad).length, 2);
+  const tooLong = make(2);
+  tooLong.questions[0].question = '字'.repeat(1000);
+  assert.equal(loilo.validate(tooLong).length, 1);
+  assert.throws(() => loilo.buildWorkbook(tooLong));
+  checks++;
+}
+
 // ---- 3. 提示詞不可與網站後端分歧 ----
 function backendLines(file) {
   const src = fs.readFileSync(path.join(root, file), 'utf8');
