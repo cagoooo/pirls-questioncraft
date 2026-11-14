@@ -249,6 +249,18 @@ function backendLines(file) {
   assert.ok(!prompt.textPrompt({ text: 'X', questionMode: '8-questions', languageMode: 'zh-TW' }).includes('適讀年級'), '沒選年級時不可出現年級段落');
   assert.ok(!prompt.rewritePrompt({ grade: '2' }).includes('<ARTICLE>'), '圖片改寫不應有 ARTICLE 區塊');
   assert.throws(() => prompt.rewritePrompt({ text: 'X', grade: '9' }));
+  // 沒分段的改寫結果要自動分段；已分段的不動
+  const blob = '學校後面有一塊長滿雜草的空地。那裡的雜草又高又亂，看起來很可怕。大家走過去的時候都沒有注意它。去年秋天，自然老師有一個很棒的好想法。他笑著說：「我們一起來種菜吧！」同學們戴上手套一起拔草。泥土裡有很多石頭，鋤頭常常卡住。過了兩個月，小白菜終於長大了。';
+  const paras = prompt.ensureParagraphs(blob).split('\n\n');
+  assert.equal(paras.length, 3);
+  assert.equal(paras.join(''), blob);
+  assert.ok(paras[1].includes('種菜吧！」同學們'), '引號要跟著句子，不可被切開');
+  assert.equal(prompt.ensureParagraphs('第一段。\n\n第二段。'), '第一段。\n\n第二段。');
+  assert.equal(prompt.ensureParagraphs('短短一句。'), '短短一句。');
+  const tsSrc = fs.readFileSync(path.join(root, 'functions/src/flows/rewrite-for-grade.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const jsSrc = fs.readFileSync(path.join(root, 'extension/lib/prompt.js'), 'utf8').replace(/\r\n/g, '\n');
+  const re = (src) => (src.match(/const sentences = t\.match\((.*?)\) \?\?/) || [])[1];
+  assert.ok(re(tsSrc) && re(tsSrc) === re(jsSrc), '網站與擴充套件的自動分段規則不同');
   checks++;
 
   // ---- 4. 結果檢查與模型排序 ----

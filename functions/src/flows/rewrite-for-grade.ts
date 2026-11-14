@@ -55,7 +55,7 @@ const textRewritePrompt = ai.definePrompt({
 
 1. **只能改寫，不能編造**：保留原文的主題、主要人物、事件順序與重要事實；不可加入原文沒有的事實、人物、數字或結論。
 2. **長度跟著原文**：原文比建議字數短時，維持原本長度，不要為了湊字數增加內容；原文太長時，保留主線，刪去枝節。
-3. **格式**：段落之間空一行；不要加標題符號、項目符號、括號註解或改寫說明。
+3. **一定要分段**：依內容分成數段，每段 2～4 句；articleContent 裡段落之間要放一個空白行（兩個換行字元）。不要加標題符號、項目符號、括號註解或改寫說明。
 4. **語言**：原文是中文就用繁體中文（台灣常用語彙）改寫；原文是英文就用英文改寫，字彙與句型配合年級降低難度。
 5. **title**：沿用原文的標題；原文沒有標題時，取一個 15 字以內的標題。
 
@@ -86,7 +86,7 @@ const imagesRewritePrompt = ai.definePrompt({
 
 1. **只能改寫，不能編造**：保留原文的主題、主要人物、事件順序與重要事實；不可加入原文沒有的事實、人物、數字或結論。
 2. **長度跟著原文**：原文比建議字數短時，維持原本長度，不要為了湊字數增加內容；原文太長時，保留主線，刪去枝節。
-3. **格式**：段落之間空一行；不要加標題符號、項目符號、括號註解或改寫說明。
+3. **一定要分段**：依內容分成數段，每段 2～4 句；articleContent 裡段落之間要放一個空白行（兩個換行字元）。不要加標題符號、項目符號、括號註解或改寫說明。
 4. **語言**：原文是中文就用繁體中文（台灣常用語彙）改寫；原文是英文就用英文改寫，字彙與句型配合年級降低難度。
 5. **title**：沿用原文的標題；原文沒有標題時，取一個 15 字以內的標題。
 
@@ -105,5 +105,19 @@ export async function runRewriteForGrade(
   if (!output || !output.articleContent?.trim()) {
     throw new Error('AI 沒有成功改寫文章，請再試一次。');
   }
-  return { title: output.title?.trim() || '', articleContent: output.articleContent.trim() };
+  return { title: output.title?.trim() || '', articleContent: ensureParagraphs(output.articleContent) };
+}
+
+/**
+ * AI 偶爾會把全文擠成一整段（2026-11-14 正式站實測：二年級改寫 473 字完全沒換行）。
+ * 沒有任何換行時，依句號等句尾每 3 句分一段，避免低年級學生讀一大塊字。
+ * ⚠️ 擴充套件 extension/lib/prompt.js 的 ensureParagraphs 要保持相同邏輯。
+ */
+export function ensureParagraphs(text: string): string {
+  const t = text.trim().replace(/\r\n/g, '\n');
+  if (t.includes('\n') || t.length < 120) return t;
+  const sentences = t.match(/[^。！？!?]+[。！？!?]+[」』"]?|[^。！？!?]+$/g) ?? [t];
+  const paras: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join('').trim());
+  return paras.filter(Boolean).join('\n\n');
 }

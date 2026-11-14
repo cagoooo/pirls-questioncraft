@@ -223,7 +223,7 @@ const REWRITE_RULES = `# 🚨 改寫鐵律
 
 1. **只能改寫，不能編造**：保留原文的主題、主要人物、事件順序與重要事實；不可加入原文沒有的事實、人物、數字或結論。
 2. **長度跟著原文**：原文比建議字數短時，維持原本長度，不要為了湊字數增加內容；原文太長時，保留主線，刪去枝節。
-3. **格式**：段落之間空一行；不要加標題符號、項目符號、括號註解或改寫說明。
+3. **一定要分段**：依內容分成數段，每段 2～4 句；articleContent 裡段落之間要放一個空白行（兩個換行字元）。不要加標題符號、項目符號、括號註解或改寫說明。
 4. **語言**：原文是中文就用繁體中文（台灣常用語彙）改寫；原文是英文就用英文改寫，字彙與句型配合年級降低難度。
 5. **title**：沿用原文的標題；原文沒有標題時，取一個 15 字以內的標題。
 
@@ -262,6 +262,19 @@ ${text}
 ${bullets(g.rewrite)}
 
 ${REWRITE_RULES}`;
+}
+
+/**
+ * AI 偶爾會把全文擠成一整段。沒有任何換行時，依句尾每 3 句分一段。
+ * ⚠️ 與網站後端 functions/src/flows/rewrite-for-grade.ts 的 ensureParagraphs 邏輯相同。
+ */
+export function ensureParagraphs(text) {
+  const t = String(text ?? '').trim().replace(/\r\n/g, '\n');
+  if (t.includes('\n') || t.length < 120) return t;
+  const sentences = t.match(/[^。！？!?]+[。！？!?]+[」』"]?|[^。！？!?]+$/g) ?? [t];
+  const paras = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join('').trim());
+  return paras.filter(Boolean).join('\n\n');
 }
 
 export const REWRITE_SCHEMA = {

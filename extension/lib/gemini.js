@@ -1,5 +1,5 @@
 // 直接呼叫 Google Gemini API（用老師自己的金鑰）。金鑰只會送到 generativelanguage.googleapis.com。
-import { imagePrompt, textPrompt, rewritePrompt, gradeOf, RESPONSE_SCHEMA, REWRITE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
+import { imagePrompt, textPrompt, rewritePrompt, gradeOf, ensureParagraphs, RESPONSE_SCHEMA, REWRITE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const TIMEOUT_MS = 180_000;
@@ -222,7 +222,7 @@ export async function rewriteForGrade({ key, model, images = [], text = '', grad
     json = await request(false);
   }
   const out = parseCandidate(json) ?? {};
-  const articleContent = String(out.articleContent ?? '').trim();
+  const articleContent = ensureParagraphs(out.articleContent);
   if (!articleContent) throw new GeminiError('AI 沒有成功改寫文章，請再試一次。');
   return { title: String(out.title ?? '').trim(), articleContent };
 }
