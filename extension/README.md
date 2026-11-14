@@ -1,12 +1,12 @@
 # PIRLS 閱讀題組小幫手（Chrome 擴充套件）
 
-在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組，檢查修改後一鍵送到 PaGamO 批量上傳頁，或下載 LoiLoNote 測驗卡匯入檔。
+在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組（可依一～六年級改寫文章與題目難度），檢查修改後一鍵送到 PaGamO 批量上傳頁，或下載 LoiLoNote 測驗卡匯入檔。
 
 > ➕ **加到 Chrome（免費，Chrome 線上應用程式商店）：<https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp>**
 >
 > 📘 圖文安裝與使用說明：<https://cagoooo.github.io/pirls-questioncraft/extension/>
 >
-> 目前版本：v0.7.0（截圖／讀取全文／反白文字出題、逐題修改、一鍵送到 PaGamO 批量上傳頁並附上原始截圖、LoiLoNote 測驗卡匯出）
+> 目前版本：v0.8.0（截圖／讀取全文／反白文字出題、依一～六年級改寫文章與題目、逐題修改、一鍵送到 PaGamO 批量上傳頁並附上原始截圖、LoiLoNote 測驗卡匯出）
 
 ## 一、安裝（第一次約 3 分鐘）
 
@@ -30,7 +30,9 @@
 3. 會自動跳到「工作台」分頁並打開裁切視窗：拖曳框出文章範圍。
    - 文章只有這一段：按「**✨ 裁切並開始出題**」，直接開始出題。
    - 文章還有下一段：按「裁切（還要截下一段）」，回到原網頁捲下去，再按一次圖示。
-4. 出題前可以先選 8／10 題、中文／英文（會記住上次的選擇）。
+4. 出題前可以先選 8／10 題、中文／英文、**適讀年級**（會記住上次的選擇）。
+   - **適讀年級**預設「原文（不改寫）」。選一～六年級時，AI 會先把文章改寫成適合該年級閱讀的版本（字數、句子長短、用詞都配合年級），再依該年級的程度出題。改寫後的文章會放在工作台右邊，可以直接修改；學生在 PaGamO／LoiLoNote 題組裡讀到的就是改寫版。
+   - 改寫版和原始截圖的文字不同，所以改寫過的題組不會附上原始截圖。
 5. **逐題檢查、修改**：題幹、選項、正解、解析、PIRLS 層次都能直接改，改完自動儲存。
 6. 按「**🚀 送到 PaGamO（題組版）**」：會先下載一份備份，接著自動打開 PaGamO 批量上傳頁、選好「題組」、放好檔案。確認後按頁面上閃爍的「**上傳**」就完成（擴充套件不會替你按上傳）。
    - **選項順序預設「隨機」**：每位學生看到的選項順序都不同，不能靠記「答案是第幾個」猜題。少數題目需要固定順序（例如選項是「以上皆是」）時，可在匯出區切到「固定」。
@@ -93,7 +95,7 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁、截圖附圖與 LoiLoNote 匯出，96 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁、截圖附圖、依年級改寫與 LoiLoNote 匯出，109 項）。
 - 發布：改 `manifest.json` 版本時，同時在 `CHANGELOG.json` 最前面加一筆（版本不一致會讓建置失敗）。商店版要另外打包上傳到 Chrome 開發人員資訊主頁送審，通過後 Chrome 會自動更新老師的擴充套件。
 - 網站部署時 `tools/pack-extension.mjs` 會自動打包手動安裝用的 ZIP 與 `version.json`。`lib/update.js` 只在**手動安裝版**（沒有商店的 `update_url`、ID 不是 `cfbehdinangicblpbnockoofeccmoidp`）讀 `version.json` 顯示新版提醒；商店版不查網站版號。
 - 安裝說明頁的截圖：`python -X utf8 tools/capture-extension-guide.py` 重新產生。

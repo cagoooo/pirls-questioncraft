@@ -74,10 +74,14 @@ async function getJSON<T>(
   return (json as any) as T;
 }
 
+export type GradeId = '1' | '2' | '3' | '4' | '5' | '6';
+
 export interface GenerateFromImagesArgs {
   photoDataUris: string[];
   questionMode: '8-questions' | '10-questions';
   languageMode: 'zh-TW' | 'en';
+  /** 依年級改寫：'1'～'6'；不傳就照原文出題 */
+  grade?: GradeId;
   /** B.4: Cloudflare Turnstile token，由 <Turnstile> widget 產出 */
   turnstileToken?: string;
 }
@@ -86,6 +90,8 @@ export interface GenerateFromTextArgs {
   text: string;
   questionMode: '8-questions' | '10-questions';
   languageMode: 'zh-TW' | 'en';
+  /** 依年級改寫：'1'～'6'；不傳就照原文出題 */
+  grade?: GradeId;
   /** B.4: Cloudflare Turnstile token */
   turnstileToken?: string;
 }

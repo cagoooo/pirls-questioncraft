@@ -84,6 +84,7 @@ def fake_questions(n=8):
             "questions": [{"question": f"模擬第{i+1}題：小水滴在哪裡？", "options": ["荷葉上", "石頭上", "樹枝上", "屋頂上"],
                            "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "pirlsLevel": LEVELS[i // 2]} for i in range(n)]}
 
+REWRITTEN = "早上，小水滴在荷葉上。\n\n太陽出來了，小水滴飛到天上。"
 calls = []
 reject = {"on": False}
 errors = []
@@ -105,7 +106,9 @@ def gemini_mock(route):
     body = json.loads(req.post_data or "{}")
     if reject["on"] and "responseSchema" in body.get("generationConfig", {}):
         return route.fulfill(status=400, json={"error": {"code": 400, "message": "Invalid JSON payload received. Unknown name \"minItems\""}})
-    if "responseMimeType" in body.get("generationConfig", {}):
+    if "改寫成適合" in json.dumps(body, ensure_ascii=False) and "題數與層次" not in json.dumps(body, ensure_ascii=False):
+        text = json.dumps({"title": "小水滴的旅行", "articleContent": REWRITTEN}, ensure_ascii=False)
+    elif "responseMimeType" in body.get("generationConfig", {}):
         text = json.dumps(fake_questions(), ensure_ascii=False)
     else:
         text = "OK"
@@ -426,6 +429,43 @@ with sync_playwright() as p:
     check("格式規定被拒時自動退回 JSON 模式", len(gen) == 2 and "responseSchema" in gen[0]["generationConfig"]
           and "responseSchema" not in gen[1]["generationConfig"] and "JSON 格式" in json.dumps(gen[1], ensure_ascii=False), str(len(gen)))
     reject["on"] = False
+
+    # 10c. 依年級改寫（文字）：先改寫、再用改寫後的文章依年級出題
+    check("年級預設「原文」", bench.input_value("#gradeSel") == "" and "照原文出題" in bench.inner_text("#gradeHint"))
+    bench.select_option("#gradeSel", "2")
+    bench.wait_for_timeout(300)
+    check("選二年級後顯示改寫說明", "二年級" in bench.inner_text("#gradeHint"))
+    check("年級設定會記住", bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.grade)") == "2")
+    bench.once("dialog", lambda d: d.accept())
+    n_before = len(calls)
+    bench.click("#generate")
+    bench.wait_for_selector("#genStatus:has-text('完成')", timeout=20000)
+    gen = [json.loads(c["body"]) for c in calls[n_before:] if ":generateContent" in c["url"]]
+    p0 = json.dumps(gen[0], ensure_ascii=False) if gen else ""
+    p1 = json.dumps(gen[1], ensure_ascii=False) if len(gen) > 1 else ""
+    check("年級改寫：先送改寫、再送出題（共 2 次）", len(gen) == 2, str(len(gen)))
+    check("改寫提示詞帶原文與二年級標準", "改寫成適合「二年級」" in p0 and article in p0 and "每句盡量在 20 字以內" in p0 and "題數與層次" not in p0)
+    check("出題用改寫後的文章與二年級出題標準", json.dumps(REWRITTEN, ensure_ascii=False)[1:-1] in p1 and "適讀年級：二年級" in p1 and article not in p1)
+    check("工作台文章換成改寫版", bench.input_value("#article") == REWRITTEN)
+    check("顯示改寫提醒與年級標記", bench.is_visible("#gradeNote") and "二年級" in bench.inner_text("#gradeNote") and "改寫成二年級" in bench.inner_text("#resultMeta"))
+    check("草稿記住年級", bench.evaluate("chrome.storage.local.get('draft').then(r => r.draft.grade)") == "2")
+
+    # 10d. 依年級改寫（截圖）：圖片直接送去改寫，改寫版不附原始截圖
+    bench.evaluate("chrome.storage.local.set({ sourceMode: 'image' })")
+    bench.wait_for_timeout(500)
+    bench.once("dialog", lambda d: d.accept())
+    n_before = len(calls)
+    bench.click("#generate")
+    bench.wait_for_selector("#genStatus:has-text('完成')", timeout=20000)
+    gen = [json.loads(c["body"]) for c in calls[n_before:] if ":generateContent" in c["url"]]
+    parts0 = gen[0]["contents"][0]["parts"] if gen else []
+    parts1 = gen[1]["contents"][0]["parts"] if len(gen) > 1 else []
+    check("截圖改寫：第 1 次帶圖片與辨識指示", any("inline_data" in x for x in parts0) and "辨識上方圖片" in json.dumps(parts0, ensure_ascii=False))
+    check("截圖改寫：第 2 次只送改寫後的文字", parts1 and not any("inline_data" in x for x in parts1) and "<ARTICLE>" in parts1[0].get("text", ""))
+    check("改寫版不附原始截圖", bench.is_disabled("#attachShots") and not bench.is_checked("#attachShots") and "不附上原圖" in bench.inner_text("#attachMissing"))
+    bench.select_option("#gradeSel", "")
+    bench.wait_for_timeout(300)
+    check("切回「原文」", bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.grade)") == "")
 
     # 11. 無法框選的頁面：整張截圖到工作台裁切
     bench.evaluate("""async () => {

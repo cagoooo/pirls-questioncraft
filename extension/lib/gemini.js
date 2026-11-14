@@ -1,5 +1,5 @@
 // 直接呼叫 Google Gemini API（用老師自己的金鑰）。金鑰只會送到 generativelanguage.googleapis.com。
-import { imagePrompt, textPrompt, RESPONSE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
+import { imagePrompt, textPrompt, rewritePrompt, gradeOf, RESPONSE_SCHEMA, REWRITE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const TIMEOUT_MS = 180_000;
@@ -192,13 +192,60 @@ const TEXT_SCHEMA = {
 const ORDER = Object.fromEntries(PIRLS_LEVELS.map((l, i) => [l, i]));
 
 /**
- * 出題。images: [{ mimeType, base64 }]；或 text: 文章。
- * 回傳 { data, warnings, model }。
+ * 依年級改寫文章（對應網站後端 rewrite-for-grade）。images 或 text 擇一。
+ * 回傳 { title, articleContent }。
  */
-export async function generateQuestions({ key, model, images = [], text = '', questionMode, languageMode, onStatus }) {
+export async function rewriteForGrade({ key, model, images = [], text = '', grade, onStatus }) {
   if (!model) throw new GeminiError('還沒有選擇 AI 模型，請到「設定」按「測試金鑰」。');
+  const g = gradeOf(grade);
+  if (!g) throw new GeminiError(`不認得的年級：${grade}`);
+  onStatus?.(`AI 正在把文章改寫成${g.label}的版本…`);
+  const parts = [
+    ...images.map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } })),
+    { text: rewritePrompt({ text: images.length ? '' : text, grade }) },
+  ];
+  const request = (useSchema) => call(`models/${model}:generateContent`, {
+    key,
+    method: 'POST',
+    body: {
+      contents: [{ role: 'user', parts: useSchema ? parts : [...parts, { text: 'JSON 格式：{"title": 標題, "articleContent": 改寫後的全文}' }] }],
+      generationConfig: useSchema
+        ? { responseMimeType: 'application/json', responseSchema: REWRITE_SCHEMA, temperature: 0.5 }
+        : { responseMimeType: 'application/json', temperature: 0.5 },
+    },
+  });
+  let json;
+  try {
+    json = await request(true);
+  } catch (e) {
+    if (e.status !== 400 || /api key|API_KEY/i.test(e.detail ?? '')) throw e;
+    json = await request(false);
+  }
+  const out = parseCandidate(json) ?? {};
+  const articleContent = String(out.articleContent ?? '').trim();
+  if (!articleContent) throw new GeminiError('AI 沒有成功改寫文章，請再試一次。');
+  return { title: String(out.title ?? '').trim(), articleContent };
+}
+
+/**
+ * 出題。images: [{ mimeType, base64 }]；或 text: 文章。
+ * grade（'1'～'6'）：先依年級改寫文章，再用改寫後的文章依同一個年級出題。
+ * 回傳 { data, warnings, model, grade, originalTitle }。
+ */
+export async function generateQuestions({ key, model, images = [], text = '', questionMode, languageMode, grade = '', onStatus }) {
+  if (!model) throw new GeminiError('還沒有選擇 AI 模型，請到「設定」按「測試金鑰」。');
+  if (grade) {
+    const rewritten = await rewriteForGrade({ key, model, images, text, grade, onStatus });
+    const result = await generateFromSource({ key, model, text: rewritten.articleContent, questionMode, languageMode, grade, onStatus });
+    if (!result.data.title && rewritten.title) result.data.title = rewritten.title;
+    return { ...result, grade };
+  }
+  return generateFromSource({ key, model, images, text, questionMode, languageMode, grade: '', onStatus });
+}
+
+async function generateFromSource({ key, model, images = [], text = '', questionMode, languageMode, grade = '', onStatus }) {
   const isText = !images.length;
-  const prompt = isText ? textPrompt({ text, questionMode, languageMode }) : imagePrompt({ questionMode, languageMode });
+  const prompt = isText ? textPrompt({ text, questionMode, languageMode, grade }) : imagePrompt({ questionMode, languageMode });
   const parts = [
     ...images.map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } })),
     { text: prompt },

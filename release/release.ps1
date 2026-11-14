@@ -20,7 +20,10 @@ param(
     [switch]$Defer,
 
     # 只把商店上已上傳的草稿送審，不改版本、不打包、不上傳
-    [switch]$PublishOnly
+    [switch]$PublishOnly,
+
+    # 不升版：直接打包並上傳目前版本（先前用 -NoUpload 升好版、等上一版審核通過後再傳時用）
+    [switch]$KeepVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -468,6 +471,10 @@ if ($DryRun) {
     if ($Bump -or $Version) {
         Write-Info '試跑模式不會改版本檔，仍打包目前版本。'
     }
+} elseif ($KeepVersion) {
+    if ($Version -or $Bump) { throw '-KeepVersion 不能和 -Version 或 -Bump 一起用。' }
+    if ($HasChangelog) { Test-ChangelogMatches $currentVersion }
+    Write-Info ("不升版，直接打包上傳目前版本：" + $currentVersion)
 } else {
     if ($Version -and $Bump) { throw '請只擇一使用 -Version 或 -Bump。' }
     if (-not $Version -and -not $Bump) {

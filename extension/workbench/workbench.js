@@ -1,6 +1,6 @@
 import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS, logError } from '../lib/store.js';
 import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
-import { PIRLS_LEVELS, LEVEL_LABEL } from '../lib/prompt.js';
+import { PIRLS_LEVELS, LEVEL_LABEL, GRADE_LEVELS, gradeOf } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
 import { checkUpdate, STORE_URL } from '../lib/update.js';
 
@@ -29,6 +29,9 @@ async function init() {
   renderTextMeta(store[KEYS.text]);
   document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`).checked = true;
   document.querySelector(`input[name=lmode][value="${settings.languageMode}"]`).checked = true;
+  for (const g of GRADE_LEVELS) $('gradeSel').add(new Option(g.label, g.id));
+  $('gradeSel').value = gradeOf(settings.grade) ? settings.grade : '';
+  renderGradeHint();
   document.querySelector(`input[name=optorder][value="${settings.randomOptions === false ? 'fixed' : 'random'}"]`).checked = true;
   if (store.lastNotice) showNotice(store.lastNotice);
   renderKeyBanner();
@@ -332,6 +335,17 @@ $('sourceText').addEventListener('input', () => {
 });
 
 // ---------- 出題 ----------
+function renderGradeHint() {
+  const g = gradeOf($('gradeSel').value);
+  $('gradeHint').textContent = g
+    ? `🎒 會先把文章改寫成${g.label}的版本（${g.short}），題目也依${g.label}的程度出。改寫後的文章會放在右邊，可以先讀過再匯出。`
+    : '照原文出題。想讓文章和題目配合學生程度，可以選一個年級。';
+}
+$('gradeSel').addEventListener('change', async () => {
+  renderGradeHint();
+  settings = await saveSettings({ grade: $('gradeSel').value });
+});
+
 document.querySelectorAll('input[name=qmode],input[name=lmode]').forEach((r) => r.addEventListener('change', async () => {
   settings = await saveSettings({
     questionMode: document.querySelector('input[name=qmode]:checked').value,
@@ -360,6 +374,7 @@ $('generate').addEventListener('click', async () => {
   }
   const questionMode = document.querySelector('input[name=qmode]:checked').value;
   const languageMode = document.querySelector('input[name=lmode]:checked').value;
+  const grade = gradeOf($('gradeSel').value) ? $('gradeSel').value : '';
   let images = [];
   let text = '';
   if (mode === 'image') {
@@ -379,17 +394,19 @@ $('generate').addEventListener('click', async () => {
   $('generate').disabled = true;
   const t0 = Date.now();
   let label = 'AI 正在閱讀並出題…';
-  const tick = () => setStatus('', `<span class="spinner" aria-hidden="true"></span><span>${label}（已經 ${Math.round((Date.now() - t0) / 1000)} 秒，通常 20～60 秒）</span>`);
+  const usual = grade ? '改寫加出題通常 40～90 秒' : '通常 20～60 秒';
+  const tick = () => setStatus('', `<span class="spinner" aria-hidden="true"></span><span>${label}（已經 ${Math.round((Date.now() - t0) / 1000)} 秒，${usual}）</span>`);
   tick();
   const timer = setInterval(tick, 1000);
   try {
     const res = await generateQuestions({
-      key: settings.apiKey, model: settings.model, images, text, questionMode, languageMode,
+      key: settings.apiKey, model: settings.model, images, text, questionMode, languageMode, grade,
       onStatus: (s) => { label = s; tick(); },
     });
     draft = {
       data: res.data,
       questionMode, languageMode,
+      grade, // 依年級改寫過的題組：文章已不是原文
       model: res.model,
       source: mode,
       shotIds: mode === 'image' ? shots.map((s) => s.id) : [], // 題組附圖要用的截圖（出題當下的那幾張）
@@ -442,7 +459,10 @@ function renderDraft() {
   renderAttach();
   const d = draft.data;
   const when = new Date(draft.generatedAt).toLocaleString('zh-TW', { hour12: false });
-  $('resultMeta').textContent = `${when} 產生｜${draft.questionMode === '10-questions' ? '10' : '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}｜模型 ${draft.model}`;
+  const g = gradeOf(draft.grade);
+  $('resultMeta').textContent = `${when} 產生｜${draft.questionMode === '10-questions' ? '10' : '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}${g ? `｜改寫成${g.label}` : ''}｜模型 ${draft.model}`;
+  $('gradeNote').classList.toggle('hidden', !g);
+  $('gradeNote').textContent = g ? `🎒 下面的文章已經改寫成${g.label}的版本，學生在 PaGamO／LoiLoNote 題組裡讀到的就是這段。AI 改寫難免有疏漏，請先讀過一次，確認沒有改錯原文的意思。` : '';
   const warn = $('resultWarn');
   warn.classList.toggle('hidden', !draft.warnings?.length);
   warn.textContent = draft.warnings?.length ? `⚠️ ${draft.warnings.join(' ')} 可以直接修改層次或題目，或重新出題。` : '';
@@ -566,11 +586,16 @@ function renderAttach() {
   const { list, missing } = sourceShots();
   const row = $('attachRow');
   row.classList.toggle('hidden', !list.length && !missing);
-  $('attachShots').checked = settings.attachShots !== false && list.length > 0;
-  $('attachShots').disabled = !list.length;
+  // 改寫過的文章和原始截圖的文字不同，附上原圖會讓學生看到兩種版本
+  const rewritten = !!gradeOf(draft?.grade);
+  $('attachShots').checked = !rewritten && settings.attachShots !== false && list.length > 0;
+  $('attachShots').disabled = rewritten || !list.length;
   $('attachCount').textContent = list.length;
-  $('attachMissing').classList.toggle('hidden', !missing);
-  $('attachMissing').textContent = missing ? `（有 ${missing} 張出題用的截圖已經刪掉，只能附上剩下的）` : '';
+  const note = rewritten
+    ? '（文章已改寫成新的年級版本，和原始截圖的文字不同，所以這次不附上原圖）'
+    : missing ? `（有 ${missing} 張出題用的截圖已經刪掉，只能附上剩下的）` : '';
+  $('attachMissing').classList.toggle('hidden', !note);
+  $('attachMissing').textContent = note;
 }
 
 $('attachShots').addEventListener('change', async () => {

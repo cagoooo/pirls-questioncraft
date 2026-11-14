@@ -1,11 +1,13 @@
 // 改寫自 src/ai/flows/generate-pirls-questions-from-text.ts
 import { z } from 'genkit';
 import { ai } from '../genkit';
+import { gradeInfo } from './rewrite-for-grade';
 
 const InputSchema = z.object({
   text: z.string(),
   questionMode: z.enum(['8-questions', '10-questions']),
   languageMode: z.enum(['zh-TW', 'en']),
+  grade: z.enum(['1', '2', '3', '4', '5', '6']).optional(),
 });
 
 const PirlsQuestionSchema = z.object({
@@ -71,6 +73,16 @@ const prompt = ai.definePrompt({
 - evaluate & critique（評估批判）：**2 題**
 {{/if}}
 
+{{#if gradeLabel}}
+# 🎒 適讀年級：{{gradeLabel}}
+
+這篇文章已經改寫成適合{{gradeLabel}}學生閱讀的版本。題目的用字、句子長度與思考難度都要配合下列年級標準：
+
+{{{gradeQuestionGuide}}}
+
+PIRLS 四層次的題數分配不變，只調整每一題的難度。
+
+{{/if}}
 # 🌐 語言模式
 
 {{#if isEnglishMode}}
@@ -125,6 +137,7 @@ export async function runGenerateFromText(
     ...input,
     is10QuestionMode: input.questionMode === '10-questions',
     isEnglishMode: input.languageMode === 'en',
+    ...(input.grade ? gradeInfo(input.grade) : {}),
   } as any);
 
   if (output && output.questions) {

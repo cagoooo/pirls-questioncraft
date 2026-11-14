@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   attachShots: true, // 用截圖出題時，題組版附上原始截圖（v0.7.0）
   questionMode: '8-questions',
   languageMode: 'zh-TW',
+  grade: '', // 依年級改寫：''＝照原文出題；'1'～'6'＝先改寫成該年級的文章（v0.8.0）
 };
 
 export async function getSettings() {

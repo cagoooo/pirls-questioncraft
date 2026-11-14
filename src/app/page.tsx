@@ -20,7 +20,8 @@ import {
   rememberTeacherKey,
   buildDashboardUrl,
 } from '@/lib/api';
-import type { GeneratePirlsQuestionsOutput } from '@/lib/api';
+import type { GeneratePirlsQuestionsOutput, GradeId } from '@/lib/api';
+import GRADE_LEVELS from '@/lib/gradeLevels.json';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { PlatformExportDialog } from '@/components/PlatformExportDialog';
 import type { ReadingSource } from '@/lib/generateReadingPdf';
@@ -131,6 +132,9 @@ export default function PIRLSQuestionCraftPage() {
   const [inputText, setInputText] = useState('');
   const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
   const [languageMode, setLanguageMode] = useState<'zh-TW' | 'en'>('zh-TW');
+  // 依年級改寫：'' = 照原文出題；'1'～'6' = 先改寫成該年級的文章再出題
+  const [grade, setGrade] = useState<GradeId | ''>('');
+  const [resultGrade, setResultGrade] = useState<GradeId | ''>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
@@ -285,18 +289,18 @@ export default function PIRLSQuestionCraftPage() {
           updateDisplayProgress(pct, `📷 已處理 ${i + 1}/${imageFiles.length} 張圖片...`);
         }
         if (photoDataUris.length === 0) throw new Error('無法處理圖片，請確認檔案是否正確。');
-        updateDisplayProgress(32, '🚀 正在上傳圖片至 AI 伺服器...');
+        updateDisplayProgress(32, grade ? `🎒 正在辨識文章並改寫成${gradeLabel(grade)}的版本...` : '🚀 正在上傳圖片至 AI 伺服器...');
         cancelSimProgress = simulateProgress(35, updateDisplayProgress, true);
-        result = await generatePirlsQuestions({ photoDataUris, questionMode, languageMode, turnstileToken });
+        result = await generatePirlsQuestions({ photoDataUris, questionMode, languageMode, grade: grade || undefined, turnstileToken });
         cancelSimProgress();
         cancelSimProgress = null;
         if (result?.articleContent) setInputText(result.articleContent);
       } else {
         updateDisplayProgress(15, '📝 正在打包文章內容...');
         await new Promise((r) => setTimeout(r, 200));
-        updateDisplayProgress(30, '🚀 正在傳送至 AI 伺服器...');
-        cancelSimProgress = simulateProgress(32, updateDisplayProgress, false);
-        result = await generatePirlsQuestionsFromText({ text: inputText, questionMode, languageMode, turnstileToken });
+        updateDisplayProgress(30, grade ? `🎒 正在把文章改寫成${gradeLabel(grade)}的版本...` : '🚀 正在傳送至 AI 伺服器...');
+        cancelSimProgress = simulateProgress(32, updateDisplayProgress, !!grade);
+        result = await generatePirlsQuestionsFromText({ text: inputText, questionMode, languageMode, grade: grade || undefined, turnstileToken });
         cancelSimProgress();
         cancelSimProgress = null;
       }
@@ -304,7 +308,11 @@ export default function PIRLSQuestionCraftPage() {
       if (result && result.questions && result.questions.length > 0) {
         updateDisplayProgress(100, '題目已成功生成！');
         setGeneratedQuestionsOutput(result);
-        setReadingSource({ text: inputMode === 'text' ? inputText : result.articleContent, images: inputMode === 'image' ? [...imageFiles] : [] });
+        setResultGrade(grade);
+        // 改寫過的文章和原文／原圖不同：學生端一律用改寫後的文字，不放原圖
+        setReadingSource(grade
+          ? { text: result.articleContent, images: [] }
+          : { text: inputMode === 'text' ? inputText : result.articleContent, images: inputMode === 'image' ? [...imageFiles] : [] });
         toast({
           title: '成功！',
           description: 'PIRLS 題目已生成。',
@@ -327,7 +335,12 @@ export default function PIRLSQuestionCraftPage() {
       if (cancelSimProgress) cancelSimProgress();
       setIsLoading(false);
     }
-  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, loadingProgress, turnstileToken]);
+  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, grade, loadingProgress, turnstileToken]);
+
+  // 改寫過的題組：學生讀的是改寫後的文章，不是原文或原圖
+  const isRewritten = !!resultGrade && !!generatedQuestionsOutput;
+  const studentText = isRewritten ? generatedQuestionsOutput!.articleContent : inputText;
+  const studentImages = isRewritten ? [] : imageFiles;
 
   const fileProgressCallback: ProgressCallback = (progress, message) => {
     setFileGenerationProgress(progress);
@@ -359,8 +372,8 @@ export default function PIRLSQuestionCraftPage() {
     try {
       await exportPIRLStoPDF({
         questionsOutput: generatedQuestionsOutput,
-        imageFiles: inputMode === 'image' ? imageFiles : [],
-        inputText,
+        imageFiles: inputMode === 'image' ? studentImages : [],
+        inputText: studentText,
         showToast: toast,
         updateProgressCallback,
       });
@@ -460,8 +473,8 @@ export default function PIRLSQuestionCraftPage() {
     setIsShareDialogOpen(true);
     try {
       let imageFilesDataURIs: string[] = [];
-      let sharedText = inputMode === 'text' ? inputText : '';
-      if (inputMode === 'image') {
+      let sharedText = isRewritten ? studentText : inputMode === 'text' ? inputText : '';
+      if (inputMode === 'image' && !isRewritten) {
         const fitted = await compressImagesForShare(imageFiles);
         if (fitted) {
           imageFilesDataURIs = fitted;
@@ -711,6 +724,11 @@ export default function PIRLSQuestionCraftPage() {
                   { id: 'en', t: 'English', d: '英文題幹與選項，解析中文' },
                 ]}
               />
+              <GradeCard
+                value={grade}
+                onChange={(v) => !isLoading && setGrade(v)}
+                disabled={isLoading || isAnyDownloading}
+              />
             </div>
           </div>
         )}
@@ -864,6 +882,22 @@ export default function PIRLSQuestionCraftPage() {
                 </NeoCard>
 
                 {/* Action bar */}
+                {isRewritten && (
+                  <NeoCard className="p-5">
+                    <details>
+                      <summary className="cursor-pointer font-extrabold text-[1.0625rem] flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 bg-lemon border-neo rounded-full px-3 py-1 text-sm">🎒 {gradeLabel(resultGrade)}改寫版</span>
+                        看改寫後的文章（{generatedQuestionsOutput.articleContent.length} 字）
+                      </summary>
+                      <p className="text-sm text-muted-foreground mt-3">
+                        學生在線上測驗、分享連結、PDF 和 PaGamO／LoiLoNote 題組裡讀到的都是這個版本。AI 改寫難免有疏漏，請先讀過一次，確認沒有改錯原文的意思。
+                      </p>
+                      <div className="mt-3 bg-cream border-neo rounded-[14px] p-4 whitespace-pre-wrap leading-[1.8] text-[1rem]">
+                        {generatedQuestionsOutput.articleContent}
+                      </div>
+                    </details>
+                  </NeoCard>
+                )}
                 <NeoCard className="p-4">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <div className="text-[0.875rem] font-bold text-muted-foreground mr-1">匯出 / 分享 →</div>
@@ -904,8 +938,8 @@ export default function PIRLSQuestionCraftPage() {
             {isQuizActive ? (
               <QuizView
                 questionsOutput={generatedQuestionsOutput}
-                imageFiles={imageFiles}
-                inputText={inputText}
+                imageFiles={studentImages}
+                inputText={studentText}
                 onExitQuiz={handleExitQuiz}
                 toast={toast}
                 showFileGenerationProgress={handleShowQuizResultsPdfProgress}
@@ -969,6 +1003,64 @@ export default function PIRLSQuestionCraftPage() {
 }
 
 /* ===== SettingCard 子元件 ===== */
+function gradeLabel(id: string) {
+  return GRADE_LEVELS.find((g) => g.id === id)?.label ?? '';
+}
+
+function GradeCard({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: GradeId | '';
+  onChange: (v: GradeId | '') => void;
+  disabled?: boolean;
+}) {
+  const selected = GRADE_LEVELS.find((g) => g.id === value);
+  const options: { id: GradeId | ''; t: string }[] = [
+    { id: '', t: '原文' },
+    ...GRADE_LEVELS.map((g) => ({ id: g.id as GradeId, t: g.label })),
+  ];
+  return (
+    <NeoCard className="p-5">
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className="w-9 h-9 rounded-xl border-neo flex items-center justify-center text-lg shadow-neo-sm bg-lemon">🎒</div>
+        <div>
+          <div className="text-[0.8125rem] font-extrabold tracking-[0.15em] text-muted-foreground">STEP 04</div>
+          <div className="font-extrabold text-[1.125rem]">適讀年級</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mt-3.5" role="radiogroup" aria-label="適讀年級">
+        {options.map((o) => {
+          const on = value === o.id;
+          return (
+            <button
+              key={o.id || 'original'}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(o.id)}
+              disabled={disabled}
+              className={cn(
+                'rounded-[12px] px-1 py-2.5 text-[0.9375rem] font-bold transition-all',
+                on ? 'bg-ink text-cream border-[2px] border-ink' : 'bg-card border-[1.5px] border-line hover:border-ink/50',
+                disabled && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              {o.t}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+        {selected
+          ? `先把文章改寫成${selected.label}的版本（${selected.short}），題目也依${selected.label}的程度出。`
+          : '照原文出題，不改寫文章。選了年級，會先把文章改寫成適合該年級閱讀的版本，再依該年級的程度出題。'}
+      </p>
+    </NeoCard>
+  );
+}
+
 function SettingCard({
   step,
   title,

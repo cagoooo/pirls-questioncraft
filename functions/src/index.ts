@@ -17,6 +17,7 @@ import type { Response } from 'express';
 
 import { runGenerateFromImages } from './flows/generate-from-images';
 import { runGenerateFromText } from './flows/generate-from-text';
+import { runRewriteForGrade, isGradeId, gradeInfo } from './flows/rewrite-for-grade';
 import { checkRateLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
@@ -176,7 +177,8 @@ const NOTIFY_SECRETS = [
 // ---- AI flows ----
 
 export const generateFromImages = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS] },
+  // 依年級改寫要連續呼叫兩次 AI（改寫＋出題），放寬到 240 秒
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS], timeoutSeconds: 240 },
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
@@ -186,18 +188,29 @@ export const generateFromImages = onRequest(
         return;
       }
       const { photoDataUris, questionMode, languageMode } = req.body ?? {};
+      const grade = isGradeId(req.body?.grade) ? req.body.grade : undefined;
       if (!Array.isArray(photoDataUris) || photoDataUris.length === 0) {
         res.status(400).json({ success: false, error: 'photoDataUris 不可為空。' });
         return;
       }
       try {
-        const result = await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
+        // 選了年級：先依年級改寫圖片中的文章，再依同一個年級出題
+        const result = grade
+          ? await runGenerateFromText({
+              text: (await runRewriteForGrade({ photoDataUris, grade })).articleContent,
+              questionMode,
+              languageMode,
+              grade,
+            })
+          : await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-images');
         // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
         const estKB = Math.round(photoDataUris.reduce((sum, d) => sum + d.length, 0) * 0.75 / 1024);
 
-        const quizId = await savePreviewQuiz(result, photoDataUris, '圖片出題');
+        const quizId = grade
+          ? await savePreviewQuiz(result, [], result.articleContent)
+          : await savePreviewQuiz(result, photoDataUris, '圖片出題');
         const previewUrl = quizId ? `${SITE_BASE_URL}/quiz/?id=${quizId}` : null;
 
         notifyAdminCard({
@@ -208,6 +221,7 @@ export const generateFromImages = onRequest(
             { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張（${estKB} KB）` },
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '文章', value: `${result.articleContent.length} 字` },
+            { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
             { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
             { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
@@ -242,7 +256,7 @@ export const generateFromImages = onRequest(
 );
 
 export const generateFromText = onRequest(
-  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS] },
+  { secrets: [GEMINI_API_KEY, TURNSTILE_SECRET, ...NOTIFY_SECRETS], timeoutSeconds: 240 },
   withProtection(
     async (req, res) => {
       const t0 = Date.now();
@@ -252,16 +266,18 @@ export const generateFromText = onRequest(
         return;
       }
       const { text, questionMode, languageMode } = req.body ?? {};
+      const grade = isGradeId(req.body?.grade) ? req.body.grade : undefined;
       if (typeof text !== 'string' || text.trim().length === 0) {
         res.status(400).json({ success: false, error: 'text 不可為空。' });
         return;
       }
       try {
-        const result = await runGenerateFromText({ text, questionMode, languageMode });
+        const article = grade ? (await runRewriteForGrade({ text, grade })).articleContent : text;
+        const result = await runGenerateFromText({ text: article, questionMode, languageMode, grade });
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text');
 
-        const quizId = await savePreviewQuiz(result, [], text);
+        const quizId = await savePreviewQuiz(result, [], article);
         const previewUrl = quizId ? `${SITE_BASE_URL}/quiz/?id=${quizId}` : null;
 
         notifyAdminCard({
@@ -270,7 +286,8 @@ export const generateFromText = onRequest(
           appName: APP_NAME,
           fields: [
             { icon: '📝', label: '標題', value: result.title },
-            { icon: '📏', label: '字數', value: `${text.length}` },
+            { icon: '📏', label: '字數', value: grade ? `${text.length} → ${article.length}` : `${text.length}` },
+            { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
             { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
             { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },

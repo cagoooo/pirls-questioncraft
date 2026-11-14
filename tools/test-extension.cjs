@@ -208,9 +208,11 @@ const LOILO_OFFICIAL_HEADERS = ['Question Type', 'Question', 'Answer Required', 
 
 // ---- 3. 提示詞不可與網站後端分歧 ----
 function backendLines(file) {
-  const src = fs.readFileSync(path.join(root, file), 'utf8');
-  const body = src.slice(src.indexOf('prompt: `') + 9, src.indexOf('`,\n});'));
-  return body.replace(/\\`/g, '`').split('\n').map((l) => l.trim())
+  const src = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
+  // 一個檔案可能有好幾個 definePrompt：全部取出來
+  const bodies = [...src.matchAll(/prompt: `([\s\S]*?)`,\n\}\);/g)].map((m) => m[1]);
+  assert.ok(bodies.length, `${file} 找不到提示詞`);
+  return bodies.join('\n').replace(/\\`/g, '`').split('\n').map((l) => l.trim())
     .filter((l) => l && !l.includes('{{') && !l.includes('{{{'));
 }
 
@@ -219,9 +221,34 @@ function backendLines(file) {
   const gemini = await import(path.join(root, 'extension/lib/gemini.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
   const opts = [['8-questions', 'zh-TW'], ['10-questions', 'en']];
   const imageAll = opts.map(([questionMode, languageMode]) => prompt.imagePrompt({ questionMode, languageMode })).join('\n');
-  const textAll = opts.map(([questionMode, languageMode]) => prompt.textPrompt({ text: 'X', questionMode, languageMode })).join('\n');
+  const textAll = [
+    ...opts.map(([questionMode, languageMode]) => prompt.textPrompt({ text: 'X', questionMode, languageMode })),
+    prompt.textPrompt({ text: 'X', questionMode: '8-questions', languageMode: 'zh-TW', grade: '3' }),
+  ].join('\n');
   for (const line of backendLines('functions/src/flows/generate-from-images.ts')) assert.ok(imageAll.includes(line), `圖片提示詞少了：${line}`);
   for (const line of backendLines('functions/src/flows/generate-from-text.ts')) assert.ok(textAll.includes(line), `文字提示詞少了：${line}`);
+  checks++;
+
+  // ---- 3b. 依年級改寫：三份年級標準一致、改寫提示詞與後端一致、年級段落只在選了年級時出現 ----
+  const gradeSrc = JSON.parse(fs.readFileSync(path.join(root, 'src/lib/gradeLevels.json'), 'utf8'));
+  const gradeFn = JSON.parse(fs.readFileSync(path.join(root, 'functions/src/flows/grade-levels.json'), 'utf8'));
+  assert.equal(JSON.stringify(gradeFn), JSON.stringify(gradeSrc), 'functions 的年級標準和 src/lib/gradeLevels.json 不同，請執行 npm run sync:extension');
+  assert.equal(JSON.stringify(prompt.GRADE_LEVELS), JSON.stringify(gradeSrc), '擴充套件的年級標準和 src/lib/gradeLevels.json 不同，請執行 npm run sync:extension');
+  assert.equal(gradeSrc.map((g) => g.id).join(','), '1,2,3,4,5,6');
+  for (const g of gradeSrc) assert.ok(g.label && g.short && g.rewrite.length && g.questions.length, `年級 ${g.id} 資料不完整`);
+  const rewriteAll = gradeSrc.flatMap((g) => [prompt.rewritePrompt({ text: 'X', grade: g.id }), prompt.rewritePrompt({ grade: g.id })]).join('\n');
+  for (const line of backendLines('functions/src/flows/rewrite-for-grade.ts')) assert.ok(rewriteAll.includes(line), `改寫提示詞少了：${line}`);
+  for (const g of gradeSrc) {
+    const tp = prompt.textPrompt({ text: 'X', questionMode: '8-questions', languageMode: 'zh-TW', grade: g.id });
+    assert.ok(tp.includes(`# 🎒 適讀年級：${g.label}`));
+    for (const l of g.questions) assert.ok(tp.includes(`- ${l}`), `年級出題標準沒放進提示詞：${l}`);
+    const rp = prompt.rewritePrompt({ text: '原文', grade: g.id });
+    for (const l of g.rewrite) assert.ok(rp.includes(`- ${l}`), `年級改寫標準沒放進提示詞：${l}`);
+    assert.ok(rp.includes('<ARTICLE>\n原文\n</ARTICLE>'));
+  }
+  assert.ok(!prompt.textPrompt({ text: 'X', questionMode: '8-questions', languageMode: 'zh-TW' }).includes('適讀年級'), '沒選年級時不可出現年級段落');
+  assert.ok(!prompt.rewritePrompt({ grade: '2' }).includes('<ARTICLE>'), '圖片改寫不應有 ARTICLE 區塊');
+  assert.throws(() => prompt.rewritePrompt({ text: 'X', grade: '9' }));
   checks++;
 
   // ---- 4. 結果檢查與模型排序 ----

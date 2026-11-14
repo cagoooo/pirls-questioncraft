@@ -68,7 +68,11 @@
               <label><input type="radio" name="lmode" value="en"><span>英文題目</span></label>
             </div>
           </div>
+          <div class="opt-group"><label class="opt-label" for="gradeSel">適讀年級</label>
+            <select id="gradeSel" class="grade-sel"><option value="">原文（不改寫）</option></select>
+          </div>
         </div>
+        <p class="muted grade-hint" id="gradeHint"></p>
         <button class="btn primary big full" id="generate" type="button">✨ 開始出題</button>
         <div id="genStatus" class="gen-status hidden" role="status" aria-live="polite"></div>
       </section>
@@ -87,6 +91,7 @@
           <div id="resultBody" class="hidden">
             <p class="muted" id="resultMeta"></p>
             <div id="resultWarn" class="notice warn hidden"></div>
+            <div id="gradeNote" class="notice hidden"></div>
             <label class="field"><span>文章標題</span><input id="title" type="text"></label>
             <label class="field"><span>文章內容（學生在 PaGamO／LoiLoNote 題組中會看到這段）</span><textarea id="article" rows="10"></textarea></label>
             <div id="questions"></div>

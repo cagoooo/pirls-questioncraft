@@ -10,3 +10,12 @@ globalThis.PAGAMO_TEMPLATES = ${json.trim()};
 `;
 fs.writeFileSync(path.join(root, 'extension/lib/pagamoTemplates.js'), out);
 console.log('已同步 extension/lib/pagamoTemplates.js');
+
+// 依年級改寫的標準：網站、後端、擴充套件共用同一份（src/lib/gradeLevels.json）。
+const gradeJson = fs.readFileSync(path.join(root, 'src/lib/gradeLevels.json'), 'utf8');
+JSON.parse(gradeJson);
+fs.writeFileSync(path.join(root, 'functions/src/flows/grade-levels.json'), gradeJson);
+fs.writeFileSync(path.join(root, 'extension/lib/gradeLevels.js'), `// 自動產生，請勿手動修改：由 tools/sync-extension.cjs 從 src/lib/gradeLevels.json 同步。
+export const GRADE_LEVELS = ${gradeJson.trim()};
+`);
+console.log('已同步 functions/src/flows/grade-levels.json 與 extension/lib/gradeLevels.js');

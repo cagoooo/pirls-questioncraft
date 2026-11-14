@@ -1,5 +1,29 @@
 // 出題提示詞：移植自網站後端 functions/src/flows/generate-from-images.ts 與 generate-from-text.ts。
 // ⚠️ 修改網站後端的提示詞時，記得同步改這裡（兩邊內容要一致）。
+// 依年級改寫的提示詞移植自 functions/src/flows/rewrite-for-grade.ts。
+import { GRADE_LEVELS } from './gradeLevels.js';
+
+export { GRADE_LEVELS };
+
+export function gradeOf(id) {
+  return GRADE_LEVELS.find((g) => g.id === id) ?? null;
+}
+
+const bullets = (lines) => lines.map((l) => `- ${l}`).join('\n');
+
+function gradeBlock(grade) {
+  const g = gradeOf(grade);
+  if (!g) return '';
+  return `# 🎒 適讀年級：${g.label}
+
+這篇文章已經改寫成適合${g.label}學生閱讀的版本。題目的用字、句子長度與思考難度都要配合下列年級標準：
+
+${bullets(g.questions)}
+
+PIRLS 四層次的題數分配不變，只調整每一題的難度。
+
+`;
+}
 
 export const PIRLS_LEVELS = [
   'locate & retrieve',
@@ -103,7 +127,7 @@ ${languageBlock(languageMode)}
 `;
 }
 
-export function textPrompt({ text, questionMode, languageMode }) {
+export function textPrompt({ text, questionMode, languageMode, grade = '' }) {
   return `# 📥 給你的文章（這是你唯一可以使用的內容來源）
 
 <ARTICLE>
@@ -126,7 +150,7 @@ ${text}
 
 ${countBlock(questionMode)}
 
-# 🌐 語言模式
+${gradeBlock(grade)}# 🌐 語言模式
 
 ${languageBlock(languageMode)}
 
@@ -192,4 +216,57 @@ export const RESPONSE_SCHEMA = {
   },
   required: ['title', 'articleContent', 'questions'],
   propertyOrdering: ['title', 'articleContent', 'questions'],
+};
+
+// ---- 依年級改寫（對應 functions/src/flows/rewrite-for-grade.ts） ----
+const REWRITE_RULES = `# 🚨 改寫鐵律
+
+1. **只能改寫，不能編造**：保留原文的主題、主要人物、事件順序與重要事實；不可加入原文沒有的事實、人物、數字或結論。
+2. **長度跟著原文**：原文比建議字數短時，維持原本長度，不要為了湊字數增加內容；原文太長時，保留主線，刪去枝節。
+3. **格式**：段落之間空一行；不要加標題符號、項目符號、括號註解或改寫說明。
+4. **語言**：原文是中文就用繁體中文（台灣常用語彙）改寫；原文是英文就用英文改寫，字彙與句型配合年級降低難度。
+5. **title**：沿用原文的標題；原文沒有標題時，取一個 15 字以內的標題。
+
+請輸出符合 schema 的 JSON 物件：title 是標題，articleContent 是改寫後的全文。
+`;
+
+/** 依年級改寫。text 有值＝改寫文字；沒有＝改寫圖片中的文章（圖片放在本訊息前面）。 */
+export function rewritePrompt({ text = '', grade }) {
+  const g = gradeOf(grade);
+  if (!g) throw new Error(`不認得的年級：${grade}`);
+  const head = text
+    ? `# 📥 原始文章
+
+<ARTICLE>
+${text}
+</ARTICLE>
+
+---
+
+你是國小國語文老師，擅長把文章改寫成適合不同年級學生閱讀的版本。
+
+請把上方 <ARTICLE> 標籤之間的文章，改寫成適合「${g.label}」學生閱讀的版本。`
+    : `# 📥 原始文章圖片
+
+（圖片已附在本訊息前面）
+
+---
+
+你是國小國語文老師，擅長把文章改寫成適合不同年級學生閱讀的版本。
+
+請先仔細辨識上方圖片中的文章文字（略過頁首、頁尾、頁碼和廣告），再把這篇文章改寫成適合「${g.label}」學生閱讀的版本。`;
+  return `${head}
+
+# 🎯 ${g.label}的改寫標準
+
+${bullets(g.rewrite)}
+
+${REWRITE_RULES}`;
+}
+
+export const REWRITE_SCHEMA = {
+  type: 'OBJECT',
+  properties: { title: { type: 'STRING' }, articleContent: { type: 'STRING' } },
+  required: ['title', 'articleContent'],
+  propertyOrdering: ['title', 'articleContent'],
 };
