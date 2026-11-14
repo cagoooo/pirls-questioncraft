@@ -1,12 +1,12 @@
 # PIRLS 閱讀題組小幫手（Chrome 擴充套件）
 
-在任何網頁**框選截圖**、**讀取整頁全文**或**反白文字**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組（可依一～六年級改寫文章與題目難度），檢查修改後一鍵送到 PaGamO 批量上傳頁，或下載 LoiLoNote 測驗卡匯入檔。
+在任何網頁**框選截圖**、**讀取整頁全文**、**反白文字**或用 **YouTube 影片**，用自己的免費 Gemini 金鑰產生 PIRLS 四層次閱讀理解題組（可依一～六年級改寫文章與題目難度），檢查修改後一鍵送到 PaGamO 批量上傳頁，或下載 LoiLoNote 測驗卡匯入檔。
 
 > ➕ **加到 Chrome（免費，Chrome 線上應用程式商店）：<https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp>**
 >
 > 📘 圖文安裝與使用說明：<https://cagoooo.github.io/pirls-questioncraft/extension/>
 >
-> 目前版本：v0.8.0（截圖／讀取全文／反白文字出題、依一～六年級改寫文章與題目、逐題修改、一鍵送到 PaGamO 批量上傳頁並附上原始截圖、LoiLoNote 測驗卡匯出）
+> 目前版本：v0.9.0（截圖／讀取全文／反白文字／YouTube 影片出題、依一～六年級改寫文章與題目、逐題修改、一鍵送到 PaGamO 批量上傳頁並附上原始截圖、LoiLoNote 測驗卡匯出）
 
 ## 一、安裝（第一次約 3 分鐘）
 
@@ -49,6 +49,11 @@
 - **讀取這頁全文出題**（部落格、新聞最好用）：按工具列圖示 →「📖 讀取這頁全文」，或在網頁空白處按右鍵 →「讀取這頁全文出 PIRLS 題組」。會自動去掉選單、側欄、廣告、留言，只留下正文；文章超過 4,000 字會提醒你刪掉不需要的段落。
 - **反白文字出題**：在網頁反白一段文章 → 按右鍵 →「用這段文字出 PIRLS 題組」。
 - **貼上圖片**：在工作台按 Ctrl+V 貼上圖片，或把圖片檔拖進來。
+- **🎬 用 YouTube 影片出題**（v0.9.0）：在 YouTube 影片頁按工具列圖示 →「🎬 用這部影片出題」，或在工作台「🎬 影片」分頁貼上影片網址。
+  - 可以只出其中一段（填「從 02:00 到 08:30」）；影片已經播到一半時，會自動從目前的位置開始。超過 20 分鐘的影片建議只選一段。
+  - AI 會看畫面、聽聲音，寫一段標了時間的「影片重點摘要」並出題，答後講解會寫出線索的時間點（例如「線索在影片 03:12」）。也可以搭配「適讀年級」。
+  - 題組文章會放影片標題、「▶ 觀看影片」連結（直接跳到那一段）和重點摘要；題組版預設附上影片封面圖。LoiLoNote 含文章版會把連結寫成「文字：網址」。
+  - **只能用公開影片**（不公開、私人、有年齡限制的都不行）；免費金鑰每天最多 8 小時影片。請先確認學生的帳號打得開 YouTube。
 
 ## 三、金鑰安全
 
@@ -95,7 +100,7 @@
 - 純 JavaScript、免打包；`vendor/xlsx.full.min.js` 是 SheetJS 0.18.5（Apache-2.0，授權見 `vendor/xlsx-LICENSE.txt`）；`vendor/Readability.js` 是 Mozilla Readability 0.6.0（Firefox 閱讀模式的正文擷取程式，Apache-2.0，授權見 `vendor/readability-LICENSE.md`）。
 - PaGamO 格式移植自網站 `src/lib/buildPaGamOWorkbook.ts`；範本表頭由 `npm run sync:extension` 從 `src/lib/pagamoTemplates.json` 同步。
 - 出題提示詞移植自 `functions/src/flows/`，**修改後端提示詞時要同步改 `lib/prompt.js`**（`npm test` 會檢查兩邊是否一致）。
-- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁、截圖附圖、依年級改寫與 LoiLoNote 匯出，109 項）。
+- 測試：`npm test`（格式與提示詞一致性）、`python -X utf8 tools/test-extension-e2e.py`（Playwright 實際載入擴充套件操作，含模擬 PaGamO 批量上傳頁、截圖附圖、依年級改寫、YouTube 影片出題與 LoiLoNote 匯出，122 項）。
 - 發布：改 `manifest.json` 版本時，同時在 `CHANGELOG.json` 最前面加一筆（版本不一致會讓建置失敗）。商店版要另外打包上傳到 Chrome 開發人員資訊主頁送審，通過後 Chrome 會自動更新老師的擴充套件。
 - 網站部署時 `tools/pack-extension.mjs` 會自動打包手動安裝用的 ZIP 與 `version.json`。`lib/update.js` 只在**手動安裝版**（沒有商店的 `update_url`、ID 不是 `cfbehdinangicblpbnockoofeccmoidp`）讀 `version.json` 顯示新版提醒；商店版不查網站版號。
 - 安裝說明頁的截圖：`python -X utf8 tools/capture-extension-guide.py` 重新產生。

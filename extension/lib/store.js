@@ -6,6 +6,7 @@ export const KEYS = {
   shots: 'shots',
   text: 'sourceText',
   draft: 'draft',
+  video: 'videoSource', // YouTube 影片出題（v0.9.0）：{ url, id, start, end, title, author }
 };
 
 export function currentTerm(date = new Date()) {

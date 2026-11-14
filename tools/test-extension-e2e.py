@@ -4,6 +4,7 @@
 import json, shutil, sys, tempfile, time, base64, pathlib, zipfile, io
 from playwright.sync_api import sync_playwright
 import openpyxl
+from PIL import Image
 
 SRC = pathlib.Path(__file__).resolve().parent.parent / "extension"
 HERE = pathlib.Path(tempfile.mkdtemp(prefix="pirls-ext-e2e-"))
@@ -84,6 +85,15 @@ def fake_questions(n=8):
             "questions": [{"question": f"模擬第{i+1}題：小水滴在哪裡？", "options": ["荷葉上", "石頭上", "樹枝上", "屋頂上"],
                            "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "pirlsLevel": LEVELS[i // 2]} for i in range(n)]}
 
+YT_ID = "9hE5-98ZeCg"
+def youtube_route(route):
+    if "/oembed" in route.request.url:
+        return route.fulfill(json={"title": "水循環小旅行", "author_name": "自然科學頻道"}, headers={"Access-Control-Allow-Origin": "*"})
+    return route.fulfill(body="<html><head><title>水循環小旅行 - YouTube</title></head><body><video></video></body></html>", content_type="text/html; charset=utf-8")
+def thumb_route(route):
+    buf = io.BytesIO(); Image.new("RGB", (480, 360), (30, 120, 200)).save(buf, "JPEG")
+    return route.fulfill(body=buf.getvalue(), content_type="image/jpeg", headers={"Access-Control-Allow-Origin": "*"})
+
 REWRITTEN = "早上，小水滴在荷葉上。\n\n太陽出來了，小水滴飛到天上。"
 calls = []
 reject = {"on": False}
@@ -130,6 +140,8 @@ with sync_playwright() as p:
         "download": "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip",
         "install": "https://cagoooo.github.io/pirls-questioncraft/extension/"}))
     ctx.route("https://www.pagamo.org/**", pagamo_route)
+    ctx.route("https://www.youtube.com/**", youtube_route)
+    ctx.route("https://i.ytimg.com/**", thumb_route)
     ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=BLOG_HTML if "blog" in r.request.url else ARTICLE_HTML, content_type="text/html; charset=utf-8"))
 
     sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
@@ -466,6 +478,78 @@ with sync_playwright() as p:
     bench.select_option("#gradeSel", "")
     bench.wait_for_timeout(300)
     check("切回「原文」", bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.grade)") == "")
+
+    # 10e. YouTube 影片出題（v0.9.0）：影片頁小視窗 → 工作台「影片」分頁 → 出題 → 題組放連結與封面圖
+    saved_state = bench.evaluate("chrome.storage.local.get(['draft', 'prevDraft']).then(r => r)")
+    yt = ctx.new_page()
+    yt.goto(f"https://www.youtube.com/watch?v={YT_ID}&t=90")
+    def open_popup_early(url_pattern):
+        # 小視窗一打開就會查「目前分頁」：要在它的程式執行前就把查詢指到測試網頁
+        pg = ctx.new_page()
+        pg.add_init_script("""(() => { const pat = %s; const orig = chrome.tabs.query.bind(chrome.tabs);
+          chrome.tabs.query = async () => { const [t] = await orig({ url: pat }); return [t]; }; })();""" % json.dumps(url_pattern))
+        pg.goto(f"{base}/popup/popup.html")
+        pg.wait_for_selector("#capture")
+        return pg
+    pgv = open_popup_early("https://www.youtube.com/watch*")
+    pgv.wait_for_timeout(600)
+    check("YouTube 影片頁的小視窗出現「用這部影片出題」", pgv.is_visible("#video"))
+    pgv.click("#video", no_wait_after=True)
+    bench.wait_for_selector("#panel-video:not(.hidden)", timeout=8000)
+    bench.wait_for_selector("#ytTitle:text-is('水循環小旅行')", timeout=8000)
+    check("影片帶進工作台：網址、從 01:30 開始、標題與頻道",
+          bench.input_value("#ytUrl").endswith(YT_ID) and bench.input_value("#ytStart") == "01:30" and "自然科學頻道" in bench.inner_text("#ytAuthor"),
+          str([bench.input_value("#ytUrl"), bench.input_value("#ytStart"), bench.inner_text("#ytAuthor")]))
+    pg2 = open_popup_early("https://pirls-test.example/article*"); pg2.wait_for_timeout(600)
+    check("一般網頁的小視窗不顯示影片按鈕", not pg2.is_visible("#video")); pg2.close()
+    bench.fill("#ytUrl", "https://example.com/abc"); bench.wait_for_timeout(700)
+    check("不是 YouTube 網址要提醒", "不是 YouTube 影片網址" in bench.inner_text("#ytMsg"), bench.inner_text("#ytMsg"))
+    bench.fill("#ytUrl", f"https://youtu.be/{YT_ID}"); bench.fill("#ytEnd", "01:00"); bench.wait_for_timeout(700)
+    check("結束比開始早要提醒", "結束時間要比開始時間晚" in bench.inner_text("#ytMsg"), bench.inner_text("#ytMsg"))
+    bench.fill("#ytEnd", "06:30"); bench.wait_for_timeout(900)
+    bench.locator(".card.source").screenshot(path=str(OUT / "video-panel.png"))
+    check("片段存進設定", bench.evaluate("chrome.storage.local.get('videoSource').then(r => [r.videoSource.start, r.videoSource.end])") == [90, 390])
+    if bench.evaluate("chrome.storage.local.get('draft').then(r => !!r.draft)"):
+        bench.once("dialog", lambda d: d.accept())
+    n_before = len(calls)
+    bench.click("#generate")
+    bench.wait_for_selector("#genStatus:has-text('完成')", timeout=20000)
+    gen = [json.loads(c["body"]) for c in calls[n_before:] if ":generateContent" in c["url"]]
+    vparts = gen[-1]["contents"][0]["parts"] if gen else []
+    fd = vparts[0] if vparts else {}
+    check("影片出題只送 1 次、帶 YouTube 網址與片段秒數",
+          len(gen) == 1 and fd.get("file_data", {}).get("file_uri") == f"https://www.youtube.com/watch?v={YT_ID}"
+          and fd.get("video_metadata") == {"start_offset": "90s", "end_offset": "390s"}, json.dumps(fd, ensure_ascii=False)[:200])
+    vtext = vparts[1].get("text", "") if len(vparts) > 1 else ""
+    check("影片提示詞是觀看理解版、要求時間點、帶影片標題", "觀看理解" in vtext and "MM:SS" in vtext and "水循環小旅行" in vtext and "01:30～06:30" in vtext)
+    varticle = bench.input_value("#article")
+    check("題組文章＝影片標題＋觀看連結＋重點摘要",
+          varticle.startswith("🎬 影片：水循環小旅行") and f"[▶ 觀看影片（01:30～06:30）](https://youtu.be/{YT_ID}?t=90)" in varticle and "影片重點摘要：" in varticle, varticle[:140])
+    check("題組標題用影片標題", bench.input_value("#title") == "水循環小旅行", bench.input_value("#title"))
+    if not bench.is_checked("#attachShots"):
+        bench.check("#attachShots"); bench.wait_for_timeout(300)
+    check("附圖改成「影片封面圖」", "影片封面圖" in bench.inner_text("#attachRow") and bench.is_enabled("#attachShots"), bench.inner_text("#attachRow")[:60])
+    with bench.expect_download() as dlv:
+        bench.click("#dlGroup")
+    pv = OUT / ("video_" + dlv.value.suggested_filename); dlv.value.save_as(str(pv))
+    with zipfile.ZipFile(pv) as z:
+        zn = z.namelist(); cov = [n for n in zn if n.endswith("_cover.jpg")]
+        xl = [n for n in zn if n.endswith(".xlsx")]
+        wv = openpyxl.load_workbook(io.BytesIO(z.read(xl[0]))).active if xl else None
+        cov_ok = bool(cov) and z.read(cov[0])[:3] == b"\xff\xd8\xff"
+    check("影片題組壓縮檔＝Excel＋封面圖，文章列寫封面檔名",
+          len(zn) == 2 and cov_ok and wv is not None and wv.cell(row=11, column=8).value == cov[0], str(zn))
+    with bench.expect_download() as dll:
+        bench.click("#dlLoiloArticle")
+    plv = OUT / ("video_loilo_" + dll.value.suggested_filename); dll.value.save_as(str(plv))
+    wlv = openpyxl.load_workbook(plv); wsv = wlv["Import"] if "Import" in wlv.sheetnames else wlv.active
+    l3v = str(wsv.cell(row=3, column=2).value)
+    check("LoiLoNote 的影片連結改成「文字：網址」", f"▶ 觀看影片（01:30～06:30）：https://youtu.be/{YT_ID}?t=90" in l3v and "](" not in l3v, l3v[:140])
+    yt.close(); pgv.close()
+    bench.bring_to_front()
+    # 還原影片測試前的題組，後面的測試沿用原本的「小水滴的旅行」
+    bench.evaluate("(st) => chrome.storage.local.set({ draft: st.draft ?? null, prevDraft: st.prevDraft ?? null, sourceMode: 'image' })", saved_state)
+    bench.reload(); bench.wait_for_selector("#generate"); bench.wait_for_timeout(500)
 
     # 11. 無法框選的頁面：整張截圖到工作台裁切
     bench.evaluate("""async () => {

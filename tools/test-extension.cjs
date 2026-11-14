@@ -263,6 +263,45 @@ function backendLines(file) {
   assert.ok(re(tsSrc) && re(tsSrc) === re(jsSrc), '網站與擴充套件的自動分段規則不同');
   checks++;
 
+  // ---- 3c. YouTube 影片出題（v0.9.0） ----
+  const yt = await import(path.join(root, 'extension/lib/youtube.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
+  const ID = '9hE5-98ZeCg';
+  for (const u of [`https://www.youtube.com/watch?v=${ID}`, `https://m.youtube.com/watch?v=${ID}&t=40s`, `https://youtu.be/${ID}?t=40`,
+    `youtube.com/shorts/${ID}`, `https://www.youtube.com/embed/${ID}`, `https://www.youtube.com/live/${ID}?si=x`, ID]) {
+    assert.equal(yt.parseYouTubeId(u), ID, u);
+  }
+  for (const u of ['https://example.com/watch?v=' + ID, 'https://www.youtube.com/@channel', 'https://www.youtube.com/watch?v=short', '', null]) {
+    assert.equal(yt.parseYouTubeId(u), null, String(u));
+  }
+  assert.equal(yt.startFromUrl(`https://youtu.be/${ID}?t=90`), 90);
+  assert.equal(yt.startFromUrl(`https://www.youtube.com/watch?v=${ID}&t=1m30s`), 90);
+  assert.equal(yt.startFromUrl(`https://www.youtube.com/watch?v=${ID}`), null);
+  assert.equal(yt.parseTime('2:30'), 150);
+  assert.equal(yt.parseTime('1:02:03'), 3723);
+  assert.equal(yt.parseTime('２'), NaN);
+  assert.equal(yt.parseTime('2：30'), 150, '全形冒號也要接受');
+  assert.equal(yt.parseTime(''), null);
+  assert.ok(Number.isNaN(yt.parseTime('2:75')));
+  assert.equal(yt.formatTime(90), '01:30');
+  assert.equal(yt.formatTime(3723), '1:02:03');
+  assert.equal(yt.checkRange('02:00', '01:00').error, '結束時間要比開始時間晚。');
+  assert.ok(yt.checkRange('02:00', '02:10').error.includes('太短'));
+  assert.deepEqual(yt.checkRange('', ''), { start: null, end: null, error: '' });
+  assert.equal(yt.rangeLabel(90, null), '從 01:30 開始');
+  assert.equal(yt.rangeLabel(null, null), '完整影片');
+  const va = yt.videoArticle({ id: ID, title: '水循環', start: 90, end: 390, summary: '【00:10】雲。' });
+  assert.ok(va.startsWith('🎬 影片：水循環\n[▶ 觀看影片（01:30～06:30）](https://youtu.be/9hE5-98ZeCg?t=90)'), va);
+  assert.ok(va.endsWith('影片重點摘要：\n【00:10】雲。'));
+  assert.ok(yt.videoArticle({ id: ID, title: 't', summary: 's' }).includes(`[▶ 觀看影片](https://youtu.be/${ID})`));
+  assert.equal(yt.plainLinks('看 [▶ 觀看影片](https://youtu.be/x?t=9) 吧'), '看 ▶ 觀看影片：https://youtu.be/x?t=9 吧');
+  const vp = prompt.videoPrompt({ questionMode: '10-questions', languageMode: 'zh-TW', grade: '2', title: '水循環', rangeText: '01:30～06:30' });
+  assert.ok(vp.includes('**共 10 題**') && vp.includes('觀看理解') && vp.includes('MM:SS') && vp.includes('「水循環」') && vp.includes('01:30～06:30'));
+  for (const l of gradeSrc[1].rewrite.concat(gradeSrc[1].questions)) assert.ok(vp.includes(`- ${l}`), `影片提示詞少了二年級標準：${l}`);
+  assert.ok(!prompt.videoPrompt({ questionMode: '8-questions', languageMode: 'en' }).includes('適讀年級'));
+  assert.deepEqual(gemini.videoPart({ id: ID, start: 90, end: 390 }), { file_data: { file_uri: `https://www.youtube.com/watch?v=${ID}` }, video_metadata: { start_offset: '90s', end_offset: '390s' } });
+  assert.deepEqual(gemini.videoPart({ id: ID }), { file_data: { file_uri: `https://www.youtube.com/watch?v=${ID}` } });
+  checks++;
+
   // ---- 4. 結果檢查與模型排序 ----
   const good = { title: 't', articleContent: 'a', questions: prompt.PIRLS_LEVELS.flatMap((l) => [0, 1].map(() => ({ question: 'q', options: ['1', '2', '3', '4'], correctAnswerIndex: 1, explanation: 'e', pirlsLevel: l }))) };
   assert.deepEqual(gemini.checkResult(gemini.normalize(good), '8-questions'), { fatal: [], warnings: [] });

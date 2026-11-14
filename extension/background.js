@@ -1,6 +1,7 @@
 // 背景程式：截圖、讀取全文、右鍵選單、快捷鍵、打開工作台、送到 PaGamO。
 import { getShots, setShots, KEYS, getSettings, saveSettings, logError } from './lib/store.js';
 import { upgradeDefaultModel } from './lib/gemini.js';
+import { parseYouTubeId, startFromUrl } from './lib/youtube.js';
 
 const WORKBENCH_URL = chrome.runtime.getURL('workbench/workbench.html');
 const MAX_SHOTS = 10;
@@ -42,6 +43,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return startCapture(msg.tab ?? sender.tab);
       case 'READ_PAGE':
         return readFullPage(msg.tab ?? sender.tab);
+      case 'USE_VIDEO':
+        return useVideo(msg.tab ?? sender.tab);
       case 'OPEN_WORKBENCH':
         await openWorkbench();
         return { ok: true };
@@ -127,6 +130,28 @@ async function useSelection(info, tab) {
     sourceMode: 'text',
   });
   await openWorkbench();
+}
+
+// ---------- YouTube 影片出題（v0.9.0） ----------
+async function useVideo(tab) {
+  const id = parseYouTubeId(tab?.url);
+  if (!id) return { ok: false, error: '這一頁不是 YouTube 影片。請先打開要出題的影片。' };
+  let start = startFromUrl(tab.url);
+  try {
+    // 影片已經播到一半：從目前播放的位置開始（老師可以在工作台改）
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => { const v = document.querySelector('video'); return v ? Math.floor(v.currentTime) : null; },
+    });
+    if (!start && res?.result > 5) start = res.result;
+  } catch { /* 讀不到就從頭 */ }
+  await archiveDraft();
+  await chrome.storage.local.set({
+    [KEYS.video]: { url: `https://www.youtube.com/watch?v=${id}`, id, start: start || null, end: null, title: (tab.title || '').replace(/ - YouTube$/, ''), author: '' },
+    sourceMode: 'video',
+  });
+  await openWorkbench();
+  return { ok: true };
 }
 
 // ---------- 讀取這頁全文 ----------

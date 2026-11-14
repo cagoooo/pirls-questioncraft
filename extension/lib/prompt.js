@@ -283,3 +283,82 @@ export const REWRITE_SCHEMA = {
   required: ['title', 'articleContent'],
   propertyOrdering: ['title', 'articleContent'],
 };
+
+// ---- YouTube 影片出題（v0.9.0，只有擴充套件有；網站沒有對應的後端提示詞） ----
+function videoGradeBlock(grade) {
+  const g = gradeOf(grade);
+  if (!g) return '';
+  return `# 🎒 適讀年級：${g.label}
+
+學生是${g.label}。影片重點摘要的寫法要符合下列標準：
+
+${bullets(g.rewrite)}
+
+題目的用字、句子長度與思考難度都要配合下列年級標準：
+
+${bullets(g.questions)}
+
+PIRLS 四層次的題數分配不變，只調整每一題的難度。
+
+`;
+}
+
+/** 影片出題。影片（YouTube 網址）放在本訊息前面；rangeText 例：「02:00～08:30」或「完整影片」。 */
+export function videoPrompt({ questionMode, languageMode, grade = '', title = '', rangeText = '完整影片' }) {
+  return `# 📥 給你的影片（你唯一可以使用的內容來源）
+
+（YouTube 影片已附在本訊息前面${title ? `，標題是「${title}」` : ''}；這次要看的範圍：${rangeText}）
+
+---
+
+你是 PIRLS 閱讀素養評量出題專家，現在要用「觀看理解」的方式出題：學生先看影片，再回答題目。
+
+請根據**影片中真實出現的畫面、旁白、對話與字幕**完成下列任務。**禁止**使用影片以外的知識或內容。
+
+# 🚨 三大鐵律
+
+1. **articleContent 是「影片重點摘要」**：用 3～6 段文字，依影片順序整理重要內容（人物、事件、說明的重點、數字），讓沒看過影片的老師也能核對題目。每段開頭標出時間，例如「【01:20】」。**不可虛構影片中沒有的內容**。段落之間空一行。
+2. **題目必須來自影片**：每一題的 \`question\` 與 \`explanation\` 都要對應影片中真實出現的內容，學生看完影片才答得出來。
+3. **PIRLS 層次必須嚴格平衡**：見下方分配。
+
+# 📋 題數與層次
+
+${countBlock(questionMode)}
+
+各層次在影片中的意思：
+- locate & retrieve（訊息提取）：影片中明確說出或看得到的資訊
+- make straightforward inferences（直接推論）：把影片中相鄰的兩、三個訊息連起來
+- interpret & integrate（詮釋整合）：整合影片不同段落，理解主旨、人物想法或因果
+- evaluate & critique（評估批判）：評估影片的說明方式、例子或觀點
+
+${videoGradeBlock(grade)}# 🌐 語言模式
+
+${languageBlock(languageMode)}
+
+# ✍️ explanation 的寫法（答後講解）
+
+\`explanation\` 只會在學生**作答之後**和正確答案一起顯示，每題都要包含三件事：
+
+1. **線索在哪裡**：寫出影片時間點（MM:SS，例如「線索在影片 03:12」），並簡短引用當時的旁白或畫面。
+2. **為什麼正確答案對**：用影片內容說明理由。
+3. **其他選項為什麼不對**：簡短點出干擾選項錯在哪裡（影片沒提到、和影片相反、只說對一半）。上傳後選項順序會被打亂，所以**要直接寫出選項的內容**（例如「『只能處理文字檔案』和影片說法相反」），不可寫「選項一」「第二個」「A」這類代稱。
+
+最後用一句話說明這題練習的是哪一個 PIRLS 層次的能力。
+
+# 📝 自我檢查（生成前先做）
+
+- [ ] articleContent 是不是依影片順序、標了時間的重點摘要，而且沒有編造？
+- [ ] 每一題是不是都看完影片才答得出來？
+- [ ] PIRLS 四層次題數是否完全符合上面的分配？
+- [ ] 每題的 explanation 是否都有影片時間點？
+
+# 📐 其他規則
+
+- 每題 4 個選項，僅一個正確答案
+- 干擾選項要合理但明確錯誤
+- 「評估與批判」題仍要有單一最合理答案，不是開放題
+- title：用影片的主題取一個 20 字以內的標題
+
+請輸出符合 schema 的 JSON 物件。
+`;
+}

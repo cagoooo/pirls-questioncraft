@@ -1,5 +1,6 @@
 import { getSettings, getShots } from '../lib/store.js';
 import { checkUpdate } from '../lib/update.js';
+import { parseYouTubeId } from '../lib/youtube.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -7,6 +8,12 @@ const $ = (id) => document.getElementById(id);
   const [s, shots] = await Promise.all([getSettings(), getShots()]);
   $('warn').classList.toggle('hidden', !!(s.apiKey && s.model));
   if (shots.length) $('n').textContent = `（${shots.length} 張截圖）`;
+  // 在 YouTube 影片頁：最上面多一顆「用這部影片出題」（activeTab 讓小視窗看得到目前分頁的網址）
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (parseYouTubeId(tab?.url)) {
+    $('video').classList.remove('hidden');
+    $('capture').classList.remove('primary', 'big');
+  }
   const info = await checkUpdate(); // 商店安裝會自動更新，不提醒
   if (info) {
     $('upd').innerHTML = `🆕 有新版本 v${info.version}，<a href="${info.install}#update" target="_blank" rel="noopener noreferrer">看更新方法</a>`;
@@ -41,6 +48,7 @@ async function send(type, busyText, btn) {
   window.close();
 }
 
+$('video').addEventListener('click', (e) => send('USE_VIDEO', '⏳ 帶入影片中…', e.currentTarget));
 $('capture').addEventListener('click', (e) => send('START_CAPTURE', '⏳ 截圖中…', e.currentTarget));
 $('readPage').addEventListener('click', (e) => send('READ_PAGE', '⏳ 讀取全文中…', e.currentTarget));
 $('bench').addEventListener('click', async () => {

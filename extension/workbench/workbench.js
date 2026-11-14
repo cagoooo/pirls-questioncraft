@@ -3,6 +3,7 @@ import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL, GRADE_LEVELS, gradeOf } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
 import { checkUpdate, STORE_URL } from '../lib/update.js';
+import { parseYouTubeId, startFromUrl, checkRange, formatTime, rangeLabel, thumbUrl, videoArticle, plainLinks, fetchVideoInfo, fetchThumbnail } from '../lib/youtube.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_EDGE = 2000;
@@ -24,7 +25,9 @@ async function init() {
   draft = store[KEYS.draft] ?? null;
   prevDraft = store.prevDraft ?? null;
   shots = await getShots();
-  mode = store.sourceMode === 'text' ? 'text' : 'image';
+  mode = ['text', 'video'].includes(store.sourceMode) ? store.sourceMode : 'image';
+  videoSrc = (await chrome.storage.local.get(KEYS.video))[KEYS.video] ?? null;
+  renderVideoSource();
   $('sourceText').value = store[KEYS.text]?.text ?? '';
   renderTextMeta(store[KEYS.text]);
   document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`).checked = true;
@@ -72,7 +75,76 @@ function renderMode() {
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t.dataset.mode === mode));
   $('panel-image').classList.toggle('hidden', mode !== 'image');
   $('panel-text').classList.toggle('hidden', mode !== 'text');
+  $('panel-video').classList.toggle('hidden', mode !== 'video');
 }
+
+// ---------- 素材：YouTube 影片（v0.9.0） ----------
+let videoSrc = null; // { url, id, start, end, title, author }
+let videoInfoFor = '';
+
+function renderVideoSource() {
+  const v = videoSrc ?? {};
+  if (document.activeElement !== $('ytUrl')) $('ytUrl').value = v.url ?? '';
+  // 優先顯示老師打的字（打錯時不要被清掉）；從小視窗帶進來的只有秒數
+  if (document.activeElement !== $('ytStart')) $('ytStart').value = v.startText ?? (v.start != null ? formatTime(v.start) : '');
+  if (document.activeElement !== $('ytEnd')) $('ytEnd').value = v.endText ?? (v.end != null ? formatTime(v.end) : '');
+  const has = !!v.id;
+  $('ytCard').classList.toggle('hidden', !has);
+  if (has) {
+    if ($('ytThumb').dataset.id !== v.id) { $('ytThumb').src = thumbUrl(v.id); $('ytThumb').dataset.id = v.id; }
+    $('ytTitle').textContent = v.title || '（正在讀取影片資訊…）';
+    $('ytAuthor').textContent = v.author ? `頻道：${v.author}` : '';
+    $('ytRange').textContent = `出題範圍：${rangeLabel(v.start ?? null, v.end ?? null)}`;
+  }
+  if (has && videoInfoFor !== v.id) loadVideoInfo(v.id);
+}
+
+async function loadVideoInfo(id) {
+  videoInfoFor = id;
+  const info = await fetchVideoInfo(id);
+  if (videoSrc?.id !== id) return;
+  const msg = $('ytMsg');
+  if (info.ok) {
+    // 讀到標題不要清掉訊息：時間打錯的提醒要留著
+    if (info.title !== videoSrc.title || info.author !== videoSrc.author) await saveVideoSource({ ...videoSrc, title: info.title, author: info.author });
+  } else {
+    msg.className = 'error';
+    msg.textContent = info.reason === 'private'
+      ? '⚠️ 這部影片不是公開影片（可能是不公開或私人），AI 讀不到，請換一部公開影片。'
+      : info.reason === 'notfound' ? '⚠️ 找不到這部影片，請確認網址是否正確、影片是否已刪除。' : '⚠️ 暫時讀不到影片資訊（網路問題），仍可以試著出題。';
+  }
+}
+
+async function saveVideoSource(v) {
+  videoSrc = v;
+  await chrome.storage.local.set({ [KEYS.video]: v });
+  renderVideoSource();
+}
+
+let ytTimer;
+function onVideoInput() {
+  clearTimeout(ytTimer);
+  ytTimer = setTimeout(async () => {
+    const url = $('ytUrl').value.trim();
+    const id = parseYouTubeId(url);
+    const msg = $('ytMsg');
+    if (!id) videoInfoFor = ''; // 換回影片網址時要重新讀標題
+    if (url && !id) { msg.className = 'error'; msg.textContent = '⚠️ 這不是 YouTube 影片網址。請到影片頁複製網址列的網址（例如 https://www.youtube.com/watch?v=…）。'; }
+    else { msg.className = 'muted'; msg.textContent = ''; }
+    let startText = $('ytStart').value;
+    // 網址帶 ?t=90 而且還沒填開始時間：自動帶入
+    if (id && !startText.trim() && startFromUrl(url)) { startText = formatTime(startFromUrl(url)); $('ytStart').value = startText; }
+    const r = checkRange(startText, $('ytEnd').value);
+    if (r.error && ($('ytStart').value.trim() || $('ytEnd').value.trim())) { msg.className = 'error'; msg.textContent = `⚠️ ${r.error}`; }
+    const same = id && id === videoSrc?.id;
+    await saveVideoSource({
+      url, id, start: r.error ? null : r.start, end: r.error ? null : r.end,
+      startText: $('ytStart').value, endText: $('ytEnd').value,
+      title: same ? videoSrc.title : '', author: same ? videoSrc.author : '',
+    });
+  }, 400);
+}
+['ytUrl', 'ytStart', 'ytEnd'].forEach((k) => $(k).addEventListener('input', onVideoInput));
 
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
   mode = t.dataset.mode;
@@ -377,7 +449,14 @@ $('generate').addEventListener('click', async () => {
   const grade = gradeOf($('gradeSel').value) ? $('gradeSel').value : '';
   let images = [];
   let text = '';
-  if (mode === 'image') {
+  let video = null;
+  if (mode === 'video') {
+    const id = parseYouTubeId($('ytUrl').value);
+    if (!id) return setStatus('error', '⚠️ 還沒有 YouTube 影片網址。請在 YouTube 影片頁按工具列圖示「🎬 用這部影片出題」，或把影片網址貼在「影片」分頁。');
+    const r = checkRange($('ytStart').value, $('ytEnd').value);
+    if (r.error) return setStatus('error', `⚠️ ${r.error}`);
+    video = { id, start: r.start, end: r.end, title: videoSrc?.id === id ? (videoSrc.title || '') : '' };
+  } else if (mode === 'image') {
     if (!shots.length) return setStatus('error', '⚠️ 還沒有截圖。請到要出題的網頁按工具列圖示「截取這個畫面」（或 Alt+Shift+P），或切到「文字」分頁貼上文章。');
     if (shots.some((s) => s.needsCrop)) return setStatus('error', '⚠️ 有截圖還沒裁切，請先按該張的 ✂️ 框出文章範圍。');
     images = shots.map((s) => dataUrlToPart(s.dataUrl));
@@ -394,17 +473,23 @@ $('generate').addEventListener('click', async () => {
   $('generate').disabled = true;
   const t0 = Date.now();
   let label = 'AI 正在閱讀並出題…';
-  const usual = grade ? '改寫加出題通常 40～90 秒' : '通常 20～60 秒';
+  const usual = video ? '影片出題通常 1～3 分鐘，影片越長越久' : grade ? '改寫加出題通常 40～90 秒' : '通常 20～60 秒';
   const tick = () => setStatus('', `<span class="spinner" aria-hidden="true"></span><span>${label}（已經 ${Math.round((Date.now() - t0) / 1000)} 秒，${usual}）</span>`);
   tick();
   const timer = setInterval(tick, 1000);
   try {
     const res = await generateQuestions({
-      key: settings.apiKey, model: settings.model, images, text, questionMode, languageMode, grade,
+      key: settings.apiKey, model: settings.model, images, text, video, questionMode, languageMode, grade,
       onStatus: (s) => { label = s; tick(); },
     });
+    if (video) {
+      // 題組文章＝影片標題＋觀看連結＋重點摘要；標題沿用影片標題，老師比較好認
+      if (video.title) res.data.title = video.title;
+      res.data.articleContent = videoArticle({ ...video, summary: res.data.articleContent });
+    }
     draft = {
       data: res.data,
+      video, // YouTube 影片出題：{ id, start, end, title }
       questionMode, languageMode,
       grade, // 依年級改寫過的題組：文章已不是原文
       model: res.model,
@@ -577,14 +662,25 @@ function showExportError(e) {
 const MEDIA_MAX_BYTES = 5 * 1024 * 1024 - 64 * 1024; // PaGamO 非壓縮檔單檔上限 5 MB，留一點餘裕
 
 function sourceShots() {
+  if (draft?.source === 'video' && draft.video?.id) return { list: [], missing: 0, video: true };
   if (draft?.source !== 'image' || !Array.isArray(draft.shotIds)) return { list: [], missing: 0 };
   const list = draft.shotIds.map((id) => shots.find((s) => s.id === id)).filter(Boolean);
   return { list, missing: draft.shotIds.length - list.length };
 }
 
 function renderAttach() {
-  const { list, missing } = sourceShots();
+  const { list, missing, video } = sourceShots();
   const row = $('attachRow');
+  if (video) {
+    // 影片題組：附上影片封面圖（不受年級改寫影響，封面不是文章）
+    row.classList.remove('hidden');
+    $('attachText').textContent = '📎 題組版附上影片封面圖';
+    $('attachShots').checked = settings.attachShots !== false;
+    $('attachShots').disabled = false;
+    $('attachMissing').classList.add('hidden');
+    return;
+  }
+  $('attachText').innerHTML = '📎 題組版附上原始截圖（<b id="attachCount">0</b> 張）';
   row.classList.toggle('hidden', !list.length && !missing);
   // 改寫過的文章和原始截圖的文字不同，附上原圖會讓學生看到兩種版本
   const rewritten = !!gradeOf(draft?.grade);
@@ -624,12 +720,17 @@ async function shrinkToLimit(dataUrl) {
 }
 
 async function buildMedia(group) {
-  const { list } = sourceShots();
-  if (!group || !list.length || !$('attachShots').checked) return [];
+  const { list, video } = sourceShots();
+  if (!group || (!list.length && !video) || !$('attachShots').checked) return [];
   const d = new Date();
   const p2 = (n) => String(n).padStart(2, '0');
   // 每次匯出都用新的時間碼，避免和題庫裡之前上傳過的圖片同名
   const tag = `pirls${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+  if (video) {
+    const bytes = await fetchThumbnail(draft.video.id);
+    if (!bytes) { showExportError(new Error('下載不到影片封面圖，這次先不附圖（題組裡仍有影片連結）。')); return []; }
+    return [{ name: `${tag}_cover.jpg`, type: 'image/jpeg', bytes }];
+  }
   const out = [];
   for (const [k, s] of list.entries()) {
     let { type, bytes } = dataUrlBytes(s.dataUrl);
@@ -665,7 +766,7 @@ async function exportFile(group, { quiet = false } = {}) {
       name = globalThis.PirlsPagamo.download(draft.data, opts);
     }
     if (!quiet) {
-      const what = media.length ? `（Excel＋${media.length} 張文章附圖，上傳時直接選這個壓縮檔）` : '';
+      const what = media.length ? `（Excel＋${media.length} 張${draft.source === 'video' ? '影片封面圖' : '文章附圖'}，上傳時直接選這個壓縮檔）` : '';
       showExportOk(`✅ 已下載「${escapeHtml(name)}」${what}。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
     }
     return { name, xlsxName, opts, media };
@@ -715,8 +816,10 @@ $('dlChoice').addEventListener('click', () => exportFile(false));
 function exportLoilo(withArticle) {
   const msg = $('loiloMsg');
   try {
-    const name = globalThis.PirlsLoilo.download(draft.data, { legacy: !withArticle });
-    const parts = withArticle ? globalThis.PirlsLoilo.passageItems(draft.data.title, draft.data.articleContent).length : 0;
+    // LoiLoNote 不認得 [文字](網址) 超連結：影片題組改成「文字：網址」
+    const data = draft.source === 'video' ? { ...draft.data, articleContent: plainLinks(draft.data.articleContent) } : draft.data;
+    const name = globalThis.PirlsLoilo.download(data, { legacy: !withArticle });
+    const parts = withArticle ? globalThis.PirlsLoilo.passageItems(data.title, data.articleContent).length : 0;
     const note = parts > 1 ? `文章較長，已分成 ${parts} 段放在題目前面。` : '';
     msg.className = 'notice ok';
     msg.innerHTML = `✅ 已下載「${escapeHtml(name)}」。${note}到 LoiLoNote 測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。`;
@@ -781,8 +884,12 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
     autoGrow($('sourceText'));
   }
   if (changes.sourceMode) {
-    mode = changes.sourceMode.newValue === 'text' ? 'text' : 'image';
+    mode = ['text', 'video'].includes(changes.sourceMode.newValue) ? changes.sourceMode.newValue : 'image';
     renderMode();
+  }
+  if (changes[KEYS.video] && JSON.stringify(changes[KEYS.video].newValue ?? null) !== JSON.stringify(videoSrc)) {
+    videoSrc = changes[KEYS.video].newValue ?? null;
+    renderVideoSource();
   }
   if (changes.lastNotice?.newValue) showNotice(changes.lastNotice.newValue);
   if (changes[KEYS.settings]) {

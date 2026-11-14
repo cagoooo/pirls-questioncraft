@@ -31,6 +31,7 @@
         <div class="tabs" role="tablist" aria-label="素材類型">
           <button role="tab" id="tab-image" aria-controls="panel-image" class="tab" data-mode="image">📷 截圖 <b id="shotCount">0</b></button>
           <button role="tab" id="tab-text" aria-controls="panel-text" class="tab" data-mode="text">📝 文字</button>
+          <button role="tab" id="tab-video" aria-controls="panel-video" class="tab" data-mode="video">🎬 影片</button>
         </div>
 
         <div id="panel-image" role="tabpanel" aria-labelledby="tab-image">
@@ -53,6 +54,26 @@
             <textarea id="sourceText" rows="12" placeholder="把文章貼在這裡"></textarea>
           </label>
           <p class="muted" id="textMeta"></p>
+        </div>
+
+        <div id="panel-video" role="tabpanel" aria-labelledby="tab-video" class="hidden">
+          <label class="field"><span>YouTube 影片網址（在影片頁按工具列圖示「🎬 用這部影片出題」會自動帶進來）</span>
+            <input id="ytUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="yt-range">
+            <label class="field"><span>從（可空白）</span><input id="ytStart" type="text" inputmode="numeric" placeholder="例 02:00" autocomplete="off"></label>
+            <label class="field"><span>到（可空白）</span><input id="ytEnd" type="text" inputmode="numeric" placeholder="例 08:30" autocomplete="off"></label>
+          </div>
+          <div id="ytCard" class="yt-card hidden">
+            <img id="ytThumb" alt="影片封面" width="160" height="90">
+            <div><b id="ytTitle"></b><span class="muted" id="ytAuthor"></span><span class="muted" id="ytRange"></span></div>
+          </div>
+          <p id="ytMsg" class="muted" role="status" aria-live="polite"></p>
+          <ul class="muted yt-tips">
+            <li>只能用<b>公開</b>的影片（不公開、私人、有年齡限制的不行）。</li>
+            <li>超過 20 分鐘的影片，建議只選一段：出題比較準，也比較省免費額度（每天最多 8 小時影片）。</li>
+            <li>題組會放「▶ 觀看影片」連結，請先確認學生的帳號打得開 YouTube。</li>
+          </ul>
         </div>
 
         <div class="gen-opts">
@@ -113,7 +134,7 @@
             <span class="muted">隨機：每位學生看到的選項順序不同，比較不會互相看答案</span>
           </div>
           <div class="attach-row hidden" id="attachRow">
-            <label class="attach-check"><input type="checkbox" id="attachShots" checked> 📎 題組版附上原始截圖（<b id="attachCount">0</b> 張）</label>
+            <label class="attach-check"><input type="checkbox" id="attachShots" checked> <span id="attachText">📎 題組版附上原始截圖（<b id="attachCount">0</b> 張）</span></label>
             <span class="muted">學生在 PaGamO 題組裡會看到原本的頁面與插圖。課本、繪本等有版權的圖片，請只用於自己的課堂。<span id="attachMissing" class="hidden"></span></span>
           </div>
           <div id="exportErr" class="notice error hidden"></div>

@@ -1,5 +1,6 @@
 // 直接呼叫 Google Gemini API（用老師自己的金鑰）。金鑰只會送到 generativelanguage.googleapis.com。
-import { imagePrompt, textPrompt, rewritePrompt, gradeOf, ensureParagraphs, RESPONSE_SCHEMA, REWRITE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
+import { canonicalUrl, rangeLabel } from './youtube.js';
+import { imagePrompt, textPrompt, videoPrompt, rewritePrompt, gradeOf, ensureParagraphs, RESPONSE_SCHEMA, REWRITE_SCHEMA, PIRLS_LEVELS, LEVEL_LABEL, expectedDistribution } from './prompt.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const TIMEOUT_MS = 180_000;
@@ -16,6 +17,9 @@ function friendlyError(status, detail) {
   const d = String(detail || '');
   if (status === 400 && /api key not valid|API_KEY_INVALID/i.test(d)) return '金鑰無效：請到「設定」重新貼上金鑰（注意前後不要有空白）。';
   if (status === 400 && /location is not supported|User location/i.test(d)) return '這個地區目前無法使用 Gemini 免費 API。';
+  // YouTube 影片（v0.9.0）：私人、不公開、已刪除或有年齡限制的影片，Gemini 讀不到
+  if (status === 400 && /youtube|video|file_uri|fileUri|file_data/i.test(d)) return `AI 讀不到這部影片：只能用「公開」的 YouTube 影片（不公開、私人、已刪除或有年齡限制的都不行）。也可能是這個 AI 模型不支援影片，可到「設定」改選 Flash 再試。（${d.slice(0, 120)}）`;
+  if (status === 429 && /video|youtube/i.test(d)) return '今天的免費影片額度可能用完了（每天最多 8 小時影片），明天會自動恢復；也可以只選影片的一段再試。';
   if (status === 401 || status === 403) return '金鑰沒有使用權限：可能被停用、刪除，或限制了不能用 Gemini。請到 Google AI Studio 檢查。';
   if (status === 404) return '這個 AI 模型已停用或不存在：請到「設定」按「測試金鑰」，自動換成可用的模型。';
   if (status === 429) return '免費額度暫時用完：請等一分鐘再試；若一直出現，可能已達今天的上限，明天會自動恢復。';
@@ -37,7 +41,7 @@ async function call(path, { key, method = 'GET', body, timeout = TIMEOUT_MS } = 
       signal: ctrl.signal,
     });
   } catch (e) {
-    if (e?.name === 'AbortError') throw new GeminiError('等太久了（超過 3 分鐘），請減少截圖張數或稍後再試。');
+    if (e?.name === 'AbortError') throw new GeminiError(`等太久了（超過 ${Math.round(timeout / 60000)} 分鐘），請減少截圖張數、只選影片的一段，或稍後再試。`);
     throw new GeminiError('網路連線失敗：請確認電腦有連上網路。');
   } finally {
     clearTimeout(timer);
@@ -232,8 +236,10 @@ export async function rewriteForGrade({ key, model, images = [], text = '', grad
  * grade（'1'～'6'）：先依年級改寫文章，再用改寫後的文章依同一個年級出題。
  * 回傳 { data, warnings, model, grade, originalTitle }。
  */
-export async function generateQuestions({ key, model, images = [], text = '', questionMode, languageMode, grade = '', onStatus }) {
+export async function generateQuestions({ key, model, images = [], text = '', video = null, questionMode, languageMode, grade = '', onStatus }) {
   if (!model) throw new GeminiError('還沒有選擇 AI 模型，請到「設定」按「測試金鑰」。');
+  // 影片：一次看完影片、寫摘要、出題；年級直接寫進影片提示詞，不另外改寫
+  if (video) return generateFromSource({ key, model, video, questionMode, languageMode, grade, onStatus });
   if (grade) {
     const rewritten = await rewriteForGrade({ key, model, images, text, grade, onStatus });
     const result = await generateFromSource({ key, model, text: rewritten.articleContent, questionMode, languageMode, grade, onStatus });
@@ -243,10 +249,23 @@ export async function generateQuestions({ key, model, images = [], text = '', qu
   return generateFromSource({ key, model, images, text, questionMode, languageMode, grade: '', onStatus });
 }
 
-async function generateFromSource({ key, model, images = [], text = '', questionMode, languageMode, grade = '', onStatus }) {
-  const isText = !images.length;
-  const prompt = isText ? textPrompt({ text, questionMode, languageMode, grade }) : imagePrompt({ questionMode, languageMode });
+/** YouTube 影片的請求內容：file_data 放影片網址，片段用 video_metadata 的秒數。 */
+export function videoPart({ id, start = null, end = null }) {
+  const part = { file_data: { file_uri: canonicalUrl(id) } };
+  const meta = {};
+  if (start != null) meta.start_offset = `${Math.floor(start)}s`;
+  if (end != null) meta.end_offset = `${Math.floor(end)}s`;
+  if (Object.keys(meta).length) part.video_metadata = meta;
+  return part;
+}
+
+async function generateFromSource({ key, model, images = [], text = '', video = null, questionMode, languageMode, grade = '', onStatus }) {
+  const isText = !images.length && !video;
+  const prompt = video
+    ? videoPrompt({ questionMode, languageMode, grade, title: video.title, rangeText: rangeLabel(video.start ?? null, video.end ?? null) })
+    : isText ? textPrompt({ text, questionMode, languageMode, grade }) : imagePrompt({ questionMode, languageMode });
   const parts = [
+    ...(video ? [videoPart(video)] : []),
     ...images.map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } })),
     { text: prompt },
     // 文字模式：原文由程式自己放回，不讓 AI 逐字抄一遍（長文章可省下大量時間）
@@ -260,9 +279,10 @@ async function generateFromSource({ key, model, images = [], text = '', question
   let last;
   let useSchema = true;
   for (let attempt = 1; attempt <= 2; attempt++) {
-    onStatus?.(attempt === 1 ? 'AI 正在閱讀並出題…' : '第一次結果不符合規定，AI 正在重新出題…');
+    onStatus?.(attempt === 1 ? (video ? 'AI 正在看影片並出題…（影片越長越久）' : 'AI 正在閱讀並出題…') : '第一次結果不符合規定，AI 正在重新出題…');
     const request = () => call(`models/${model}:generateContent`, {
       key,
+      timeout: video ? 300_000 : undefined, // 影片要看比較久：給 5 分鐘
       method: 'POST',
       body: {
         contents: [{ role: 'user', parts: [...parts, ...(useSchema ? [] : [{ text: hint }]), ...(note ? [{ text: note }] : [])] }],
@@ -282,6 +302,7 @@ async function generateFromSource({ key, model, images = [], text = '', question
     }
     const data = normalize(parseCandidate(json));
     if (isText) data.articleContent = text; // 與網站相同：文字模式一律保留老師提供的原文
+    if (video) data.articleContent = ensureParagraphs(data.articleContent); // 影片摘要也要分段
     data.questions.sort((a, b) => (ORDER[a.pirlsLevel] ?? 9) - (ORDER[b.pirlsLevel] ?? 9));
     const check = checkResult(data, questionMode);
     last = { data, warnings: check.warnings, fatal: check.fatal, model };
