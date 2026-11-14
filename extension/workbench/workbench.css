@@ -88,3 +88,7 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
 .loilo-box { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line); }
 .loilo-box h3 { margin: 0 0 6px; font-size: var(--fs-md, 1.05rem); }
 .loilo-box p { margin: 10px 0; }
+.attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 12px 0 4px; padding: 10px 14px; border: 1.5px dashed var(--line); border-radius: 14px; }
+.attach-check { font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.attach-check input { width: 20px; height: 20px; accent-color: var(--ink, #3D2E1E); }
+.attach-row .muted { font-size: var(--fs-sm); }

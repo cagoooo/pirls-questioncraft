@@ -107,6 +107,10 @@
             </div>
             <span class="muted">隨機：每位學生看到的選項順序不同，比較不會互相看答案</span>
           </div>
+          <div class="attach-row hidden" id="attachRow">
+            <label class="attach-check"><input type="checkbox" id="attachShots" checked> 📎 題組版附上原始截圖（<b id="attachCount">0</b> 張）</label>
+            <span class="muted">學生在 PaGamO 題組裡會看到原本的頁面與插圖。課本、繪本等有版權的圖片，請只用於自己的課堂。<span id="attachMissing" class="hidden"></span></span>
+          </div>
           <div id="exportErr" class="notice error hidden"></div>
           <div id="exportOk" class="notice ok hidden" role="status" aria-live="polite"></div>
           <div class="row-btns">
@@ -171,6 +175,7 @@
   <script src="../vendor/xlsx.full.min.js"></script>
   <script src="../lib/pagamoTemplates.js"></script>
   <script src="../lib/pagamo.js"></script>
+  <script src="../lib/zip.js"></script>
   <script src="../lib/loilo.js"></script>
   <script type="module" src="workbench.js"></script>
 </body>

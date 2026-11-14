@@ -100,6 +100,48 @@ assert.equal(validate(bad).length, 2);
 assert.throws(() => buildWorkbook(bad, {}));
 checks++;
 
+// ---- 2a. 題組附圖（v0.7.0）：檔名寫在文章列「內容多媒體檔名」（第 8 欄），多張用 & 分隔；沒附圖時與網站版完全相同 ----
+{
+  const d = make(8);
+  const media = ['pirls20261114120000_1.jpg', 'pirls20261114120000_2.jpg'];
+  const rows = rowsOf(roundtrip(buildWorkbook(d, { group: true, contentMedia: media })));
+  assert.equal(rows[9][7], '內容多媒體檔名', '範本第 10 列第 8 欄應是「內容多媒體檔名」');
+  assert.equal(rows[10][7], media.join('&'), '文章列要寫上附圖檔名');
+  assert.ok(rows.slice(11).every((r) => r[7] === null), '題目列不放附圖');
+  const plain = rowsOf(roundtrip(buildWorkbook(d, { group: true, contentMedia: [] })));
+  assert.equal(plain[10][7], null);
+  assert.deepEqual(plain, rowsOf(roundtrip(buildPaGamOWorkbook(d, true))), '沒附圖時要與網站版相同');
+  // 一般選擇題沒有文章列，給了附圖也不寫
+  const choice = rowsOf(roundtrip(buildWorkbook(d, { group: false, contentMedia: media })));
+  assert.deepEqual(choice, rowsOf(roundtrip(buildPaGamOWorkbook(d, false))));
+  // 檔名規則：只收英數、JPG／PNG／MP3、不可重複
+  assert.throws(() => buildWorkbook(d, { group: true, contentMedia: ['中文.jpg'] }));
+  assert.throws(() => buildWorkbook(d, { group: true, contentMedia: ['a.gif'] }));
+  assert.throws(() => buildWorkbook(d, { group: true, contentMedia: ['a.jpg', 'a.jpg'] }));
+  checks++;
+}
+
+// ---- 2a-2. 壓縮檔：Excel＋圖片打包後，用 SheetJS 內建的 ZIP 讀取器讀回來要一模一樣 ----
+{
+  vm.runInContext(fs.readFileSync(ext('lib/zip.js'), 'utf8'), Object.assign(extCtx, { TextEncoder }));
+  const { makeZip, crc32 } = extCtx.PirlsZip;
+  assert.equal(crc32(new TextEncoder().encode('123456789')), 0xCBF43926, 'CRC32 標準測試值');
+  const xlsx = new Uint8Array(toBytes(make(8), { group: true, contentMedia: ['p_1.jpg'] }));
+  const img = Uint8Array.from({ length: 5000 }, (_, i) => (i * 37) % 256);
+  const zip = makeZip([{ name: 'PIRLS_PaGamO_題組_小水滴.xlsx', bytes: xlsx }, { name: 'p_1.jpg', bytes: img }]);
+  const cfb = XLSX.CFB.read(Buffer.from(zip), { type: 'buffer' });
+  // SheetJS 的讀取器不看「檔名是 UTF-8」的旗標（會當 Latin-1 讀），也會多列一個自己的內部項目，這裡轉回來比對
+  const utf8 = (n) => Buffer.from(n, 'latin1').toString('utf8');
+  const entries = cfb.FileIndex.filter((f) => f.type === 2 && !f.name.startsWith('\u0001'));
+  const names = entries.map((f) => utf8(f.name));
+  assert.deepEqual(names.sort(), ['PIRLS_PaGamO_題組_小水滴.xlsx', 'p_1.jpg'].sort(), '壓縮檔內的檔名（含中文）');
+  const get = (n) => Buffer.from(entries.find((f) => utf8(f.name) === n).content);
+  assert.ok(get('p_1.jpg').equals(Buffer.from(img)), '圖片內容不變');
+  const back = XLSX.read(get('PIRLS_PaGamO_題組_小水滴.xlsx'), { type: 'buffer' });
+  assert.equal(rowsOf(back)[10][7], 'p_1.jpg', '壓縮檔裡的 Excel 可以正常讀取');
+  checks++;
+}
+
 // ---- 2b. LoiLoNote 測驗卡（v1.2.0 題組：questionOnly 文章＋radio 單選題）----
 vm.runInContext(fs.readFileSync(ext('lib/loilo.js'), 'utf8'), extCtx);
 const loilo = extCtx.PirlsLoilo;

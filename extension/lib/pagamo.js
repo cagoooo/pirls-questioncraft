@@ -23,7 +23,8 @@
 
   /**
    * @param data { title, articleContent, questions[] }
-   * @param opts { group, subject, book, chapter, title, article, randomOptions }
+   * @param opts { group, subject, book, chapter, title, article, randomOptions, contentMedia }
+   *   contentMedia：題組文章附圖的檔名陣列（圖片檔要和 Excel 一起上傳）
    *   randomOptions：true＝PaGamO 打亂選項順序（v）；預設 false＝固定順序（x，與網站版相同）
    */
   function buildWorkbook(data, opts) {
@@ -42,6 +43,12 @@
     if (data.questions.length + (group ? 1 : 0) > 1000) throw new Error('PaGamO 一次最多匯出 1,000 列（題組包含文章列）。');
     if (group && (!String(title).trim() || !String(article).trim())) throw new Error('題組必須包含文章標題與內容。');
     if (group && (title.length > 32767 || article.length > 32767)) throw new Error('文章超過 Excel 單格長度，請先分篇。');
+    // 題組文章的附圖（官方範本「內容多媒體檔名」：完整檔名、不可重複、僅 JPG／PNG／MP3，多個用半形 & 分隔）
+    var media = group && Array.isArray(opts.contentMedia) ? opts.contentMedia : [];
+    media.forEach(function (n) {
+      if (!/^[A-Za-z0-9_.-]+\.(jpg|jpeg|png|mp3)$/i.test(n)) throw new Error('附圖檔名格式不對：' + n);
+    });
+    if (new Set(media).size !== media.length) throw new Error('附圖檔名不可重複。');
 
     var template = templates[group ? 'group' : 'choice'];
     var rows = template.headers.map(function (row) { return row.slice(); });
@@ -49,6 +56,7 @@
       var heading = new Array(25).fill(null);
       heading[0] = 1; heading[1] = subject; heading[2] = book; heading[3] = chapter;
       heading[5] = title; heading[6] = article;
+      if (media.length) heading[7] = media.join('&');
       rows.push(heading);
     }
     data.questions.forEach(function (q, i) {

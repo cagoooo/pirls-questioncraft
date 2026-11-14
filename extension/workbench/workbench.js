@@ -78,6 +78,7 @@ document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () 
 }));
 
 function renderShots() {
+  renderAttach(); // 截圖刪除或排序改變時，題組附圖的張數跟著更新
   $('shotCount').textContent = shots.length;
   $('shotEmpty').classList.toggle('hidden', shots.length > 0);
   $('clearShots').classList.toggle('hidden', shots.length === 0);
@@ -391,6 +392,7 @@ $('generate').addEventListener('click', async () => {
       questionMode, languageMode,
       model: res.model,
       source: mode,
+      shotIds: mode === 'image' ? shots.map((s) => s.id) : [], // 題組附圖要用的截圖（出題當下的那幾張）
       generatedAt: Date.now(),
       warnings: res.warnings,
       category: defaultCategory(res.data.title),
@@ -437,6 +439,7 @@ function renderDraft() {
   $('resultBody').classList.toggle('hidden', !has);
   $('exportCard').classList.toggle('hidden', !has);
   if (!has) return;
+  renderAttach();
   const d = draft.data;
   const when = new Date(draft.generatedAt).toLocaleString('zh-TW', { hour12: false });
   $('resultMeta').textContent = `${when} 產生｜${draft.questionMode === '10-questions' ? '10' : '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}｜模型 ${draft.model}`;
@@ -549,12 +552,98 @@ function showExportError(e) {
   err.scrollIntoView({ block: 'center' });
 }
 
-function exportFile(group) {
+// ---------- 題組附圖：用截圖出題時，把出題用的截圖一起送進 PaGamO ----------
+// 官方範本「內容多媒體檔名」：完整檔名、不可重複、僅 JPG／PNG／MP3；圖片要和 Excel 一起選擇上傳，或放在同一個壓縮檔
+const MEDIA_MAX_BYTES = 5 * 1024 * 1024 - 64 * 1024; // PaGamO 非壓縮檔單檔上限 5 MB，留一點餘裕
+
+function sourceShots() {
+  if (draft?.source !== 'image' || !Array.isArray(draft.shotIds)) return { list: [], missing: 0 };
+  const list = draft.shotIds.map((id) => shots.find((s) => s.id === id)).filter(Boolean);
+  return { list, missing: draft.shotIds.length - list.length };
+}
+
+function renderAttach() {
+  const { list, missing } = sourceShots();
+  const row = $('attachRow');
+  row.classList.toggle('hidden', !list.length && !missing);
+  $('attachShots').checked = settings.attachShots !== false && list.length > 0;
+  $('attachShots').disabled = !list.length;
+  $('attachCount').textContent = list.length;
+  $('attachMissing').classList.toggle('hidden', !missing);
+  $('attachMissing').textContent = missing ? `（有 ${missing} 張出題用的截圖已經刪掉，只能附上剩下的）` : '';
+}
+
+$('attachShots').addEventListener('change', async () => {
+  settings = await saveSettings({ attachShots: $('attachShots').checked });
+});
+
+function dataUrlBytes(dataUrl) {
+  const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+  return { type: m[1], bytes: Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)) };
+}
+
+// 超過上限就縮小重存（截圖本來最長邊 2000 像素，通常用不到）
+async function shrinkToLimit(dataUrl) {
+  const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  let scale = 0.85;
+  for (;;) {
+    const c = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const bytes = new Uint8Array(await (await c.convertToBlob({ type: 'image/jpeg', quality: 0.82 })).arrayBuffer());
+    if (bytes.length <= MEDIA_MAX_BYTES || scale < 0.3) return bytes;
+    scale *= 0.8;
+  }
+}
+
+async function buildMedia(group) {
+  const { list } = sourceShots();
+  if (!group || !list.length || !$('attachShots').checked) return [];
+  const d = new Date();
+  const p2 = (n) => String(n).padStart(2, '0');
+  // 每次匯出都用新的時間碼，避免和題庫裡之前上傳過的圖片同名
+  const tag = `pirls${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+  const out = [];
+  for (const [k, s] of list.entries()) {
+    let { type, bytes } = dataUrlBytes(s.dataUrl);
+    if (bytes.length > MEDIA_MAX_BYTES || !/^image\/(jpeg|png)$/.test(type)) { bytes = await shrinkToLimit(s.dataUrl); type = 'image/jpeg'; }
+    out.push({ name: `${tag}_${k + 1}.${type === 'image/png' ? 'png' : 'jpg'}`, type, bytes });
+  }
+  return out;
+}
+
+function downloadBytes(bytes, name, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// 下載 PaGamO 檔：有附圖時打包成壓縮檔（Excel＋圖片），PaGamO 批量上傳頁可以直接收壓縮檔
+async function exportFile(group, { quiet = false } = {}) {
   $('exportErr').classList.add('hidden');
   try {
-    const name = globalThis.PirlsPagamo.download(draft.data, exportOpts(group));
-    showExportOk(`✅ 已下載「${escapeHtml(name)}」。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
-    return name;
+    const opts = exportOpts(group);
+    const media = await buildMedia(group);
+    if (media.length) opts.contentMedia = media.map((m) => m.name);
+    const xlsxName = globalThis.PirlsPagamo.fileName(draft.data, group);
+    let name;
+    if (media.length) {
+      const xlsx = new Uint8Array(globalThis.PirlsPagamo.toBytes(draft.data, opts));
+      name = xlsxName.replace(/\.xlsx$/, '.zip');
+      downloadBytes(globalThis.PirlsZip.makeZip([{ name: xlsxName, bytes: xlsx }, ...media]), name, 'application/zip');
+    } else {
+      name = globalThis.PirlsPagamo.download(draft.data, opts);
+    }
+    if (!quiet) {
+      const what = media.length ? `（Excel＋${media.length} 張文章附圖，上傳時直接選這個壓縮檔）` : '';
+      showExportOk(`✅ 已下載「${escapeHtml(name)}」${what}。到 PaGamO 批量上傳時，題型請選「${group ? '題組' : '選擇題'}」。`);
+    }
+    return { name, xlsxName, opts, media };
   } catch (e) {
     showExportError(e);
     return null;
@@ -569,16 +658,20 @@ function toBase64(u8) {
 
 // 下載備份 → 存好要上傳的檔案 → 背景程式打開 PaGamO 批量上傳頁並自動放檔
 async function sendToPagamo(group) {
-  const name = exportFile(group);
-  if (!name) return;
+  const r = await exportFile(group, { quiet: true });
+  if (!r) return;
   try {
-    const bytes = new Uint8Array(globalThis.PirlsPagamo.toBytes(draft.data, exportOpts(group)));
+    const bytes = new Uint8Array(globalThis.PirlsPagamo.toBytes(draft.data, r.opts));
     await chrome.storage.local.set({
-      pagamoPending: { name, base64: toBase64(bytes), group, typeLabel: group ? '題組' : '選擇題', ts: Date.now() },
+      pagamoPending: {
+        name: r.xlsxName, base64: toBase64(bytes), group, typeLabel: group ? '題組' : '選擇題', ts: Date.now(),
+        media: r.media.map((m) => ({ name: m.name, type: m.type, base64: toBase64(m.bytes) })),
+      },
     });
     const res = await chrome.runtime.sendMessage({ type: 'SEND_TO_PAGAMO' });
     if (res?.ok === false) throw new Error(res.error || '打不開 PaGamO 頁面');
-    showExportOk(`🚀 已下載備份，並打開 PaGamO 批量上傳頁：題型「${group ? '題組' : '選擇題'}」與檔案會自動放好，請在 PaGamO 頁面確認後按「上傳」。`);
+    const extra = r.media.length ? `與 ${r.media.length} 張文章附圖` : '';
+    showExportOk(`🚀 已下載備份，並打開 PaGamO 批量上傳頁：題型「${group ? '題組' : '選擇題'}」、檔案${extra}會自動放好，請在 PaGamO 頁面確認後按「上傳」。`);
   } catch (e) {
     showExportError(e);
   }

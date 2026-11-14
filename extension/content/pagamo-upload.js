@@ -58,14 +58,22 @@
     // 2. 放入檔案（只放進欄位，不會上傳）
     const input = await waitFor(() => document.querySelector('input[type=file]'));
     if (!input) throw new Error('找不到檔案上傳欄位。');
-    const bytes = Uint8Array.from(atob(p.base64), (c) => c.charCodeAt(0));
-    const file = new File([bytes], p.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const toBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     const dt = new DataTransfer();
-    dt.items.add(file);
+    dt.items.add(new File([toBytes(p.base64)], p.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    // 題組附圖：官方規定圖片要和 Excel「在上傳頁一起選擇」
+    const media = Array.isArray(p.media) ? p.media : [];
+    if (media.length && !input.multiple) throw new Error('上傳欄位不能一次選多個檔案（PaGamO 頁面可能改版了），請改用下載的壓縮檔手動上傳。');
+    media.forEach((m) => dt.items.add(new File([toBytes(m.base64)], m.name, { type: m.type || 'image/jpeg' })));
     input.files = dt.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
-    const listed = await waitFor(() => [...document.querySelectorAll('.ant-upload-list-item-name, .ant-upload-list-item')].some((e) => e.textContent.includes(p.name)), 6000);
-    if (!listed) throw new Error('檔案沒有出現在 PaGamO 的上傳清單。');
+    const names = [p.name, ...media.map((m) => m.name)];
+    const listedAll = () => {
+      const shown = [...document.querySelectorAll('.ant-upload-list-item-name, .ant-upload-list-item')].map((e) => e.textContent);
+      return names.every((n) => shown.some((t) => t.includes(n)));
+    };
+    const listed = await waitFor(listedAll, 6000);
+    if (!listed) throw new Error(media.length ? 'Excel 或附圖沒有全部出現在 PaGamO 的上傳清單。' : '檔案沒有出現在 PaGamO 的上傳清單。');
 
     await chrome.storage.local.remove('pagamoPending');
 
@@ -84,7 +92,8 @@
       }, { once: true });
       submit.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-    show('ok', `✅ 已選好題型「<b>${esc(p.typeLabel)}</b>」並放入「<b>${esc(p.name)}</b>」。<br>請確認後按下方閃爍的「<b>上傳</b>」按鈕。`);
+    const extra = media.length ? `，以及 <b>${media.length}</b> 張文章附圖` : '';
+    show('ok', `✅ 已選好題型「<b>${esc(p.typeLabel)}</b>」並放入「<b>${esc(p.name)}</b>」${extra}。<br>請確認後按下方閃爍的「<b>上傳</b>」按鈕。`);
   } catch (e) {
     show('err', `⚠️ 自動放檔沒有完成：${esc(e.message)}<br>${manual}`);
   } finally {

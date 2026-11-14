@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   chapterMode: 'title', // title＝用文章標題當章節；custom＝用下方自訂文字
   chapter: 'PIRLS閱讀理解',
   randomOptions: true, // PaGamO 選項順序隨機（2026-11-07 阿凱老師要求預設隨機）
+  attachShots: true, // 用截圖出題時，題組版附上原始截圖（v0.7.0）
   questionMode: '8-questions',
   languageMode: 'zh-TW',
 };

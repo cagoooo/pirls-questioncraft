@@ -163,6 +163,7 @@ export default function ExtensionGuidePage() {
               </ol>
               <p>還沒登入 PaGamO 的話，先登入，登入後會自動回到批量上傳頁接著做。</p>
               <p>選項順序預設<b>隨機</b>，學生不能靠記「答案是第幾個」猜題；需要固定順序時，在匯出區切到「固定」。</p>
+              <p>📎 <b>用截圖出題時</b>，題組版會一起附上原始截圖，學生在題組裡看得到原本的頁面與插圖（可在匯出區取消勾選）。課本、繪本等有版權的圖片，請只用於自己的課堂。</p>
               <p className="bg-sky/40 border-neo rounded-xl px-4 py-3 text-[1rem]">🃏 <b>用 LoiLoNote？</b>同一區下方按「<b>⬇️ 下載 LoiLoNote 題組檔</b>」（只有題目）或「<b>含文章版（新版格式）</b>」，再到 LoiLoNote 測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。</p>
             </Step>
           </ol>

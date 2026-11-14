@@ -1,7 +1,7 @@
 # 擴充套件端對端測試：Playwright 載入未封裝擴充套件，模擬老師操作（Gemini 以模擬回應代替，另含一次「無效金鑰」真連線）。
 # 需求：pip install playwright openpyxl pillow ＆ python -m playwright install chromium
 # 執行：python -X utf8 tools/test-extension-e2e.py （截圖與下載檔會放在暫存資料夾，結尾會印出位置）
-import json, shutil, sys, tempfile, time, base64, pathlib
+import json, shutil, sys, tempfile, time, base64, pathlib, zipfile, io
 from playwright.sync_api import sync_playwright
 import openpyxl
 
@@ -287,6 +287,44 @@ with sync_playwright() as p:
     check("重新整理後保留修改", q1.locator("[data-f=question]").input_value().startswith("老師改過") and q1.locator("input[type=radio][value='2']").is_checked())
     check("章節跟著標題改", bench.input_value("#catChapter") == "小水滴的旅行（修訂）")
 
+    # 8a. 題組附圖（v0.7.0）：用截圖出題 → 題組版附上出題時的 2 張截圖
+    check("截圖出題時顯示「附上原始截圖」且預設打勾", bench.is_visible("#attachRow") and bench.is_checked("#attachShots") and bench.inner_text("#attachCount") == "2",
+          bench.inner_text("#attachRow")[:60])
+    with bench.expect_download() as dlz:
+        bench.click("#dlGroup")
+    check("有附圖時只下載檔案＝壓縮檔", dlz.value.suggested_filename == "PIRLS_PaGamO_題組_小水滴的旅行（修訂）.zip", dlz.value.suggested_filename)
+    pz = OUT / dlz.value.suggested_filename
+    dlz.value.save_as(str(pz))
+    with zipfile.ZipFile(pz) as z:
+        zn = z.namelist()
+        jpgs = [n for n in zn if n.endswith(".jpg")]
+        wsz = openpyxl.load_workbook(io.BytesIO(z.read("PIRLS_PaGamO_題組_小水滴的旅行（修訂）.xlsx"))).active
+        jpg_ok = all(z.read(n)[:3] == b"\xff\xd8\xff" for n in jpgs)
+    check("壓縮檔＝Excel＋2 張 JPG", len(zn) == 3 and len(jpgs) == 2 and jpg_ok, str(zn))
+    check("文章列「內容多媒體檔名」寫上 2 張圖（& 分隔、與壓縮檔內檔名一致）",
+          wsz.cell(row=11, column=8).value == "&".join(sorted(jpgs)), str(wsz.cell(row=11, column=8).value))
+    # 送到 PaGamO（附圖版）：Excel＋2 張圖一起放進上傳欄位
+    pg_img = ctx.new_page()
+    pg_img.goto("https://www.pagamo.org/api/teacher_console/questions/add_questions/batch")
+    with bench.expect_download():
+        bench.click("#sendGroup")
+    pg_img.wait_for_function("document.querySelectorAll('.ant-upload-list-item-name').length >= 3", timeout=15000)
+    placed = pg_img.evaluate("[...document.querySelector('input[type=file]').files].map(f => [f.name, f.type, f.size])")
+    check("PaGamO 上傳欄位放入 Excel＋2 張附圖", len(placed) == 3 and placed[0][0].endswith(".xlsx") and [p[1] for p in placed[1:]] == ["image/jpeg", "image/jpeg"],
+          str([p[:2] for p in placed]))
+    b64x = pg_img.evaluate("""async () => { const f = document.querySelector('input[type=file]').files[0];
+      const u = new Uint8Array(await f.arrayBuffer()); let s = ''; for (const c of u) s += String.fromCharCode(c); return btoa(s); }""")
+    wsp = openpyxl.load_workbook(io.BytesIO(base64.b64decode(b64x))).active
+    check("放進 PaGamO 的 Excel 文章列寫的檔名＝放進去的圖片檔名", wsp.cell(row=11, column=8).value == "&".join(p[0] for p in placed[1:]), str(wsp.cell(row=11, column=8).value))
+    banner_img = pg_img.evaluate("document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || ''")
+    check("PaGamO 頁面提示有 2 張文章附圖", "2 張文章附圖" in banner_img, banner_img[:90])
+    check("附圖版也不會自動按上傳", pg_img.evaluate("window.__submitted === undefined"))
+    pg_img.close()
+    bench.bring_to_front()
+    # 取消勾選 → 回到原本的 xlsx（以下沿用原本的檢查）
+    bench.uncheck("#attachShots")
+    bench.wait_for_timeout(300)
+
     # 8. 下載 PaGamO 題組版並驗證內容
     with bench.expect_download() as dl:
         bench.click("#dlGroup")
@@ -339,6 +377,9 @@ with sync_playwright() as p:
     pf = OUT / ("fixed_" + dl_fixed.value.suggested_filename); dl_fixed.value.save_as(str(pf))
     check("切換「固定」後寫 x", openpyxl.load_workbook(pf).active.cell(row=11, column=21).value == "x")
     bench.click("label:has(input[name=optorder][value=random])")
+    bench.wait_for_timeout(300)
+    check("取消附圖後題組檔沒有寫附圖檔名", ws.cell(row=11, column=8).value is None, str(ws.cell(row=11, column=8).value))
+    bench.check("#attachShots")
     bench.wait_for_timeout(300)
 
     # 9. 匯出前檢查：清空一個選項要被擋
