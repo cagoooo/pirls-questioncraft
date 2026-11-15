@@ -42,7 +42,7 @@ PIRLS 閱讀題組小幫手讓老師在任何網頁截圖、讀取全文或反�
 • contextMenus：在網頁上提供右鍵「用這段文字出題」或「讀取這頁全文」。
 • scripting：在老師指定的網頁擷取正文，以及在 PaGamO 批量上傳頁放入檔案。
 • https://generativelanguage.googleapis.com/*：用老師自己的金鑰呼叫 Google Gemini 出題。
-• https://www.pagamo.org/*：打開 PaGamO 批量上傳頁並放入檔案，不會代按上傳。
+• https://www.pagamo.org/*：打開 PaGamO 批量上傳頁並放入檔案，倒數 5 秒後按「上傳」（可取消），檢查通過後打開「題目總覽」標出剛上傳的題目。
 
 遠端程式碼：無。所有程式都在套件內，內容安全政策只允許 script-src 'self'。
 

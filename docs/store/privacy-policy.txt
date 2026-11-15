@@ -11,7 +11,7 @@ PIRLS 閱讀題組小幫手 隱私權政策
 
 二、資料會送到哪裡
 1. 當您按出題時，套件會把您選取的截圖或文字，連同您自己的金鑰，傳送到 Google Gemini（網址為 generativelanguage.googleapis.com），以便產生 PIRLS 閱讀理解題組。傳輸遵循 Google 的相關條款；免費方案送出的內容可能被 Google 用來改進產品，因此請不要截取含學生姓名、成績或其他個人資料的畫面。
-2. 當您按「送到 PaGamO」時，套件會在您的瀏覽器開啟 PaGamO（www.pagamo.org）的批量上傳頁並放入檔案。套件不會代您按下「上傳」，也不會取得您的 PaGamO 密碼。
+2. 當您按「送到 PaGamO」時，套件會在您的瀏覽器開啟 PaGamO（www.pagamo.org）的批量上傳頁並放入檔案。放好後會倒數 5 秒再按下「上傳」（您可以取消，改成自己按），PaGamO 檢查通過後會打開「題目總覽」並標出剛上傳的題目。套件不會取得您的 PaGamO 密碼，題目只會送到您自己登入的 PaGamO 帳號。
 3. 為了提醒您更新，套件最多每 12 小時向 https://cagoooo.github.io/pirls-questioncraft/extension/version.json 查詢一次版本資訊。這次查詢不會帶上金鑰或文章內容。
 
 三、我們不會做的事
