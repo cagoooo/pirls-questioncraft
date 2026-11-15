@@ -209,8 +209,27 @@ async function sendToPagamo() {
 }
 
 chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
-  if (change.status === 'complete') handlePagamoTab(tabId, tab);
+  if (change.status !== 'complete') return;
+  handlePagamoTab(tabId, tab);
+  handlePagamoOverview(tabId, tab);
 });
+
+// 上傳檢查通過後會跳到「題目總覽」：有 pagamoWatch（15 分鐘內）就注入 content/pagamo-overview.js 標出剛上傳的題目
+const PAGAMO_OVERVIEW_URL = 'https://www.pagamo.org/api/teacher_console/questions/overview';
+async function handlePagamoOverview(tabId, tab) {
+  if (!(tab.url ?? '').startsWith(PAGAMO_OVERVIEW_URL)) return;
+  const { pagamoWatch: watch } = await chrome.storage.local.get('pagamoWatch');
+  if (!watch) return;
+  if (Date.now() - watch.ts > 15 * 60 * 1000) {
+    await chrome.storage.local.remove('pagamoWatch');
+    return;
+  }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content/pagamo-overview.js'] });
+  } catch (e) {
+    await logError('PaGamO 題目總覽', e);
+  }
+}
 
 let pagamoBusy = false;
 async function handlePagamoTab(tabId, tab) {

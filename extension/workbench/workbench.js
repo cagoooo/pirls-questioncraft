@@ -792,12 +792,16 @@ async function sendToPagamo(group) {
       pagamoPending: {
         name: r.xlsxName, base64: toBase64(bytes), group, typeLabel: group ? '題組' : '選擇題', ts: Date.now(),
         media: r.media.map((m) => ({ name: m.name, type: m.type, base64: toBase64(m.bytes) })),
+        mediaLabel: draft.source === 'video' ? '影片封面圖' : '文章附圖',
+        // 上傳後到「題目總覽」用來找出剛上傳的題目：題組比對標題，選擇題比對題幹
+        title: r.opts.title ?? draft.data.title,
+        matches: group ? [r.opts.title ?? draft.data.title] : draft.data.questions.map((q) => q.question),
       },
     });
     const res = await chrome.runtime.sendMessage({ type: 'SEND_TO_PAGAMO' });
     if (res?.ok === false) throw new Error(res.error || '打不開 PaGamO 頁面');
     const extra = r.media.length ? `與 ${r.media.length} 張文章附圖` : '';
-    showExportOk(`🚀 已下載備份，並打開 PaGamO 批量上傳頁：題型「${group ? '題組' : '選擇題'}」、檔案${extra}會自動放好，請在 PaGamO 頁面確認後按「上傳」。`);
+    showExportOk(`🚀 已下載備份，並打開 PaGamO 批量上傳頁：題型「${group ? '題組' : '選擇題'}」、檔案${extra}會自動放好，放好後倒數 5 秒會自動按「上傳」（想自己檢查可以按「先不要」），檢查通過後會帶你到「題目總覽」看結果。`);
   } catch (e) {
     showExportError(e);
   }

@@ -66,15 +66,30 @@ document.querySelector('input[type=file]').addEventListener('change', e => {
   const list = document.querySelector('.ant-upload-list');
   list.innerHTML = [...e.target.files].map(f => '<div class=ant-upload-list-item><span class=ant-upload-list-item-name>' + f.name + '</span></div>').join('');
 });
-document.querySelector('button[type=submit]').addEventListener('click', () => { window.__submitted = true; });
+document.querySelector('button[type=submit]').addEventListener('click', () => {
+  window.__submitted = (window.__submitted || 0) + 1;
+  const d = document.createElement('div'); d.textContent = '正在檢查檔案'; document.body.prepend(d);
+  setTimeout(() => {
+    if (window.__fail) { d.className = 'ant-message-error'; d.textContent = '檔案格式錯誤，請下載範例檔重新填寫'; }
+    else d.textContent = '檔案檢查通過，共 9 列，系統正在處理中，預計於 10 分鐘後上傳完畢';
+  }, 800);
+});
 </script></body></html>"""
-pagamo_state = {"logged_in": True}
+pagamo_state = {"logged_in": True, "overview_title": "", "fail": False}
+# 模擬「題目總覽」（2026-11-15 偵察：每題一張 .ant-card，含「ID 數字」與標題）
+def fake_overview():
+    cards = "".join(f'<div class="ant-card"><div class="ant-card-body"><div>ID {i}</div><div>{t}</div><span>題組</span></div></div>'
+                    for i, t in [(7790001, pagamo_state["overview_title"]), (7788837, "鑰匙不會分身")] if t)
+    return f"<!doctype html><html><meta charset=utf-8><title>PaGamO</title><body><p>共 2 題</p>{cards}</body></html>"
 def pagamo_route(route):
     url = route.request.url
+    if "questions/overview" in url:
+        return route.fulfill(body=fake_overview(), content_type="text/html; charset=utf-8")
     if "add_questions/batch" in url:
         if not pagamo_state["logged_in"]:
             return route.fulfill(status=302, headers={"Location": "https://www.pagamo.org/sign_in"})
-        return route.fulfill(body=FAKE_PAGAMO_BATCH, content_type="text/html; charset=utf-8")
+        body = FAKE_PAGAMO_BATCH.replace("<body>", "<body><script>window.__fail = true</script>") if pagamo_state["fail"] else FAKE_PAGAMO_BATCH
+        return route.fulfill(body=body, content_type="text/html; charset=utf-8")
     if "sign_in" in url:
         return route.fulfill(body="<!doctype html><meta charset=utf-8><title>登入</title><h1>請登入</h1>", content_type="text/html; charset=utf-8")
     return route.fulfill(body="<!doctype html><meta charset=utf-8><title>PaGamO 首頁</title><h1>首頁</h1>", content_type="text/html; charset=utf-8")
@@ -333,7 +348,11 @@ with sync_playwright() as p:
     check("放進 PaGamO 的 Excel 文章列寫的檔名＝放進去的圖片檔名", wsp.cell(row=11, column=8).value == "&".join(p[0] for p in placed[1:]), str(wsp.cell(row=11, column=8).value))
     banner_img = pg_img.evaluate("document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || ''")
     check("PaGamO 頁面提示有 2 張文章附圖", "2 張文章附圖" in banner_img, banner_img[:90])
-    check("附圖版也不會自動按上傳", pg_img.evaluate("window.__submitted === undefined"))
+    check("放好後顯示倒數自動上傳", "秒後自動按下" in banner_img, banner_img[:120])
+    pg_img.evaluate("document.querySelector('[data-pirls-pagamo]').shadowRoot.querySelector('[data-act=cancel]').click()")
+    pg_img.wait_for_timeout(6500)
+    check("按「先不要」就不會自動按上傳", pg_img.evaluate("window.__submitted === undefined"))
+    check("取消後改成框出上傳按鈕", "4px" in pg_img.evaluate("document.querySelector('button[type=submit]').style.outline"))
     pg_img.close()
     bench.bring_to_front()
     # 取消勾選 → 回到原本的 xlsx（以下沿用原本的檢查）
@@ -623,7 +642,7 @@ with sync_playwright() as p:
     check("超過 20,000 字顯示太長", bench.locator(".len-bad").count() == 1)
     bench.fill("#sourceText", txt)
 
-    # 17. 送到 PaGamO（已登入）：下載備份 → 打開批量上傳頁 → 選「題組」→ 放好檔案 → 不自動按上傳
+    # 17. 送到 PaGamO（已登入）：下載備份 → 打開批量上傳頁 → 選「題組」→ 放好檔案 → 倒數 5 秒自動上傳 → 檢查通過跳到題目總覽並標出新題組
     bench.set_viewport_size({"width": 1440, "height": 900})
     bench.evaluate("chrome.storage.local.get('draft')")  # 確認還有題目
     # Playwright 攔不到擴充套件「新開分頁」的第一個請求，所以先開好 PaGamO 分頁，測「沿用已開分頁」這條路
@@ -653,13 +672,30 @@ with sync_playwright() as p:
     r11 = [c.value for c in ws3[11]]
     check("放進 PaGamO 的檔案內容正確（題組文章列）", r11[0] == 1 and r11[1] == "國語" and ws3.max_row == 19, str(r11[:4]) + f" rows={ws3.max_row}")
     banner = pg_pagamo.evaluate("document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || ''")
-    check("PaGamO 頁面顯示「請確認後按上傳」", "已選好題型" in banner and "上傳" in banner, banner[:80])
-    check("不會自動按下上傳", pg_pagamo.evaluate("window.__submitted === undefined"))
-    check("上傳按鈕被框起來提醒", "4px" in pg_pagamo.evaluate("document.querySelector('button[type=submit]').style.outline"))
+    check("PaGamO 頁面顯示倒數自動上傳", "已選好題型" in banner and "秒後自動按下" in banner, banner[:120])
     check("用完即清掉暫存檔", bench.evaluate("chrome.storage.local.get('pagamoPending').then(r => !r.pagamoPending)"))
+    pagamo_state["overview_title"] = dl3.value.suggested_filename[len("PIRLS_PaGamO_題組_"):-len(".xlsx")]
+    pg_pagamo.wait_for_url("**/questions/overview", timeout=20000)
+    pg_pagamo.wait_for_function("(document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || '').includes('上傳完成')", timeout=15000)
+    ov = pg_pagamo.evaluate("document.querySelector('[data-pirls-pagamo]').shadowRoot.textContent")
+    check("題目總覽顯示上傳完成與題目 ID", "7790001" in ov and "7788837" not in ov, ov[:120])
+    check("剛上傳的題組被框起來", "4px" in pg_pagamo.evaluate("document.querySelector('.ant-card').style.outline"))
+    check("找到後清掉追蹤資料", bench.evaluate("chrome.storage.local.get('pagamoWatch').then(r => !r.pagamoWatch)"))
+    # 上傳失敗：PaGamO 顯示錯誤就不跳頁
+    pg_fail = ctx.new_page()
+    pg_fail.goto("https://www.pagamo.org/api/teacher_console/questions/add_questions/batch")
+    pagamo_state["fail"] = True
+    with bench.expect_download():
+        bench.click("#sendGroup")
+    pg_fail.wait_for_function("(document.querySelector('[data-pirls-pagamo]')?.shadowRoot?.textContent || '').includes('回報檔案有問題')", timeout=20000)
+    fb = pg_fail.evaluate("document.querySelector('[data-pirls-pagamo]').shadowRoot.textContent")
+    check("PaGamO 回報錯誤時顯示原因、不跳頁", "檔案格式錯誤" in fb and "add_questions/batch" in pg_fail.url, fb[:120])
+    pg_fail.close()
+    pagamo_state["fail"] = False
     check("工作台在匯出區顯示說明", "PaGamO 批量上傳頁" in bench.inner_text("#exportOk"), bench.inner_text("#exportOk"))
 
     # 18. 還沒登入：先提示登入；登入後回到 PaGamO 首頁會自動帶到批量上傳並放好「選擇題」檔
+    pg_pagamo.goto("https://www.pagamo.org/api/teacher_console/questions/add_questions/batch")  # 上一步跳到了題目總覽，先回批量上傳頁
     pagamo_state["logged_in"] = False
     with bench.expect_download():
         bench.click("#sendChoice")
