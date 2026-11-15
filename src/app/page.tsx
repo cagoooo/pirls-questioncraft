@@ -29,6 +29,15 @@ import { exportPIRLStoExcel } from '@/lib/generateExcel';
 import { exportPIRLStoPaGamO } from '@/lib/generatePaGamOExcel';
 import { exportPIRLStoPaGamOQuizGroup, type PaGamOQuizGroupData } from '@/lib/generatePaGamOQuizGroupExcel';
 import { useToast } from '@/hooks/use-toast';
+import {
+  isAuthConfigured,
+  isGoogleUser,
+  loginErrorMessage,
+  onUserChange,
+  signInWithGoogle,
+  signOutGoogle,
+  type User,
+} from '@/lib/firebase-client';
 import { AlertCircle, Loader2, MessageSquareHeart, FileText, Image as ImageIcon, Sparkles, Star as StarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -160,6 +169,36 @@ export default function PIRLSQuestionCraftPage() {
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
 
   const { toast } = useToast();
+
+  // ===== Google 登入（2026-11-15 起 AI 出題必須登入；學生作答頁不受影響） =====
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  useEffect(() => onUserChange((u) => { setAuthUser(u); setAuthReady(true); }), []);
+  const isLoggedIn = isGoogleUser(authUser);
+
+  const handleGoogleLogin = useCallback(async () => {
+    if (!isAuthConfigured()) {
+      toast({ title: '登入功能尚未設定', description: '請稍後再試，或聯絡石門國小資訊組。', variant: 'destructive' });
+      return;
+    }
+    setIsSigningIn(true);
+    try {
+      const u = await signInWithGoogle();
+      setAuthUser(u);
+      toast({ title: '登入成功', description: `歡迎，${u.displayName || u.email}！現在可以開始出題了。` });
+    } catch (e) {
+      toast({ title: '登入沒有完成', description: loginErrorMessage(e), variant: 'destructive' });
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [toast]);
+
+  const handleGoogleLogout = useCallback(async () => {
+    await signOutGoogle().catch(() => {});
+    setAuthUser(null);
+  }, []);
+
   const resultsSectionRef = useRef<HTMLDivElement>(null);
   const loadingSectionRef = useRef<HTMLDivElement>(null);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
@@ -252,6 +291,15 @@ export default function PIRLSQuestionCraftPage() {
   }, []);
 
   const handleGenerateQuestions = useCallback(async () => {
+    if (!isGoogleUser(authUser)) {
+      toast({
+        title: '請先用 Google 帳號登入',
+        description: 'AI 出題需要登入，每位老師每天最多可生成 5 次。按下方「使用 Google 帳號登入」即可。',
+        variant: 'destructive',
+      });
+      void handleGoogleLogin();
+      return;
+    }
     const isReady = (inputMode === 'image' && imageFiles.length > 0) || (inputMode === 'text' && inputText.trim().length > 0);
     if (!isReady) {
       toast({
@@ -335,7 +383,7 @@ export default function PIRLSQuestionCraftPage() {
       if (cancelSimProgress) cancelSimProgress();
       setIsLoading(false);
     }
-  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, grade, loadingProgress, turnstileToken]);
+  }, [inputMode, imageFiles, inputText, toast, questionMode, languageMode, grade, loadingProgress, turnstileToken, authUser, handleGoogleLogin]);
 
   // 改寫過的題組：學生讀的是改寫後的文章，不是原文或原圖
   const isRewritten = !!resultGrade && !!generatedQuestionsOutput;
@@ -733,6 +781,48 @@ export default function PIRLSQuestionCraftPage() {
           </div>
         )}
 
+        {/* ===== Google 登入 ===== */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <div
+            className={cn(
+              'mt-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between',
+              'px-4 py-4 sm:px-5 rounded-[18px] border-[1.5px] border-ink shadow-neo-sm',
+              isLoggedIn ? 'bg-white' : 'bg-lemon/60'
+            )}
+          >
+            {isLoggedIn ? (
+              <>
+                <p className="text-base leading-6 min-w-0 break-words">
+                  ✅ 已登入：<strong>{authUser?.displayName || authUser?.email}</strong>
+                  {authUser?.email && authUser?.displayName ? <span className="text-muted-foreground">（{authUser.email}）</span> : null}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogout}
+                  className="shrink-0 px-4 py-2 rounded-full border-[1.5px] border-ink bg-white text-sm font-bold hover:-translate-y-0.5 transition-transform"
+                >
+                  登出
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-base leading-6 min-w-0">
+                  🔒 <strong>請先用 Google 帳號登入才能出題</strong>
+                  <span className="block text-sm text-muted-foreground">任何 Google 帳號都可以，每位老師每天最多 5 次；學生作答不需要登入。</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isSigningIn || !authReady}
+                  className="shrink-0 px-5 py-3 rounded-full border-[1.5px] border-ink bg-coral text-white text-base font-extrabold shadow-neo-sm hover:-translate-y-0.5 transition-transform disabled:opacity-60"
+                >
+                  {isSigningIn ? '登入中…' : '使用 Google 帳號登入'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ===== Turnstile ===== */}
         {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
           <div className="mt-5">
@@ -745,7 +835,7 @@ export default function PIRLSQuestionCraftPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>請珍惜 AI 出題額度</AlertTitle>
             <AlertDescription className="leading-6">
-              題組生成會消耗共用的 Gemini API 額度。每位使用者每小時最多可生成 5 次，請確認素材與題數後再產生，避免只是測試或連續重複生成。
+              題組生成會消耗共用的 Gemini API 額度。需用 Google 帳號登入，每位老師每天最多可生成 5 次（台北時間午夜重置），請確認素材與題數後再產生，避免只是測試或連續重複生成。
             </AlertDescription>
           </Alert>
         )}

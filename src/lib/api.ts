@@ -3,6 +3,7 @@
 // 路線 B 後，原本 import 的 Server Action 都改用本檔的函式。
 
 // 與 functions/src/flows/generate-from-images.ts 中的 OutputSchema 對齊
+import { getIdTokenOrNull } from './firebase-client';
 export interface PirlsQuestion {
   question: string;
   options: string[];
@@ -41,9 +42,13 @@ interface ApiErr {
 type ApiRes<T> = ApiOk<T> | ApiErr;
 
 async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // AI 出題需要 Google 登入：已登入就帶上憑證（其他端點帶了也無妨）
+  const idToken = await getIdTokenOrNull();
+  if (idToken) headers.Authorization = `Bearer ${idToken}`;
   const res = await fetch(`${API_BASE}/${endpoint}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const json: ApiRes<T> = await res.json().catch(() => ({

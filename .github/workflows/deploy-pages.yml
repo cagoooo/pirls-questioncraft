@@ -41,6 +41,11 @@ jobs:
           NEXT_PUBLIC_API_BASE: https://asia-east1-pirls-questioncraft.cloudfunctions.net
           # B.4: Cloudflare Turnstile site key (public，可入 git)
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 0x4AAAAAADIPhhdOK3_0FrkR
+          # 2026-11-15：AI 出題需 Google 登入（Firebase Auth 設定由 Secrets 注入）
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
         run: npm run build
 
       - name: Disable Jekyll on GitHub Pages

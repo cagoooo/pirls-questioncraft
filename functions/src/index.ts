@@ -18,10 +18,11 @@ import type { Response } from 'express';
 import { runGenerateFromImages } from './flows/generate-from-images';
 import { runGenerateFromText } from './flows/generate-from-text';
 import { runRewriteForGrade, isGradeId, gradeInfo } from './flows/rewrite-for-grade';
-import { checkRateLimit, getClientIp } from './rate-limit';
+import { checkRateLimit, checkDailyUserLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
 import { trackUsage, getRecentUsage } from './usage-tracker';
+import { getAuth } from 'firebase-admin/auth';
 import { runWeeklyDigest } from './weekly-digest';
 import {
   buildSubmissionNotifyFields,
@@ -133,10 +134,61 @@ function withCors(handler: (req: Request, res: Response) => Promise<void> | void
     });
 }
 
+/** 已登入的 Google 使用者（AI 出題端點會掛在 req.pirlsUser） */
+type PirlsUser = { uid: string; name: string; email: string };
+const LOGIN_REQUIRED_MESSAGE = '請先用 Google 帳號登入才能出題';
+
+/** 驗證 Authorization: Bearer <Firebase ID Token>；沒帶、無效或非 Google 登入回 null */
+async function verifyGoogleUser(req: Request): Promise<{ user: PirlsUser | null; reason: string }> {
+  const m = (req.get('Authorization') || '').match(/^Bearer (.+)$/);
+  if (!m) return { user: null, reason: '未帶登入憑證' };
+  try {
+    const d = await getAuth().verifyIdToken(m[1]);
+    if (d.firebase?.sign_in_provider !== 'google.com') return { user: null, reason: '不是 Google 登入' };
+    return {
+      user: { uid: d.uid, name: String(d.name || d.email || d.uid), email: String(d.email || '') },
+      reason: '',
+    };
+  } catch {
+    return { user: null, reason: '登入憑證無效或過期' };
+  }
+}
+
+// 未登入被擋的通知：同一 IP 每 5 分鐘最多 1 則，避免被狂打時洗版
+const blockedNotifyAt = new Map<string, number>();
+function notifyLoginBlocked(ip: string, endpoint: string, reason: string): void {
+  const now = Date.now();
+  if (now - (blockedNotifyAt.get(ip) ?? 0) < 5 * 60_000) return;
+  blockedNotifyAt.set(ip, now);
+  if (blockedNotifyAt.size > 500) blockedNotifyAt.clear();
+  notifyAdminCard({
+    status: 'warning',
+    title: '未登入的出題請求被擋下',
+    appName: APP_NAME,
+    fields: [
+      { icon: '🚪', label: '端點', value: endpoint },
+      { icon: '📌', label: '原因', value: reason },
+      { icon: '🌍', label: '來源', value: ip },
+    ],
+    footerNote: '已在呼叫 Gemini 前擋下（同一來源 5 分鐘內只通知一次）',
+  });
+}
+
 /** 加速率限制 + Turnstile 驗證的中介層，包在 AI 出題類 endpoint 上 */
 function withProtection(
   handler: (req: Request, res: Response) => Promise<void> | void,
-  opts: { perMinute?: number; limit?: number; windowMs?: number; windowLabel?: string; needTurnstile?: boolean } = {}
+  opts: {
+    perMinute?: number;
+    limit?: number;
+    windowMs?: number;
+    windowLabel?: string;
+    needTurnstile?: boolean;
+    /** 必須 Google 登入（2026-11-15 起 AI 出題需要） */
+    requireGoogleLogin?: boolean;
+    /** 每位登入使用者每天最多幾次（台北午夜重置）；設定後取代 IP 限流 */
+    dailyUserLimit?: number;
+    endpointName?: string;
+  } = {}
 ) {
   const {
     perMinute,
@@ -144,18 +196,37 @@ function withProtection(
     windowMs = 60_000,
     windowLabel = windowMs === ONE_HOUR_MS ? '小時' : '分鐘',
     needTurnstile = true,
+    requireGoogleLogin = false,
+    dailyUserLimit,
+    endpointName = 'AI 出題',
   } = opts;
   return withCors(async (req, res) => {
     const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(ip, { limit, windowMs });
-    if (!rateLimit.allowed) {
-      res.status(429).json({
-        success: false,
-        error: `為了保護共用的 Gemini API 額度，題組生成目前限制每個使用者每${windowLabel}最多 ${limit} 次。請稍候再試，並把生成次數留給實際備課或教學使用。`,
-        resetAt: rateLimit.resetAt,
-      });
-      return;
+
+    // 1) Google 登入
+    let user: PirlsUser | null = null;
+    if (requireGoogleLogin) {
+      const verified = await verifyGoogleUser(req);
+      if (!verified.user) {
+        notifyLoginBlocked(ip, endpointName, verified.reason);
+        res.status(401).json({ success: false, error: LOGIN_REQUIRED_MESSAGE, code: 'auth/google-login-required' });
+        return;
+      }
+      user = verified.user;
+      (req as any).pirlsUser = user;
+    } else {
+      const rateLimit = await checkRateLimit(ip, { limit, windowMs });
+      if (!rateLimit.allowed) {
+        res.status(429).json({
+          success: false,
+          error: `為了保護共用的 Gemini API 額度，題組生成目前限制每個使用者每${windowLabel}最多 ${limit} 次。請稍候再試，並把生成次數留給實際備課或教學使用。`,
+          resetAt: rateLimit.resetAt,
+        });
+        return;
+      }
     }
+
+    // 2) Turnstile 人機驗證（保留）
     if (needTurnstile) {
       const verify = await verifyTurnstile(req, process.env.TURNSTILE_SECRET, ip);
       if (!verify.ok) {
@@ -163,8 +234,33 @@ function withProtection(
         return;
       }
     }
+
+    // 3) 每位登入使用者每天的次數（通過人機驗證才計次）
+    if (user && dailyUserLimit) {
+      const daily = await checkDailyUserLimit(user.uid, dailyUserLimit);
+      if (!daily.allowed) {
+        res.status(429).json({
+          success: false,
+          error: `為了保護共用的 Gemini API 額度，每位老師每天最多可生成 ${dailyUserLimit} 次，明天（台北時間午夜後）就能再使用。`,
+          resetAt: daily.resetAt,
+        });
+        return;
+      }
+      (req as any).pirlsRemaining = daily.remaining;
+    }
+
     await handler(req, res);
   });
+}
+
+/** 通知卡上的使用者欄位 */
+function userField(req: Request) {
+  const u = (req as any).pirlsUser as PirlsUser | undefined;
+  const remaining = (req as any).pirlsRemaining as number | undefined;
+  return [
+    { icon: '👤', label: '使用者', value: u ? `${u.name}${u.email ? `（${u.email}）` : ''}` : '未登入' },
+    ...(typeof remaining === 'number' ? [{ icon: '🔢', label: '今日剩餘', value: `${remaining} 次` }] : []),
+  ];
 }
 
 /** 取要監看的 secrets（給 onRequest 的 secrets 陣列用） */
@@ -218,6 +314,7 @@ export const generateFromImages = onRequest(
           title: '有人剛完成圖片出題',
           appName: APP_NAME,
           fields: [
+            ...userField(req),
             { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張（${estKB} KB）` },
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '文章', value: `${result.articleContent.length} 字` },
@@ -242,6 +339,7 @@ export const generateFromImages = onRequest(
           title: '圖片出題失敗',
           appName: APP_NAME,
           fields: [
+            ...userField(req),
             { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張` },
             { icon: '🌍', label: '來源', value: ip },
             { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
@@ -251,7 +349,7 @@ export const generateFromImages = onRequest(
         throw e;
       }
     },
-    { limit: 5, windowMs: ONE_HOUR_MS }
+    { requireGoogleLogin: true, dailyUserLimit: 5, endpointName: '圖片出題' }
   )
 );
 
@@ -285,6 +383,7 @@ export const generateFromText = onRequest(
           title: '有人剛完成文字出題',
           appName: APP_NAME,
           fields: [
+            ...userField(req),
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '字數', value: grade ? `${text.length} → ${article.length}` : `${text.length}` },
             { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
@@ -308,6 +407,7 @@ export const generateFromText = onRequest(
           title: '文字出題失敗',
           appName: APP_NAME,
           fields: [
+            ...userField(req),
             { icon: '📏', label: '字數', value: `${text.length}` },
             { icon: '🌍', label: '來源', value: ip },
             { icon: '💬', label: '錯誤', value: (e?.message ?? String(e)).slice(0, 250) },
@@ -317,7 +417,7 @@ export const generateFromText = onRequest(
         throw e;
       }
     },
-    { limit: 5, windowMs: ONE_HOUR_MS }
+    { requireGoogleLogin: true, dailyUserLimit: 5, endpointName: '文字出題' }
   )
 );
 

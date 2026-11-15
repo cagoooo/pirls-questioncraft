@@ -82,6 +82,49 @@ export async function checkRateLimit(
   }
 }
 
+/** 台北時間的日期字串（YYYY-MM-DD），每日額度以台北午夜換日 */
+function taipeiDay(now = Date.now()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(now));
+}
+
+/** 台北時間下一個午夜的 epoch ms（給前端顯示何時重置） */
+function nextTaipeiMidnight(now = Date.now()): number {
+  const offset = 8 * 60 * 60 * 1000;
+  const local = now + offset;
+  return Math.floor(local / 86_400_000) * 86_400_000 + 86_400_000 - offset;
+}
+
+/**
+ * 每位登入使用者（Firebase uid）每天最多 limit 次，台北時間午夜重置。
+ * 與 IP 限流共用 rateLimits collection；失敗時 fail-open。
+ */
+export async function checkDailyUserLimit(uid: string, limit: number): Promise<RateLimitResult> {
+  const day = taipeiDay();
+  const resetAt = nextTaipeiMidnight();
+  const db = getFirestore();
+  const ref = db.collection(COLLECTION).doc(`user_${uid.replace(/[^\w-]/g, '_').slice(0, 128)}_${day}`);
+  try {
+    return await db.runTransaction(async (tx: Transaction) => {
+      const snap = await tx.get(ref);
+      const current = (snap.exists && (snap.data() as any)?.count) || 0;
+      if (current >= limit) {
+        return { allowed: false, remaining: 0, resetAt, reason: `Daily limit exceeded: ${limit}/day` };
+      }
+      tx.set(
+        ref,
+        { count: current + 1, uid, day, expiresAt: Timestamp.fromMillis(resetAt + 24 * 60 * 60 * 1000) },
+        { merge: true }
+      );
+      return { allowed: true, remaining: limit - current - 1, resetAt };
+    });
+  } catch (e) {
+    console.error('daily user limit check failed, fail-open:', e);
+    return { allowed: true, remaining: limit, resetAt };
+  }
+}
+
 function sanitizeIp(ip: string): string {
   // Firestore doc id 不能含 /，且不可超過 1500 bytes
   return ip.replace(/[^\w.:-]/g, '_').slice(0, 64);
