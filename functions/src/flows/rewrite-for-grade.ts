@@ -33,6 +33,8 @@ const ImagesInputSchema = z.object({ photoDataUris: z.array(z.string()) });
 const textRewritePrompt = ai.definePrompt({
   name: 'rewriteTextForGradePrompt',
   model: 'googleai/gemini-2.5-flash',
+  // 2026-11-15 省錢：關閉思考（思考字詞按輸出價計費），出題品質由提示詞與結構化輸出把關
+  config: { thinkingConfig: { thinkingBudget: 0 } },
   input: { schema: TextInputSchema },
   output: { schema: RewriteOutputSchema },
   prompt: `# 📥 原始文章
@@ -66,6 +68,8 @@ const textRewritePrompt = ai.definePrompt({
 const imagesRewritePrompt = ai.definePrompt({
   name: 'rewriteImagesForGradePrompt',
   model: 'googleai/gemini-2.5-flash',
+  // 2026-11-15 省錢：關閉思考（思考字詞按輸出價計費），出題品質由提示詞與結構化輸出把關
+  config: { thinkingConfig: { thinkingBudget: 0 } },
   input: { schema: ImagesInputSchema },
   output: { schema: RewriteOutputSchema },
   prompt: `# 📥 原始文章圖片

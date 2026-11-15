@@ -36,6 +36,8 @@ const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsFromImagesPrompt',
   // B.15 升級：lite → flash，OCR 與指令遵守度顯著提升、仍在免費層內
   model: 'googleai/gemini-2.5-flash',
+  // 2026-11-15 省錢：關閉思考（思考字詞按輸出價計費），出題品質由提示詞與結構化輸出把關
+  config: { thinkingConfig: { thinkingBudget: 0 } },
   input: { schema: InputSchema },
   output: { schema: OutputSchema },
   prompt: `# 📥 給你的圖片（你唯一可以使用的內容來源）
