@@ -176,7 +176,8 @@ with sync_playwright() as p:
     watch(opts)
     opts.wait_for_selector("#keyStatus")
     check("設定頁提示尚未設定金鑰", "還沒設定金鑰" in opts.inner_text("#keyStatus"))
-    check("設定頁頁尾署名連結正確", "content_id=11" in opts.get_attribute(".site-credit__author", "href"))
+    check("設定頁頁尾署名連結到教育科技創新專區", opts.get_attribute(".site-credit__author", "href") == "https://cagoooo.github.io/Akai/")
+    check("設定頁頁尾有教育科技創新專區宣傳卡", opts.get_attribute(".akai-promo", "href") == "https://cagoooo.github.io/Akai/")
     check("冊次預設學期", "115上" in opts.inner_text("#catPreview"), opts.inner_text("#catPreview"))
 
     # 2. 真的打 Google：無效金鑰要顯示中文錯誤

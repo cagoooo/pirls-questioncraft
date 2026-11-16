@@ -107,6 +107,15 @@ input:disabled, textarea:disabled { background: var(--cream-deep); color: var(--
 .footer-points small { display: block; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.5; }
 .footer-links { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .footer-links a { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--ink-soft); }
+.footer-promo { padding-bottom: 22px; }
+.akai-promo { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1.5px solid var(--ink); border-radius: 16px; background: #fff; box-shadow: 0 4px 0 var(--ink); color: var(--ink); text-decoration: none; transition: transform .15s, box-shadow .15s; }
+.akai-promo:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
+.akai-promo:focus-visible { outline: 3px solid var(--sky-deep); outline-offset: 3px; }
+.ap-icon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; background: var(--lemon); border: 1.5px solid var(--ink); font-size: 22px; }
+.ap-text { flex: 1; min-width: 0; }
+.ap-text strong { display: block; font-size: var(--fs-md); }
+.ap-text small { display: block; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.5; }
+.ap-go { flex: none; font-weight: 800; font-size: var(--fs-sm); padding: 6px 14px; border-radius: 999px; background: var(--coral); border: 1.5px solid var(--ink); }
 .footer-bottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid rgba(61,46,30,.18); padding-top: 14px; padding-bottom: 18px; }
 .site-credit { margin: 0; font-size: var(--fs-sm); color: var(--ink-soft); }
 .site-credit__heart { display: inline-block; margin: 0 2px; filter: saturate(1.1); }
@@ -124,6 +133,8 @@ input:disabled, textarea:disabled { background: var(--cream-deep); color: var(--
   .footer-links { flex-direction: row; flex-wrap: wrap; }
   .footer-links a { border: 1.5px solid var(--ink); border-radius: 999px; padding: 6px 12px; background: #fff; }
   .footer-bottom { flex-direction: column; text-align: center; }
+  .akai-promo { flex-wrap: wrap; }
+  .ap-go { width: 100%; text-align: center; }
   .footer-dot { display: none; }
   .footer-school { display: block; }
 }
