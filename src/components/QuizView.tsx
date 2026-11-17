@@ -26,6 +26,17 @@ import type { Toast } from '@/hooks/use-toast';
 import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
 import { submitQuizAnswer } from '@/lib/api';
 import type { StudentInfo } from '@/app/quiz/page';
+import { QuizEndScreen } from '@/components/QuizEndScreen';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 
 type PirlsQuestion = GeneratePirlsQuestionsOutput['questions'][0];
@@ -40,6 +51,8 @@ interface QuizViewProps {
   /** B.16: 從共享連結進入時帶 quizId，交卷會寫進 submissions/{quizId}/students */
   quizId?: string;
   onExitQuiz: () => void;
+  /** 學生作答頁：按「退出測驗」先確認，再顯示結束畫面與題目回饋總結（老師預覽不開，維持直接離開） */
+  endScreen?: boolean;
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
   updateFileGenerationProgress: ProgressCallback;
@@ -65,7 +78,7 @@ interface QuizResultItem {
   pirlsLevel: PirlsQuestion['pirlsLevel'];
 }
 
-type QuizState = 'answering' | 'results';
+type QuizState = 'answering' | 'results' | 'ended';
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 4;
@@ -79,6 +92,7 @@ export function QuizView({
   studentInfo,
   quizId,
   onExitQuiz,
+  endScreen = false,
   toast,
   showFileGenerationProgress,
   updateFileGenerationProgress,
@@ -95,6 +109,9 @@ export function QuizView({
   const quizResultsTopRef = useRef<HTMLDivElement>(null);
   const [isSharingPdfInternal, setIsSharingPdfInternal] = useState(false);
   const [isCurrentQuestionAnswered, setIsCurrentQuestionAnswered] = useState(false);
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
+  const [endedEarly, setEndedEarly] = useState(false);
+  const [wasSubmitted, setWasSubmitted] = useState(false);
 
 
   // State for quiz image dialog
@@ -267,7 +284,7 @@ export function QuizView({
     }
   };
 
-  const processAndSetResults = () => {
+  const processAndSetResults = (nextState: QuizState = 'results') => {
     const results: QuizResultItem[] = questionsOutput.questions.map((q, idx) => {
       const userAnswerIndex = selectedAnswers[idx];
       return {
@@ -281,10 +298,13 @@ export function QuizView({
       };
     });
     setQuizResults(results);
-    setQuizState('results');
+    setQuizState(nextState);
 
     // B.16: 從共享連結進入且有 studentInfo → 寫一筆 submission，best-effort（失敗不擋學生看結果）
-    if (quizId && studentInfo) {
+    // 提早結束、一題都沒答時不送，避免老師儀表板多一筆 0 分紀錄
+    const answeredCount = selectedAnswers.filter(a => a !== null).length;
+    if (quizId && studentInfo && answeredCount > 0) {
+      setWasSubmitted(true);
       const correctCount = results.filter(r => r.isCorrect).length;
       const totalCount = results.length;
       const pirlsLevelStats: Record<string, { correct: number; total: number }> = {};
@@ -319,7 +339,36 @@ export function QuizView({
     setQuizResults(null);
     setQuizState('answering');
     setIsCurrentQuestionAnswered(false);
+    setEndedEarly(false);
+    setWasSubmitted(false);
   };
+
+  // 作答中按「退出測驗」：學生頁先跳確認視窗；老師預覽維持直接離開
+  const handleExitWhileAnswering = () => {
+    if (endScreen) setIsExitConfirmOpen(true);
+    else onExitQuiz();
+  };
+
+  const confirmEarlyExit = () => {
+    setIsExitConfirmOpen(false);
+    setEndedEarly(true);
+    processAndSetResults('ended');
+  };
+
+  // 看完結果按「退出測驗」：作答已送出，直接進結束畫面
+  const handleExitFromResults = () => {
+    if (endScreen) setQuizState('ended');
+    else onExitQuiz();
+  };
+
+  // 進入結束畫面時回到頁面最上方，讓學生先看到「測驗已結束」
+  useEffect(() => {
+    if (quizState === 'ended') {
+      onExitQuiz();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizState]);
 
   const handleShareResultsPdf = async () => {
     if (!quizResults) {
@@ -367,6 +416,22 @@ export function QuizView({
     return "";
   };
 
+
+  if (quizState === 'ended' && quizResults) {
+    return (
+      <QuizEndScreen
+        results={quizResults}
+        levels={pirlsLevelDetails}
+        studentInfo={studentInfo}
+        quizTitle={questionsOutput.title}
+        endedEarly={endedEarly}
+        submitted={wasSubmitted}
+        onRestart={handleRestartQuiz}
+        onDownloadPdf={handleShareResultsPdf}
+        isPdfBusy={isSharingPdfInternal || isGeneratingQuizResultsPdf}
+      />
+    );
+  }
 
   if (quizState === 'results' && quizResults) {
     const totalQuestions = quizResults.length;
@@ -423,7 +488,7 @@ export function QuizView({
               <RotateCcw className="mr-2 h-4 w-4" />
               重新測驗
             </Button>
-            <Button variant="ghost" onClick={onExitQuiz} disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}>
+            <Button variant="ghost" onClick={handleExitFromResults} disabled={isSharingPdfInternal || isGeneratingQuizResultsPdf}>
               <LogOut className="mr-2 h-4 w-4" />
               退出測驗
             </Button>
@@ -562,7 +627,7 @@ export function QuizView({
               <BookOpen className="h-6 w-6 mr-2 text-primary" />
               <CardTitle>PIRLS 線上測驗</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" onClick={onExitQuiz} className="ml-auto">
+            <Button variant="ghost" size="sm" onClick={handleExitWhileAnswering} className="ml-auto">
               <LogOut className="mr-2 h-4 w-4" />
               退出測驗
             </Button>
@@ -767,6 +832,33 @@ export function QuizView({
                 </Button>
             </div>
         </DialogContent>
+
+        <AlertDialog open={isExitConfirmOpen} onOpenChange={setIsExitConfirmOpen}>
+          <AlertDialogContent className="border-neo rounded-[20px] shadow-neo-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-extrabold">🏁 確定要結束測驗嗎？</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-base text-ink">
+                  <p>
+                    你已經作答 <b>{selectedAnswers.filter(a => a !== null).length}</b> / {questionsOutput.questions.length} 題。
+                  </p>
+                  {selectedAnswers.filter(a => a !== null).length < questionsOutput.questions.length && (
+                    <p>
+                      還有 <b>{questionsOutput.questions.length - selectedAnswers.filter(a => a !== null).length}</b> 題沒作答，結束後就不能再回來作答，沒作答的題目會算答錯。
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-sm">結束後會看到你的成績和每一題的回饋。</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel className="border-neo rounded-full">繼續作答</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmEarlyExit} className="border-neo rounded-full bg-coral hover:bg-coral text-white">
+                結束測驗，看回饋
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Dialog>
     );
   }

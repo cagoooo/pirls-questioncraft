@@ -319,9 +319,8 @@ function SharedQuizPageInner() {
             inputText={quizData.inputText}
             studentInfo={studentInfo}
             quizId={quizId}
-            onExitQuiz={() => {
-              toast({ title: '測驗已結束', description: '感謝您的參與！您可以關閉此頁面。' });
-            }}
+            onExitQuiz={() => { /* 結束畫面由 QuizView 自己顯示 */ }}
+            endScreen
             toast={toast}
             showFileGenerationProgress={handleShowQuizResultsPdfProgress}
             updateFileGenerationProgress={handleUpdateQuizResultsPdfProgress}
