@@ -1,5 +1,5 @@
 import { getSettings, getShots } from '../lib/store.js';
-import { checkUpdate } from '../lib/update.js';
+import { checkUpdate, INSTALL_URL } from '../lib/update.js';
 import { parseYouTubeId } from '../lib/youtube.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,7 +16,12 @@ const $ = (id) => document.getElementById(id);
   }
   const info = await checkUpdate(); // 商店安裝會自動更新，不提醒
   if (info) {
-    $('upd').innerHTML = `🆕 有新版本 v${info.version}，<a href="${info.install}#update" target="_blank" rel="noopener noreferrer">看更新方法</a>`;
+    const a = document.createElement('a');
+    a.href = `${INSTALL_URL}#update`;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = '看更新方法';
+    $('upd').replaceChildren(`🆕 有新版本 v${info.version}，`, a);
     $('upd').classList.remove('hidden');
   }
 })();

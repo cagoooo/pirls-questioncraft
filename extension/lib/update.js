@@ -3,6 +3,7 @@
 // 手動安裝版讀網站上的 version.json（GitHub Pages 允許跨網站讀取，不需要額外權限），最多 12 小時查一次。
 export const VERSION_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/version.json';
 export const INSTALL_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/';
+export const DOWNLOAD_URL = 'https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip';
 export const STORE_ID = 'cfbehdinangicblpbnockoofeccmoidp';
 export const STORE_URL = `https://chromewebstore.google.com/detail/${STORE_ID}`;
 const EVERY_MS = 12 * 60 * 60 * 1000;
@@ -38,5 +39,9 @@ export async function checkUpdate({ force = false } = {}) {
       }
     } catch { /* 沒網路就算了 */ }
   }
-  return info?.version && isNewer(info.version, current) ? { ...info, current } : null;
+  // 只取「版本號」與「純文字更新說明」兩樣資料；連結一律用程式裡寫死的網址，網站上的內容不會被當成畫面或程式碼使用
+  const version = String(info?.version ?? '');
+  if (!/^\d+(\.\d+){0,3}$/.test(version) || !isNewer(version, current)) return null;
+  const notes = Array.isArray(info.notes) ? info.notes.filter((n) => typeof n === 'string').slice(0, 5) : [];
+  return { version, current, notes };
 }

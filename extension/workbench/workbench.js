@@ -2,7 +2,7 @@ import { getSettings, saveSettings, getShots, setShots, currentTerm, KEYS, logEr
 import { generateQuestions, upgradeDefaultModel } from '../lib/gemini.js';
 import { PIRLS_LEVELS, LEVEL_LABEL, GRADE_LEVELS, gradeOf } from '../lib/prompt.js';
 import { renderFooter } from '../ui/footer.js';
-import { checkUpdate, STORE_URL } from '../lib/update.js';
+import { checkUpdate, STORE_URL, INSTALL_URL, DOWNLOAD_URL } from '../lib/update.js';
 import { parseYouTubeId, startFromUrl, checkRange, formatTime, rangeLabel, thumbUrl, videoArticle, plainLinks, fetchVideoInfo, fetchThumbnail } from '../lib/youtube.js';
 
 const $ = (id) => document.getElementById(id);
@@ -51,11 +51,24 @@ async function renderUpdate() {
   const info = await checkUpdate();
   if (!info) return;
   const el = $('updateBanner');
-  el.innerHTML = `🆕 <b>有新版本 v${escapeHtml(info.version)}</b>（你現在是手動安裝的 v${escapeHtml(info.current)}）`
-    + (info.notes?.length ? `：${info.notes.map(escapeHtml).join('；')}` : '')
-    + `　<a href="${escapeHtml(info.download)}" target="_blank" rel="noopener noreferrer">⬇️ 下載新版</a>`
-    + `　<a href="${escapeHtml(info.install)}#update" target="_blank" rel="noopener noreferrer">怎麼更新？</a>`
-    + `　<a href="${STORE_URL}" target="_blank" rel="noopener noreferrer">改從 Chrome 商店安裝，之後自動更新</a>`;
+  // 全部用純文字組畫面，連結用程式裡固定的網址（商店規定：不能把網路上讀到的內容當 HTML 放進畫面）
+  const link = (href, text) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = text;
+    return a;
+  };
+  const b = document.createElement('b');
+  b.textContent = `有新版本 v${info.version}`;
+  el.replaceChildren(
+    '🆕 ', b, `（你現在是手動安裝的 v${info.current}）`,
+    info.notes.length ? `：${info.notes.join('；')}` : '',
+    '　', link(DOWNLOAD_URL, '⬇️ 下載新版'),
+    '　', link(`${INSTALL_URL}#update`, '怎麼更新？'),
+    '　', link(STORE_URL, '改從 Chrome 商店安裝，之後自動更新'),
+  );
   el.classList.remove('hidden');
 }
 

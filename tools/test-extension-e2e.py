@@ -151,9 +151,9 @@ with sync_playwright() as p:
     ctx.on("page", watch)
     remote = {"version": "9.9.9"}
     ctx.route("https://cagoooo.github.io/pirls-questioncraft/extension/version.json*", lambda r: r.fulfill(json={
-        "version": remote["version"], "notes": ["測試用新功能"], "date": "2026-11-07",
-        "download": "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip",
-        "install": "https://cagoooo.github.io/pirls-questioncraft/extension/"}))
+        "version": remote["version"], "notes": remote.get("notes", ["測試用新功能"]), "date": "2026-11-07",
+        "download": remote.get("download", "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip"),
+        "install": remote.get("install", "https://cagoooo.github.io/pirls-questioncraft/extension/")}))
     ctx.route("https://www.pagamo.org/**", pagamo_route)
     ctx.route("https://www.youtube.com/**", youtube_route)
     ctx.route("https://i.ytimg.com/**", thumb_route)
@@ -730,6 +730,18 @@ with sync_playwright() as p:
     ub = bench.inner_text("#updateBanner")
     check("網站有新版時工作台顯示提醒", "9.9.9" in ub and "下載新版" in ub, ub[:80])
     check("提醒連到安裝說明的更新段落", bench.get_attribute("#updateBanner a:nth-of-type(2)", "href").endswith("/extension/#update"))
+    # 商店審查（Blue Argon）：網站上的內容只能當純文字，不能變成畫面元素；連結一律用程式裡固定的網址
+    remote.update({"notes": ['<img id="pwn" src="x">新功能'], "install": "https://evil.example/", "download": "https://evil.example/x.zip"})
+    bench.evaluate("chrome.storage.local.remove('updateCheck')")
+    bench.reload(); bench.wait_for_selector("#updateBanner:not(.hidden)", timeout=8000)
+    hrefs = bench.eval_on_selector_all("#updateBanner a", "as => as.map(a => a.href)")
+    check("網站版本資料裡的 HTML 只會顯示成文字", bench.query_selector("#pwn") is None and "<img" in bench.inner_text("#updateBanner"))
+    check("更新提醒的連結不受網站資料影響", not any("evil" in h for h in hrefs) and len(hrefs) == 3, str(hrefs))
+    remote["version"] = "9.9.9<b>x</b>"
+    bench.evaluate("chrome.storage.local.remove('updateCheck')")
+    bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(1200)
+    check("版本號格式不對時不顯示提醒", bench.is_hidden("#updateBanner"))
+    for k in ("notes", "install", "download"): remote.pop(k)
     remote["version"] = bench.evaluate("chrome.runtime.getManifest().version")
     bench.evaluate("chrome.storage.local.remove('updateCheck')")
     bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(1200)
