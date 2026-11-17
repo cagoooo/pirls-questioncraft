@@ -185,6 +185,7 @@ export default function PIRLSQuestionCraftPage() {
     setIsSigningIn(true);
     try {
       const u = await signInWithGoogle();
+      if (!u) return; // App 內建瀏覽器：已提醒，視為取消
       setAuthUser(u);
       toast({ title: '登入成功', description: `歡迎，${u.displayName || u.email}！現在可以開始出題了。` });
     } catch (e) {
