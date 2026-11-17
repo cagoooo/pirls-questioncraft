@@ -13,7 +13,7 @@
 //   3. clients.claim() 立刻接管所有開啟的 tab
 //   4. controllerchange 觸發前端 banner → 使用者點「更新」reload
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `pirls-static-${CACHE_VERSION}`;
 const HTML_CACHE = `pirls-html-${CACHE_VERSION}`;
 

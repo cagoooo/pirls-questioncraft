@@ -135,11 +135,14 @@ export function VersionUpdateBanner() {
   if (!latestVersion || dismissed) return null;
 
   const handleUpdate = async () => {
-    // 清掉所有 SW caches → reload（最徹底）
+    // 清掉本工具自己的 SW caches → reload
+    // （同網域 cagoooo.github.io 的其他工具快取不能動，只刪 pirls-static-* / pirls-html-*）
     if ('caches' in window) {
       try {
+        const isOwnCache = (k: string) =>
+          k.startsWith('pirls-static-') || k.startsWith('pirls-html-');
         const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
+        await Promise.all(keys.filter(isOwnCache).map((k) => caches.delete(k)));
       } catch {}
     }
     if ('serviceWorker' in navigator) {
