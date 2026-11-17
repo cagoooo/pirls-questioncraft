@@ -102,3 +102,31 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
 .attach-check { font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .attach-check input { width: 20px; height: 20px; accent-color: var(--ink, #3D2E1E); }
 .attach-row .muted { font-size: var(--fs-sm); }
+
+/* ---------- 出題中：右側進度面板 ---------- */
+.gen-progress { border: 1.5px solid var(--ink); border-radius: 16px; background: var(--cream); padding: 18px 20px; display: grid; gap: 14px; }
+.gp-head { display: flex; gap: 14px; align-items: center; }
+.gp-icon { flex: none; width: 48px; height: 48px; display: grid; place-items: center; font-size: 24px; border-radius: 14px; background: var(--lemon); border: 1.5px solid var(--ink); animation: gp-bob 1.6s ease-in-out infinite; }
+.gp-text { min-width: 0; }
+.gp-text strong { display: block; font-size: var(--fs-md); }
+.gp-text small { display: block; color: var(--ink-soft); font-size: var(--fs-sm); margin-top: 2px; }
+.gp-bar { height: 14px; border-radius: 999px; border: 1.5px solid var(--ink); background: #fff; overflow: hidden; }
+.gp-bar i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .8s ease;
+  background: repeating-linear-gradient(45deg, var(--coral) 0 12px, #efb398 12px 24px); background-size: 34px 34px; animation: gp-stripe 1s linear infinite; }
+.gen-progress.done .gp-bar i { background: var(--sage, #9DC3A0); animation: none; }
+.gp-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gp-steps li { display: flex; gap: 10px; align-items: center; font-size: var(--fs-sm); color: var(--ink-soft); }
+.gp-steps li::before { content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ink-soft); background: #fff; display: grid; place-items: center; font-size: 13px; }
+.gp-steps li.active { color: var(--ink); font-weight: 700; }
+.gp-steps li.active::before { border: 3px solid var(--line); border-top-color: var(--ink); animation: spin .9s linear infinite; }
+.gp-steps li.done { color: var(--ink); }
+.gp-steps li.done::before { content: "✓"; background: var(--lemon); border-color: var(--ink); font-weight: 800; }
+.gp-skel { display: grid; gap: 10px; }
+.gp-skel div { height: 58px; border-radius: 12px; border: 1.5px dashed var(--line); background: linear-gradient(90deg, #fff 0%, var(--cream-deep) 50%, #fff 100%); background-size: 200% 100%; animation: gp-shimmer 1.4s ease-in-out infinite; }
+.gp-skel div:nth-child(2) { animation-delay: .15s; }
+.gp-skel div:nth-child(3) { animation-delay: .3s; }
+.gp-tip { margin: 0; font-size: var(--fs-sm); }
+@keyframes gp-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(-6deg); } }
+@keyframes gp-stripe { to { background-position: 34px 0; } }
+@keyframes gp-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .gp-icon, .gp-bar i, .gp-skel div { animation: none; } .gp-steps li.active::before { animation-duration: 3s; } }

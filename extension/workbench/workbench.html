@@ -102,6 +102,17 @@
       <div class="right">
         <section class="card result" id="resultCard" aria-labelledby="h-res">
           <h2 id="h-res"><span class="step">2</span> 檢查與修改題目</h2>
+          <!-- 出題中：進度條＋步驟＋題目卡骨架（workbench.js 的 progressStart／progressStep／progressEnd） -->
+          <div id="genProgress" class="gen-progress hidden" role="status" aria-live="polite">
+            <div class="gp-head">
+              <span class="gp-icon" aria-hidden="true">✨</span>
+              <div class="gp-text"><strong id="gpLabel">AI 正在閱讀並出題…</strong><small id="gpTime"></small></div>
+            </div>
+            <div class="gp-bar" aria-hidden="true"><i id="gpFill"></i></div>
+            <ol class="gp-steps" id="gpSteps"></ol>
+            <div class="gp-skel" aria-hidden="true"><div></div><div></div><div></div></div>
+            <p class="muted gp-tip">可以先去做別的事，出好的題目會自動出現在這裡。</p>
+          </div>
           <div id="resultEmpty" class="empty">
             <p id="resultEmptyText">出好的文章與題目會出現在這裡，每一個欄位都可以直接修改，改完會自動存起來（關掉分頁也不會不見）。</p>
             <div id="prevBox" class="prev-box hidden">

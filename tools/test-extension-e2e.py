@@ -293,8 +293,18 @@ with sync_playwright() as p:
 
     # 6. 出題（模擬 Gemini）
     n_before = len(calls)
+    # 記錄出題中右側進度面板有沒有出現（模擬的 Gemini 回得很快，用 MutationObserver 抓）
+    bench.evaluate("""() => { window.__gp = { shown: false, steps: '', bar: '' };
+      const box = document.getElementById('genProgress');
+      new MutationObserver(() => { if (!box.classList.contains('hidden')) {
+        window.__gp.shown = true; window.__gp.steps = document.getElementById('gpSteps').textContent;
+        window.__gp.bar = document.getElementById('gpFill').style.width; } })
+        .observe(box, { attributes: true, subtree: true, childList: true }); }""")
     bench.click("#generate")
     bench.wait_for_selector("#questions .q", timeout=20000)
+    gp = bench.evaluate("window.__gp")
+    check("出題時右側出現進度面板與步驟", gp["shown"] and "讀取截圖" in gp["steps"] and "PIRLS 四層次" in gp["steps"], str(gp))
+    check("出好後進度面板收起來、題目出現", bench.evaluate("document.getElementById('genProgress').classList.contains('hidden')"))
     gen = [c for c in calls[n_before:] if ":generateContent" in c["url"]]
     body = json.loads(gen[-1]["body"]) if gen else {}
     parts = body.get("contents", [{}])[0].get("parts", [])

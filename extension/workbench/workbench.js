@@ -432,6 +432,74 @@ function setStatus(kind, html) {
   el.classList.remove('hidden');
 }
 
+// ---------- 出題中：右側進度面板 ----------
+// 進度條依「已經過時間／通常需要的時間」逼近 95%，完成才補到 100%；步驟跟著 gemini.js 回報的真實狀態走。
+const progress = { timer: null, t0: 0, expect: 40, steps: [] };
+const smoothScroll = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+
+function progressStart({ video, grade, usual }) {
+  const g = gradeOf(grade);
+  progress.t0 = Date.now();
+  progress.expect = video ? 120 : grade ? 65 : 40;
+  progress.usual = usual;
+  progress.steps = [
+    { key: 'read', text: video ? '讀取影片網址與片段' : mode === 'image' ? '讀取截圖' : '讀取文章' },
+    ...(g ? [{ key: 'rewrite', text: `改寫成${g.label}讀得懂的版本` }] : []),
+    { key: 'gen', text: video ? '看影片，依 PIRLS 四層次出題' : '依 PIRLS 四層次出題，寫答後講解' },
+    { key: 'check', text: '檢查題目格式與正解' },
+  ];
+  $('resultEmpty').classList.add('hidden');
+  $('resultBody').classList.add('hidden');
+  $('exportCard').classList.add('hidden');
+  const box = $('genProgress');
+  box.classList.remove('hidden', 'done');
+  $('gpFill').style.width = '3%';
+  progressStep('read', 'done');
+  progressStep(g ? 'rewrite' : 'gen', 'active');
+  progressTick();
+  progress.timer = setInterval(progressTick, 1000);
+  // 窄螢幕（上下排）時，結果區在下面：捲過去讓老師看得到進度
+  const r = $('resultCard').getBoundingClientRect();
+  if (r.top > innerHeight * 0.6 || r.bottom < 0) $('resultCard').scrollIntoView({ behavior: smoothScroll(), block: 'start' });
+}
+
+function progressTick() {
+  const sec = (Date.now() - progress.t0) / 1000;
+  const pct = 3 + 92 * (1 - Math.exp(-sec / progress.expect));
+  $('gpFill').style.width = `${pct.toFixed(1)}%`;
+  $('gpTime').textContent = `已經 ${Math.round(sec)} 秒，${progress.usual}`;
+}
+
+function progressStep(key, state) {
+  const idx = progress.steps.findIndex((s) => s.key === key);
+  if (idx < 0) return;
+  progress.steps.forEach((s, i) => {
+    if (i < idx) s.state = 'done';
+    else if (i === idx) s.state = state;
+    else if (state === 'active' || state === 'done') s.state = s.state === 'done' ? 'done' : '';
+  });
+  $('gpSteps').innerHTML = progress.steps.map((s) => `<li class="${s.state || ''}">${escapeHtml(s.text)}</li>`).join('');
+}
+
+function progressLabel(text) {
+  $('gpLabel').textContent = text;
+  if (/改寫/.test(text)) progressStep('rewrite', 'active');
+  else if (/出題/.test(text)) progressStep('gen', 'active');
+}
+
+async function progressEnd(ok) {
+  clearInterval(progress.timer);
+  const box = $('genProgress');
+  if (ok) {
+    progressStep('check', 'done');
+    $('gpLabel').textContent = '✅ 出好了！';
+    $('gpFill').style.width = '100%';
+    box.classList.add('done');
+    await new Promise((r) => setTimeout(r, 600));
+  }
+  box.classList.add('hidden');
+}
+
 function dataUrlToPart(dataUrl) {
   const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
   return { mimeType: m[1], base64: m[2] };
@@ -477,11 +545,17 @@ $('generate').addEventListener('click', async () => {
   const tick = () => setStatus('', `<span class="spinner" aria-hidden="true"></span><span>${label}（已經 ${Math.round((Date.now() - t0) / 1000)} 秒，${usual}）</span>`);
   tick();
   const timer = setInterval(tick, 1000);
+  progressStart({ video, grade, usual });
+  progressLabel(label);
+  let ok = false;
   try {
     const res = await generateQuestions({
       key: settings.apiKey, model: settings.model, images, text, video, questionMode, languageMode, grade,
-      onStatus: (s) => { label = s; tick(); },
+      onStatus: (s) => { label = s; tick(); progressLabel(s); },
     });
+    ok = true;
+    progressStep('check', 'active');
+    await progressEnd(true);
     if (video) {
       // 題組文章＝影片標題＋觀看連結＋重點摘要；標題沿用影片標題，老師比較好認
       if (video.title) res.data.title = video.title;
@@ -507,6 +581,7 @@ $('generate').addEventListener('click', async () => {
     $('resultCard').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   } catch (e) {
     logError('出題', e);
+    if (!ok) { await progressEnd(false); renderDraft(); }
     setStatus('error', `❌ ${escapeHtml(e.message)}`);
   } finally {
     clearInterval(timer);

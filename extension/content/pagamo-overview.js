@@ -70,7 +70,7 @@
       found[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
       const ids = found.map((c) => (c.textContent.match(/ID\s*(\d+)/) || [])[1]).filter(Boolean);
       const what = found.length > 1 ? `<b>${found.length}</b> 題` : '題目';
-      show('ok', `🎉 上傳完成！「<b>${title}</b>」的${what}已經在題目總覽（ID ${esc(ids.join('、'))}，已用橘框標出）。<br>點題目右邊的「…」→「查看題目」可以檢查正解與附圖。`);
+      show('ok', `🎉 上傳完成！「<b>${title}</b>」的${what}已經在題目總覽（ID ${esc(ids.join('、'))}，已用橘框標出）。<br>直接點一下橘框裡的題目，右邊會打開「查看題目」，可以檢查正解與附圖。`);
       return;
     }
 
