@@ -12,7 +12,7 @@ const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 const STORE_URL = 'https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp';
 const ZIP = `${base}/extension/pirls-helper-extension.zip`;
 const img = (name: string) => `${base}/extension/img/${name}.webp`;
-const TEACHER_URL = 'https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5';
+const TEACHER_URL = 'https://cagoooo.github.io/Akai/';
 // 這份說明頁最後修改的日期（Asia/Taipei），跟擴充套件的版本更新日期分開
 const GUIDE_UPDATED = '2026-11-10';
 

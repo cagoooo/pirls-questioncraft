@@ -1059,7 +1059,7 @@ export default function PIRLSQuestionCraftPage() {
             <div className="text-[0.875rem] opacity-75 mt-1">
               Made with <span aria-label="愛心">❤️</span> by{' '}
               <a
-                href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
+                href="https://cagoooo.github.io/Akai/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold underline-offset-4 hover:underline"
