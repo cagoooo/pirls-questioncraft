@@ -75,11 +75,11 @@ document.querySelector('button[type=submit]').addEventListener('click', () => {
   }, 800);
 });
 </script></body></html>"""
-pagamo_state = {"logged_in": True, "overview_title": "", "fail": False}
+pagamo_state = {"logged_in": True, "overview_title": "", "old_title": "", "fail": False}
 # 模擬「題目總覽」（2026-11-15 偵察：每題一張 .ant-card，含「ID 數字」與標題）
 def fake_overview():
     cards = "".join(f'<div class="ant-card"><div class="ant-card-body"><div>ID {i}</div><div>{t}</div><span>題組</span></div></div>'
-                    for i, t in [(7790001, pagamo_state["overview_title"]), (7788837, "鑰匙不會分身")] if t)
+                    for i, t in [(7790001, pagamo_state["overview_title"]), (7788837, "鑰匙不會分身"), (7780000, pagamo_state["old_title"])] if t)
     return f"<!doctype html><html><meta charset=utf-8><title>PaGamO</title><body><p>共 2 題</p>{cards}</body></html>"
 def pagamo_route(route):
     url = route.request.url
@@ -662,6 +662,8 @@ with sync_playwright() as p:
     with bench.expect_download() as dl3:
         bench.click("#sendGroup")
     check("送到 PaGamO 會先下載備份", dl3.value.suggested_filename.startswith("PIRLS_PaGamO_題組_"), dl3.value.suggested_filename)
+    # 題目總覽裡已經有一組「同標題的舊題組」（ID 7780000），上傳後只能標到新的那組
+    pagamo_state["old_title"] = dl3.value.suggested_filename[len("PIRLS_PaGamO_題組_"):-len(".xlsx")]
     try:
         pg_pagamo.wait_for_selector(".ant-upload-list-item-name", timeout=15000)
     except Exception:
@@ -691,6 +693,9 @@ with sync_playwright() as p:
     ov = pg_pagamo.evaluate("document.querySelector('[data-pirls-pagamo]').shadowRoot.textContent")
     check("題目總覽顯示上傳完成與題目 ID", "7790001" in ov and "7788837" not in ov, ov[:120])
     check("剛上傳的題組被框起來", "4px" in pg_pagamo.evaluate("document.querySelector('.ant-card').style.outline"))
+    outlined = pg_pagamo.evaluate("[...document.querySelectorAll('.ant-card')].filter(c => c.style.outline).map(c => c.textContent.match(/ID \d+/)[0])")
+    check("同標題的舊題組不會被標到（只標上傳前最新 ID 之後的）", outlined == ["ID 7790001"] and "7780000" not in ov, str(outlined))
+    pagamo_state["old_title"] = ""
     check("找到後清掉追蹤資料", bench.evaluate("chrome.storage.local.get('pagamoWatch').then(r => !r.pagamoWatch)"))
     # 上傳失敗：PaGamO 顯示錯誤就不跳頁
     pg_fail = ctx.new_page()

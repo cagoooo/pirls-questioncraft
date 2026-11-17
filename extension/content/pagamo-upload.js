@@ -53,6 +53,10 @@
     window.__pirlsPagamoBusy = false;
     return;
   }
+  // 上傳前先記下「題目總覽」最新的題目 ID：之後只標 ID 比它大的，同標題重複上傳時才不會標到舊題組。
+  // 在這頁開一個看不見的題目總覽框（PaGamO 允許同網站嵌入：X-Frame-Options SAMEORIGIN）；按下上傳後才讀到的不算數。
+  let clickAt = 0;
+  const baseline = newestQuestionId().then((id) => (clickAt ? null : id)).catch(() => null);
   const manual = `檔案「<b>${esc(p.name)}</b>」已經下載到電腦，可以自己選題型「<b>${esc(p.typeLabel)}</b>」，再把檔案拖進上傳區。`;
 
   try {
@@ -97,6 +101,7 @@
     let timer = null;
     submit.addEventListener('click', () => {
       clicked = true;
+      clickAt = Date.now();
       clearInterval(timer);
       submit.style.outline = '';
       watchResult();
@@ -162,7 +167,8 @@
         show('err', `⚠️ PaGamO 回報檔案有問題，請看頁面上的說明：<br><b>${esc(outcome.text.slice(0, 200))}</b><br>${manual}`);
         return;
       }
-      await chrome.storage.local.set({ pagamoWatch: { matches: p.matches || [], title: p.title || p.name, ts: Date.now(), tries: 0 } });
+      const base = await Promise.race([baseline, sleep(3000).then(() => null)]);
+      await chrome.storage.local.set({ pagamoWatch: { matches: p.matches || [], title: p.title || p.name, baseline: base, ts: Date.now(), tries: 0 } });
       let sec = 3;
       let stay = false;
       const go = () => {
@@ -184,6 +190,32 @@
     show('err', `⚠️ 自動放檔沒有完成：${esc(e.message)}<br>${manual}`);
   } finally {
     window.__pirlsPagamoBusy = false;
+  }
+
+  // 題目總覽最新的題目 ID（每題一張 .ant-card，內含「ID 1234567」，最新的排最前面）；沒有題目回傳 0，讀不到回傳 null
+  function newestQuestionId() {
+    return new Promise((resolve) => {
+      const f = document.createElement('iframe');
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;left:-10000px;top:0;width:1200px;height:900px;border:0;visibility:hidden;pointer-events:none;';
+      const end = Date.now() + 25000;
+      const done = (v) => { clearInterval(t); f.remove(); resolve(v); };
+      const t = setInterval(() => {
+        if (Date.now() > end) return done(null);
+        try {
+          const d = f.contentDocument;
+          const href = d?.location?.href || '';
+          if (/sign_in/.test(href)) return done(null);
+          if (!href.includes('questions/overview')) return;
+          const ids = [...d.querySelectorAll('.ant-card')].map((c) => Number((c.textContent.match(/ID\s*(\d+)/) || [])[1])).filter(Boolean);
+          if (ids.length) return done(Math.max(...ids));
+          if (d.querySelector('.ant-empty')) return done(0);
+        } catch { /* 讀不到就算了，退回只比對標題 */ }
+      }, 400);
+      f.src = OVERVIEW_URL;
+      document.documentElement.appendChild(f);
+    });
   }
 
   function esc(s) {

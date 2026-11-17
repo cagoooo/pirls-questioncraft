@@ -58,7 +58,14 @@
       if (cards.length) break;
       await sleep(400);
     }
-    const found = keys.length ? cards.filter((c) => { const t = c.textContent.replace(/\s+/g, ''); return keys.some((k) => t.includes(k)); }) : [];
+    // 有上傳前記下的最新 ID 時，只看比它新的題目（同一篇文章傳過兩次，才不會標到上次那組）
+    const base = Number.isFinite(w.baseline) ? w.baseline : null;
+    const idOf = (c) => Number((c.textContent.match(/ID\s*(\d+)/) || [])[1]) || 0;
+    const found = keys.length ? cards.filter((c) => {
+      if (base !== null && idOf(c) <= base) return false;
+      const t = c.textContent.replace(/\s+/g, '');
+      return keys.some((k) => t.includes(k));
+    }) : [];
 
     if (found.length) {
       await stop();
