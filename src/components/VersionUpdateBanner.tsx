@@ -2,7 +2,7 @@
 
 // B.18: SW + version.json 自動更新提示
 // 兩個機制並聯：
-//  1. 註冊 sw.js，監聽 'controllerchange' → 立刻 reload（背景偷偷換版）
+//  1. 註冊 sw.js，監聽 'controllerchange' → 換新版時立刻 reload（第一次進站與學生作答頁除外）
 //  2. 每 5 分鐘 fetch version.json 比對，發現新版彈 toast banner 讓使用者主動點
 
 import { useEffect, useState } from 'react';
@@ -45,6 +45,9 @@ export function VersionUpdateBanner() {
     }
 
     let ignored = false;
+    // 開頁時已經有舊版 SW 在管這一頁 → 之後換手才是「換新版」；
+    // 沒有的話是第一次進站，SW 只是第一次接手，不需要重新整理（否則學生剛填的姓名會不見）
+    let hadController = !!navigator.serviceWorker.controller;
 
     navigator.serviceWorker
       .register(SW_URL, { scope: SW_SCOPE })
@@ -73,9 +76,16 @@ export function VersionUpdateBanner() {
       });
 
     // SW 換手時自動 reload（清乾淨拿到新 chunks）
+    // 例外：第一次進站不 reload；學生作答頁（/quiz）也不自動 reload，免得作答到一半全部消失，改由下方「有新版本」提示讓使用者自己按
     let refreshing = false;
     const onControllerChange = () => {
       if (refreshing) return;
+      if (!hadController) {
+        // 第一次接手：記下來，之後同一頁再換手才算換新版
+        hadController = true;
+        return;
+      }
+      if (/\/quiz\/?$/.test(window.location.pathname)) return;
       refreshing = true;
       window.location.reload();
     };
