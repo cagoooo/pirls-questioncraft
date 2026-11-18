@@ -81,6 +81,12 @@ function SortHeader({
   );
 }
 
+/** 沒作答的題數（學生提早結束測驗時才會大於 0） */
+function unansweredOf(s: SubmissionRecord): number {
+  const answered = (s.answers ?? []).filter(a => a != null).length;
+  return Math.max(0, (s.totalCount ?? 0) - answered);
+}
+
 /** 展開列：顯示該位學生的逐題對錯 grid + 個人 PIRLS 層次表現 */
 function ExpandedStudentDetail({
   student, questions,
@@ -121,7 +127,7 @@ function ExpandedStudentDetail({
             逐題對錯（滑鼠移到格子上看題目與答案）：
             <span className="inline-block w-3 h-3 bg-green-500 rounded-sm ml-2 mr-1 align-middle" />答對
             <span className="inline-block w-3 h-3 bg-red-400 rounded-sm ml-2 mr-1 align-middle" />答錯
-            <span className="inline-block w-3 h-3 bg-gray-300 rounded-sm ml-2 mr-1 align-middle" />略過
+            <span className="inline-block w-3 h-3 bg-gray-300 rounded-sm ml-2 mr-1 align-middle" />未作答
           </div>
           <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-10 gap-2">
             {questions.map((q, idx) => {
@@ -173,7 +179,7 @@ function DashboardInner() {
 
   const [sortKey, setSortKey] = useState<SortKey>('submittedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [filterMode, setFilterMode] = useState<'all' | 'attention' | 'top'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'attention' | 'top' | 'early'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -371,6 +377,8 @@ function DashboardInner() {
         const acc = s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0;
         return acc >= 80;
       });
+    } else if (filterMode === 'early') {
+      list = list.filter(s => unansweredOf(s) > 0);
     }
 
     list.sort((a, b) => {
@@ -440,7 +448,7 @@ function DashboardInner() {
   const downloadCSV = () => {
     if (!data) return;
     const rows: string[] = [];
-    rows.push(['班級', '座號', '姓名', '答對', '總題數', '答對率%', '訊息提取', '直接推論', '詮釋整合', '評估批判', '交卷時間']
+    rows.push(['班級', '座號', '姓名', '答對', '總題數', '未作答', '答對率%', '訊息提取', '直接推論', '詮釋整合', '評估批判', '交卷時間']
       .map(csvCell).join(','));
     dedupedSubmissions.forEach(s => {
       const ts = s.submittedAt ? new Date(s.submittedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
@@ -452,7 +460,7 @@ function DashboardInner() {
       };
       rows.push([
         s.studentInfo.class, s.studentInfo.seatNumber, s.studentInfo.name,
-        s.correctCount, s.totalCount, acc,
+        s.correctCount, s.totalCount, unansweredOf(s), acc,
         fmt('locate & retrieve'), fmt('make straightforward inferences'),
         fmt('interpret & integrate'), fmt('evaluate & critique'),
         ts,
@@ -505,6 +513,7 @@ function DashboardInner() {
   const accOf = (s: SubmissionRecord) => (s.totalCount > 0 ? (s.correctCount / s.totalCount) * 100 : 0);
   const attentionCount = dedupedSubmissions.filter(s => accOf(s) < 60).length;
   const topCount = dedupedSubmissions.filter(s => accOf(s) >= 80).length;
+  const earlyCount = dedupedSubmissions.filter(s => unansweredOf(s) > 0).length;
   const showFilter = (mode: 'all' | 'attention' | 'top') => {
     setFilterMode(mode);
     document.getElementById('student-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -699,7 +708,7 @@ function DashboardInner() {
           <Card id="student-table" className={`print-avoid-break scroll-mt-6 min-w-0 ${dashCard}`}>
             <CardHeader>
               <CardTitle className="text-[1.5rem]">學生成績表</CardTitle>
-              <CardDescription className="text-[0.9375rem]">點欄位標題可排序、點學生看逐題對錯；可搜尋或篩選需關注／優秀；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
+              <CardDescription className="text-[0.9375rem]">點欄位標題可排序、點學生看逐題對錯；可搜尋或篩選需關注／優秀／提早結束；右上「匯出 CSV」帶回 Excel 整理</CardDescription>
             </CardHeader>
             <CardContent>
               {/* 篩選工具列 */}
@@ -717,6 +726,9 @@ function DashboardInner() {
                   <button type="button" className={pillBtn(filterMode === 'all')} onClick={() => setFilterMode('all')}>全部</button>
                   <button type="button" className={pillBtn(filterMode === 'attention')} onClick={() => setFilterMode('attention')}>⚠ 需關注（&lt;60%）</button>
                   <button type="button" className={pillBtn(filterMode === 'top')} onClick={() => setFilterMode('top')}>⭐ 優秀（≥80%）</button>
+                  {earlyCount > 0 && (
+                    <button type="button" className={pillBtn(filterMode === 'early')} onClick={() => setFilterMode('early')}>🏁 提早結束（{earlyCount}）</button>
+                  )}
                 </div>
                 <span className="text-[0.9375rem] text-muted-foreground ml-auto">
                   顯示 <span className="font-bold text-foreground">{displayedSubmissions.length}</span> / {dedupedSubmissions.length} 位
@@ -761,7 +773,17 @@ function DashboardInner() {
                             <td className="py-3 px-3">{s.studentInfo.class}</td>
                             <td className="py-3 px-3 tabular-nums">{s.studentInfo.seatNumber}</td>
                             <td className="py-3 px-3 font-bold">{s.studentInfo.name}</td>
-                            <td className="py-3 px-3 text-center tabular-nums">{s.correctCount}/{s.totalCount}</td>
+                            <td className="py-3 px-3 text-center tabular-nums">
+                              {s.correctCount}/{s.totalCount}
+                              {unansweredOf(s) > 0 && (
+                                <span
+                                  className="block mx-auto mt-1 w-fit whitespace-nowrap rounded-full bg-gray-200 text-gray-700 border border-gray-300 px-2 py-0.5 text-xs font-bold"
+                                  title="這位學生提早結束測驗，沒作答的題目算答錯"
+                                >
+                                  🏁 未作答 {unansweredOf(s)} 題
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3 px-3 text-center">
                               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-extrabold tabular-nums ${accColor} ${accBg}`}>
                                 {accIcon && <span aria-hidden>{accIcon}</span>}{acc}%

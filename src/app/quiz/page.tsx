@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { getSharedQuiz } from '@/lib/api';
+import { loadQuizProgress, clearQuizProgress, type SavedQuizProgress } from '@/lib/quizSession';
 
 interface QuizData {
   questionsOutput: GeneratePirlsQuestionsOutput;
@@ -55,6 +56,26 @@ function SharedQuizPageInner() {
   }, []);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // 上次在這台裝置沒寫完的進度（頁面被關掉／重新整理）
+  const [savedProgress, setSavedProgress] = useState<SavedQuizProgress | null>(null);
+  const [resumeProgress, setResumeProgress] = useState<SavedQuizProgress | null>(null);
+  // （載入測驗時一起檢查，見下方 getSharedQuiz；同一次更新，畫面不會先閃一下填資料表單）
+
+  const handleResume = () => {
+    if (!savedProgress) return;
+    setStudentClass(savedProgress.studentInfo.class);
+    setStudentSeatNumber(savedProgress.studentInfo.seatNumber);
+    setStudentName(savedProgress.studentInfo.name);
+    setResumeProgress(savedProgress);
+    setSavedProgress(null);
+    setIsStudentInfoSubmitted(true);
+  };
+
+  const handleDiscardSaved = () => {
+    if (quizId) clearQuizProgress(quizId);
+    setSavedProgress(null);
+  };
+
   const [isGeneratingQuizResultsPdf, setIsGeneratingQuizResultsPdf] = useState(false);
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
   const [fileGenerationMessage, setFileGenerationMessage] = useState('');
@@ -75,6 +96,8 @@ function SharedQuizPageInner() {
       try {
         const data = await getSharedQuiz(quizId);
         if (cancelled) return;
+        const count = data?.questionsOutput?.questions?.length ?? 0;
+        setSavedProgress(count > 0 ? loadQuizProgress(quizId, count) : null);
         setQuizData(data);
       } catch (err: any) {
         if (cancelled) return;
@@ -148,6 +171,61 @@ function SharedQuizPageInner() {
             <Button asChild className="w-full border-neo rounded-full bg-coral text-white shadow-neo-sm hover:shadow-neo">
               <Link href="/">返回首頁</Link>
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (quizData && !isStudentInfoSubmitted && savedProgress) {
+    const total = savedProgress.answers.length;
+    const answered = savedProgress.answers.filter(a => a !== null).length;
+    const s = savedProgress.studentInfo;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="w-14 h-14 mb-4 rounded-2xl bg-cream border-neo flex items-center justify-center p-1.5 shadow-neo-sm">
+          <PirlsLogo className="w-full h-full" />
+        </div>
+        <Card className="w-full max-w-md lg:max-w-xl border-neo shadow-neo-lg rounded-[24px]">
+          <CardHeader className="space-y-3">
+            <div className="mx-auto w-fit rounded-full bg-lemon border-neo px-3 py-1 text-sm font-extrabold shadow-neo-sm">
+              📌 上次還沒寫完
+            </div>
+            <CardTitle className="text-center text-lg sm:text-xl font-extrabold">要接著作答嗎？</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-[14px] bg-cream border-neo px-4 py-3 shadow-neo-sm space-y-1">
+              {quizData.questionsOutput?.title && (
+                <p className="text-sm text-muted-foreground truncate">{quizData.questionsOutput.title}</p>
+              )}
+              <p className="text-lg font-extrabold text-ink">
+                {s.class}　{s.seatNumber} 號　{s.name}
+              </p>
+              <p className="text-base text-ink">
+                已經作答 <b className="tabular-nums">{answered}</b> / {total} 題
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                onClick={handleResume}
+                className="w-full py-3 sm:py-4 text-base sm:text-lg border-neo rounded-full bg-coral hover:bg-coral text-white font-extrabold shadow-neo-sm hover:shadow-neo"
+              >
+                是我，接著作答
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDiscardSaved}
+                className="w-full py-3 text-base border-neo rounded-full font-bold"
+              >
+                不是我，重新開始
+              </Button>
+            </div>
+            <p className="text-center text-[0.8125rem] text-muted-foreground">
+              選「不是我」會清掉上一位同學沒寫完的作答，改填你自己的資料
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -321,6 +399,7 @@ function SharedQuizPageInner() {
             quizId={quizId}
             onExitQuiz={() => { /* 結束畫面由 QuizView 自己顯示 */ }}
             endScreen
+            initialProgress={resumeProgress ?? undefined}
             toast={toast}
             showFileGenerationProgress={handleShowQuizResultsPdfProgress}
             updateFileGenerationProgress={handleUpdateQuizResultsPdfProgress}

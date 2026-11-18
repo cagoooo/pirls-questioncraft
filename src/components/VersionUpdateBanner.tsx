@@ -3,11 +3,12 @@
 // B.18: SW + version.json 自動更新提示
 // 兩個機制並聯：
 //  1. 註冊 sw.js，監聽 'controllerchange' → 換新版時立刻 reload（第一次進站與學生作答頁除外）
-//  2. 每 5 分鐘 fetch version.json 比對，發現新版彈 toast banner 讓使用者主動點
+//  2. 每 5 分鐘 fetch version.json 比對，發現新版彈 toast banner 讓使用者主動點（學生作答中不彈，結束後才出現）
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Sparkles, X } from 'lucide-react';
+import { isQuizAnswering, onQuizAnsweringChange } from '@/lib/quizSession';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 分鐘
 const VERSION_URL =
@@ -25,6 +26,12 @@ export function VersionUpdateBanner() {
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // 學生作答中先不跳提示：按「立即更新」會重新載入頁面，等測驗結束再出現
+  const [quizAnswering, setQuizAnsweringState] = useState(false);
+  useEffect(() => {
+    setQuizAnsweringState(isQuizAnswering());
+    return onQuizAnsweringChange(setQuizAnsweringState);
+  }, []);
 
   // ---- 1. 註冊 Service Worker ----
   useEffect(() => {
@@ -142,7 +149,7 @@ export function VersionUpdateBanner() {
     };
   }, [currentVersion]);
 
-  if (!latestVersion || dismissed) return null;
+  if (!latestVersion || dismissed || quizAnswering) return null;
 
   const handleUpdate = async () => {
     // 清掉本工具自己的 SW caches → reload

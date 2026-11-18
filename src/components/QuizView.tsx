@@ -27,6 +27,7 @@ import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
 import { submitQuizAnswer } from '@/lib/api';
 import type { StudentInfo } from '@/app/quiz/page';
 import { QuizEndScreen } from '@/components/QuizEndScreen';
+import { saveQuizProgress, clearQuizProgress, setQuizAnswering } from '@/lib/quizSession';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,8 @@ interface QuizViewProps {
   onExitQuiz: () => void;
   /** 學生作答頁：按「退出測驗」先確認，再顯示結束畫面與題目回饋總結（老師預覽不開，維持直接離開） */
   endScreen?: boolean;
+  /** 學生作答頁：上次沒寫完、選擇「接著作答」時帶入的進度 */
+  initialProgress?: { answers: (number | null)[]; currentIndex: number };
   toast: typeof Toast;
   showFileGenerationProgress: (show: boolean) => void;
   updateFileGenerationProgress: ProgressCallback;
@@ -93,15 +96,20 @@ export function QuizView({
   quizId,
   onExitQuiz,
   endScreen = false,
+  initialProgress,
   toast,
   showFileGenerationProgress,
   updateFileGenerationProgress,
   isGeneratingQuizResultsPdf
 }: QuizViewProps) {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const questionCount = questionsOutput.questions.length;
+  const resumeOk = !!initialProgress && initialProgress.answers.length === questionCount;
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(() =>
+    resumeOk ? Math.min(Math.max(initialProgress!.currentIndex, 0), questionCount - 1) : 0
+  );
   const [previousQuestionIndex, setPreviousQuestionIndex] = useState<number | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(() =>
-    Array(questionsOutput.questions.length).fill(null)
+    resumeOk ? [...initialProgress!.answers] : Array(questionCount).fill(null)
   );
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [quizState, setQuizState] = useState<QuizState>('answering');
@@ -165,8 +173,22 @@ export function QuizView({
     }
   }, [quizState, quizResults]);
 
+  // 學生作答頁：每答一題、每換一題就把進度存在這台裝置，頁面不小心關掉也能接著作答
   useEffect(() => {
-    if(previousQuestionIndex !== currentQuestionIndex) { 
+    if (!endScreen || !quizId || !studentInfo || quizState !== 'answering') return;
+    if (!selectedAnswers.some(a => a !== null)) return;
+    saveQuizProgress(quizId, { studentInfo, answers: selectedAnswers, currentIndex: currentQuestionIndex });
+  }, [endScreen, quizId, studentInfo, quizState, selectedAnswers, currentQuestionIndex]);
+
+  // 學生作答中 → 不跳「有新版本可用」提示（見 VersionUpdateBanner）
+  useEffect(() => {
+    if (!endScreen) return;
+    setQuizAnswering(quizState === 'answering');
+    return () => setQuizAnswering(false);
+  }, [endScreen, quizState]);
+
+  useEffect(() => {
+    if(previousQuestionIndex !== currentQuestionIndex) {
       setPreviousQuestionIndex(currentQuestionIndex);
       setIsCurrentQuestionAnswered(selectedAnswers[currentQuestionIndex] !== null);
     }
@@ -299,6 +321,8 @@ export function QuizView({
     });
     setQuizResults(results);
     setQuizState(nextState);
+    // 已經交卷／結束：暫存的進度用不到了，清掉，下次開頁不會再問「要接著作答嗎」
+    if (quizId) clearQuizProgress(quizId);
 
     // B.16: 從共享連結進入且有 studentInfo → 寫一筆 submission，best-effort（失敗不擋學生看結果）
     // 提早結束、一題都沒答時不送，避免老師儀表板多一筆 0 分紀錄
