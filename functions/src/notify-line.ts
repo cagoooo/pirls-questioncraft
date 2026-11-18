@@ -127,10 +127,13 @@ function sendGoogleChatNotification(url: string, card: CardSpec): void {
   }).format(new Date());
 
   const statusEmoji = theme.icon;
-  const titleText = `${statusEmoji} ${card.title}`;
-  
+  const appName = card.appName || 'PIRLS閱讀理解生成站 PRO';
+  // 卡片標題：原標題後加「｜平台名」，讓多個系統共用同一個 Chat 空間時一眼分得出來
+  const titleText = `${statusEmoji} ${card.title}｜${appName}`;
+
   // push notification preview text (最外層 text 欄位，解決手機端「傳送了一個附件檔案給你」的痛點)
-  const summaryText = `${titleText} (${card.fields.map(f => `${f.label}: ${f.value}`).join(', ')})`;
+  // 手機推播只看得到這行，所以表情符號後先放【平台名】
+  const summaryText = `${statusEmoji} 【${appName}】${card.title} (${card.fields.map(f => `${f.label}: ${f.value}`).join(', ')})`;
 
   // Build widgets
   const widgets: any[] = card.fields.map(f => ({
@@ -186,7 +189,7 @@ function sendGoogleChatNotification(url: string, card: CardSpec): void {
       card: {
         header: {
           title: titleText,
-          subtitle: card.appName || 'PIRLS閱讀理解生成站 PRO',
+          subtitle: appName,
           imageUrl: imageUrl,
           imageType: 'CIRCLE'
         },
