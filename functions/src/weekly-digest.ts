@@ -127,7 +127,7 @@ export async function runWeeklyDigest(): Promise<WeeklyDigestResult> {
 
   // 4. 組 LINE 卡片
   const card = buildDigestCard(result);
-  notifyAdminCard(card);
+  notifyAdminCard({ ...card, alwaysLine: true }); // 週報每週一則，保留 LINE
 
   return result;
 }

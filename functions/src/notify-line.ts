@@ -28,6 +28,8 @@ export type CardAction = {
 
 export type CardSpec = {
   status: keyof typeof CARD_THEMES;
+  /** 非失敗卡也要推 LINE（例如每週一則的週報）。預設只有 failed 會推 LINE。 */
+  alwaysLine?: boolean;
   title: string;
   appName?: string;
   /** Header 副標：放在 appName 下方（例如週報的日期區間） */
@@ -58,10 +60,11 @@ function isConfigured(token?: string, userId?: string): boolean {
  * 若 token / userId 未設或為 placeholder 自動 no-op。
  */
 export function notifyAdminCard(card: CardSpec): void {
-  // 1) LINE push (Best-effort, only send if configured)
+  // 1) LINE push：2026-11-18 起只推「失敗」卡片。
+  //    所有網站共用同一個 LINE 官方帳號（免費方案每月 200 則），每次使用類通知改只發 Google Chat。
   const token = process.env.PIRLS_LINE_CHANNEL_ACCESS_TOKEN?.trim();
   const userId = process.env.PIRLS_LINE_ADMIN_USER_ID?.trim();
-  if (isConfigured(token, userId)) {
+  if ((card.status === 'failed' || card.alwaysLine) && isConfigured(token, userId)) {
     const flex = buildFlexBubble(card);
     const altText = `${CARD_THEMES[card.status].icon} ${card.title}`;
 
@@ -78,8 +81,12 @@ export function notifyAdminCard(card: CardSpec): void {
     })
       .then(async (res) => {
         if (!res.ok) {
-          // 雷 #9 安全網：Flex 失敗自動 fallback 純文字
+          // 雷 #9 安全網：Flex 失敗自動 fallback 純文字（429 本月額度用完時不再重送）
           const errBody = await res.text().catch(() => '');
+          if (res.status === 429) {
+            logger.warn('[notify-line] LINE 本月推播額度已用完，略過', { body: errBody.slice(0, 120) });
+            return;
+          }
           logger.warn('[notify-line] Flex failed, fallback to text', {
             status: res.status,
             body: errBody.slice(0, 300),
