@@ -48,7 +48,7 @@ interface ApiErr {
 export type ApiError = Error & { status?: number; code?: string; extensionUrl?: string; reviewUrl?: string };
 type ApiRes<T> = ApiOk<T> | ApiErr;
 
-async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
+async function postJSON<T>(endpoint: string, body: unknown, onJson?: (json: any) => void): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   // AI 出題需要 Google 登入：已登入就帶上憑證（其他端點帶了也無妨）
   const idToken = await getIdTokenOrNull();
@@ -72,6 +72,7 @@ async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
     }
     throw err;
   }
+  onJson?.(json);
   return (json.data ?? (json as any)) as T;
 }
 
@@ -116,15 +117,64 @@ export interface GenerateFromTextArgs {
 }
 
 export async function generatePirlsQuestions(
-  args: GenerateFromImagesArgs
+  args: GenerateFromImagesArgs,
+  onQuota?: (q: DailyQuotaMeta) => void
 ): Promise<GeneratePirlsQuestionsOutput> {
-  return postJSON<GeneratePirlsQuestionsOutput>('generateFromImages', args);
+  return postJSON<GeneratePirlsQuestionsOutput>('generateFromImages', args, (j) => pickQuota(j, onQuota));
 }
 
 export async function generatePirlsQuestionsFromText(
-  args: GenerateFromTextArgs
+  args: GenerateFromTextArgs,
+  onQuota?: (q: DailyQuotaMeta) => void
 ): Promise<GeneratePirlsQuestionsOutput> {
-  return postJSON<GeneratePirlsQuestionsOutput>('generateFromText', args);
+  return postJSON<GeneratePirlsQuestionsOutput>('generateFromText', args, (j) => pickQuota(j, onQuota));
+}
+
+// ---- v0.4.1：今天還剩幾次、擴充套件引導點擊 ----
+
+export interface DailyQuotaMeta {
+  dailyRemaining: number;
+  dailyLimit: number;
+}
+
+function pickQuota(json: any, cb?: (q: DailyQuotaMeta) => void) {
+  if (cb && typeof json?.dailyRemaining === 'number' && typeof json?.dailyLimit === 'number') {
+    cb({ dailyRemaining: json.dailyRemaining, dailyLimit: json.dailyLimit });
+  }
+}
+
+export interface MyQuota extends DailyQuotaMeta {
+  /** 開發者本月共用額度池還有沒有 */
+  poolAvailable: boolean;
+}
+
+/** 已登入老師查今天還剩幾次（不扣次數）；查不到回 null，不影響出題 */
+export async function getMyQuota(): Promise<MyQuota | null> {
+  const idToken = await getIdTokenOrNull();
+  if (!idToken) return null;
+  try {
+    const res = await fetch(`${API_BASE}/getMyQuota`, { headers: { Authorization: `Bearer ${idToken}` } });
+    const json = await res.json();
+    if (!res.ok || !json.success) return null;
+    return { dailyRemaining: json.dailyRemaining, dailyLimit: json.dailyLimit, poolAvailable: json.poolAvailable !== false };
+  } catch {
+    return null;
+  }
+}
+
+export type GuideSource = 'daily' | 'pool' | 'last-one' | 'banner' | 'hero';
+export type GuideTarget = 'store' | 'review' | 'install';
+
+/** 記一次引導按鈕點擊（只記次數，不記是誰）；用 sendBeacon，頁面跳走也送得出去 */
+export function trackGuideClick(source: GuideSource, target: GuideTarget): void {
+  try {
+    const url = `${API_BASE}/trackGuideClick`;
+    const body = JSON.stringify({ source, target });
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain' }))) return;
+    void fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true }).catch(() => {});
+  } catch {
+    /* 計數失敗不影響老師 */
+  }
 }
 
 export interface CreateSharedQuizArgs {
@@ -257,6 +307,8 @@ export interface AdminStats {
   pirlsBreakdown: AdminPirlsBreakdown[];
   /** v0.4.0：本月開發者共用額度池（舊後端沒有這欄） */
   quotaPool?: { month: string; spentTwd: number; budgetTwd: number; calls: number; allowed: boolean; resetAt: number };
+  /** v0.4.1：30 天內擴充套件引導點擊（guide-來源-按鈕 → 次數） */
+  guideClicks?: Record<string, number>;
   generatedAt: number;
 }
 

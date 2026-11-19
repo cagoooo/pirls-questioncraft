@@ -58,3 +58,17 @@ test('引導訊息：提到 Chrome 擴充套件、自己的免費金鑰、五星
   assert.match(dailyLimitMessage(3), /今天的 3 次/);
   assert.match(EXTENSION_REVIEW_URL, /^https:\/\/chromewebstore\.google\.com\/detail\/cfbehdinangicblpbnockoofeccmoidp\/reviews$/);
 });
+
+const { guideClickEvent } = require('../lib/guide-click');
+
+test('v0.4.1 引導點擊：只接受白名單內的來源與按鈕', () => {
+  assert.equal(guideClickEvent('daily', 'store'), 'guide-daily-store');
+  assert.equal(guideClickEvent('pool', 'review'), 'guide-pool-review');
+  assert.equal(guideClickEvent('last-one', 'install'), 'guide-last-one-install');
+  assert.equal(guideClickEvent('banner', 'store'), 'guide-banner-store');
+  assert.equal(guideClickEvent('hero', 'install'), 'guide-hero-install');
+  assert.equal(guideClickEvent('daily', 'hack'), null);
+  assert.equal(guideClickEvent('x.y', 'store'), null);
+  assert.equal(guideClickEvent(undefined, undefined), null);
+  assert.equal(guideClickEvent({ toString: () => 'daily' }, 'store'), null);
+});

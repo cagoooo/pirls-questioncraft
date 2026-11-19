@@ -125,6 +125,22 @@ export async function checkDailyUserLimit(uid: string, limit: number): Promise<R
   }
 }
 
+/** 只查不扣：這位使用者今天還剩幾次（給前端顯示「今天還可以出題 N 次」） */
+export async function peekDailyUserLimit(uid: string, limit: number): Promise<{ remaining: number; resetAt: number }> {
+  const resetAt = nextTaipeiMidnight();
+  try {
+    const snap = await getFirestore()
+      .collection(COLLECTION)
+      .doc(`user_${uid.replace(/[^\w-]/g, '_').slice(0, 128)}_${taipeiDay()}`)
+      .get();
+    const used = (snap.exists && (snap.data() as any)?.count) || 0;
+    return { remaining: Math.max(0, limit - used), resetAt };
+  } catch (e) {
+    console.error('peek daily user limit failed:', e);
+    return { remaining: limit, resetAt };
+  }
+}
+
 function sanitizeIp(ip: string): string {
   // Firestore doc id 不能含 /，且不可超過 1500 bytes
   return ip.replace(/[^\w.:-]/g, '_').slice(0, 128);

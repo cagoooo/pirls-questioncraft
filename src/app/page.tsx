@@ -12,11 +12,15 @@ import { QuizView } from '@/components/QuizView';
 import { TurnstileGate } from '@/components/TurnstileGate';
 import { ShareDialog } from '@/components/ShareDialog';
 import { HelpDialog } from '@/components/HelpDialog';
-import { ExtensionGuideCard, quotaGuideKind, type QuotaGuide } from '@/components/ExtensionGuideCard';
+import { ExtensionGuideCard, ExtensionBanner, LastOneHint, localGuideMessage, quotaGuideKind, type QuotaGuide } from '@/components/ExtensionGuideCard';
 import { NeoCard, PillBtn, Star, Squiggle, Spark, PIRLS_LEVEL_META, type PirlsLevel } from '@/components/Neo';
 import {
   generatePirlsQuestions,
   generatePirlsQuestionsFromText,
+  getMyQuota,
+  trackGuideClick,
+  type MyQuota,
+  type DailyQuotaMeta,
   createSharedQuiz,
   rememberTeacherKey,
   buildDashboardUrl,
@@ -180,6 +184,15 @@ export default function PIRLSQuestionCraftPage() {
   useEffect(() => onUserChange((u) => { setAuthUser(u); setAuthReady(true); }), []);
   const isLoggedIn = isGoogleUser(authUser);
 
+  // v0.4.1：登入後查今天還剩幾次（只查不扣），出題成功後由回應更新
+  const [myQuota, setMyQuota] = useState<MyQuota | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn) { setMyQuota(null); return; }
+    let alive = true;
+    void getMyQuota().then((q) => { if (alive) setMyQuota(q); });
+    return () => { alive = false; };
+  }, [isLoggedIn, authUser?.uid]);
+
   const handleGoogleLogin = useCallback(async () => {
     if (!isAuthConfigured()) {
       toast({ title: '登入功能尚未設定', description: '請稍後再試，或聯絡石門國小資訊組。', variant: 'destructive' });
@@ -330,6 +343,11 @@ export default function PIRLSQuestionCraftPage() {
 
     updateDisplayProgress(8, '✨ 準備開始處理...');
     let cancelSimProgress: (() => void) | null = null;
+    let quotaAfter: DailyQuotaMeta | null = null;
+    const onQuota = (q: DailyQuotaMeta) => {
+      quotaAfter = q;
+      setMyQuota((prev) => ({ poolAvailable: prev?.poolAvailable ?? true, ...q }));
+    };
     try {
       let result: GeneratePirlsQuestionsOutput | null = null;
       if (inputMode === 'image') {
@@ -344,7 +362,7 @@ export default function PIRLSQuestionCraftPage() {
         if (photoDataUris.length === 0) throw new Error('無法處理圖片，請確認檔案是否正確。');
         updateDisplayProgress(32, grade ? `🎒 正在辨識文章並改寫成${gradeLabel(grade)}的版本...` : '🚀 正在上傳圖片至 AI 伺服器...');
         cancelSimProgress = simulateProgress(35, updateDisplayProgress, true);
-        result = await generatePirlsQuestions({ photoDataUris, questionMode, languageMode, grade: grade || undefined, turnstileToken });
+        result = await generatePirlsQuestions({ photoDataUris, questionMode, languageMode, grade: grade || undefined, turnstileToken }, onQuota);
         cancelSimProgress();
         cancelSimProgress = null;
         if (result?.articleContent) setInputText(result.articleContent);
@@ -353,7 +371,7 @@ export default function PIRLSQuestionCraftPage() {
         await new Promise((r) => setTimeout(r, 200));
         updateDisplayProgress(30, grade ? `🎒 正在把文章改寫成${gradeLabel(grade)}的版本...` : '🚀 正在傳送至 AI 伺服器...');
         cancelSimProgress = simulateProgress(32, updateDisplayProgress, !!grade);
-        result = await generatePirlsQuestionsFromText({ text: inputText, questionMode, languageMode, grade: grade || undefined, turnstileToken });
+        result = await generatePirlsQuestionsFromText({ text: inputText, questionMode, languageMode, grade: grade || undefined, turnstileToken }, onQuota);
         cancelSimProgress();
         cancelSimProgress = null;
       }
@@ -368,7 +386,13 @@ export default function PIRLSQuestionCraftPage() {
           : { text: inputMode === 'text' ? inputText : result.articleContent, images: inputMode === 'image' ? [...imageFiles] : [] });
         toast({
           title: '成功！',
-          description: 'PIRLS 題目已生成。',
+          description: (() => {
+            const q = quotaAfter as DailyQuotaMeta | null;
+            if (!q) return 'PIRLS 題目已生成。';
+            return q.dailyRemaining > 0
+              ? `PIRLS 題目已生成。今天還可以出題 ${q.dailyRemaining} 次。`
+              : 'PIRLS 題目已生成。今天的共用次數用完了，想再出題可以改用 Chrome 擴充套件。';
+          })(),
           className: 'bg-sage border-sage-deep text-ink',
         });
         setTurnstileResetSignal(s => s + 1);
@@ -383,6 +407,7 @@ export default function PIRLSQuestionCraftPage() {
       const guideKind = quotaGuideKind(err?.code);
       if (guideKind) {
         setQuotaGuide({ kind: guideKind, message: errorMessage, extensionUrl: err.extensionUrl, reviewUrl: err.reviewUrl });
+        setMyQuota((prev) => prev && (guideKind === 'pool' ? { ...prev, poolAvailable: false } : { ...prev, dailyRemaining: 0 }));
         toast({
           title: guideKind === 'pool' ? '本月共用額度用完了' : '今天的共用次數用完了',
           description: '可以改用 Chrome 擴充套件繼續出題，說明在下方。',
@@ -690,6 +715,7 @@ export default function PIRLSQuestionCraftPage() {
             <div className="hidden 2xl:flex items-center absolute inset-y-0 right-12 z-[2] pointer-events-none">
             <Link
               href="/extension/"
+              onClick={() => trackGuideClick('hero', 'install')}
               className="pointer-events-auto flex flex-col gap-3 w-[25rem] bg-card border-neo rounded-[22px] shadow-neo-lg p-6 text-ink no-underline neo-hover-lift"
             >
               <span className="self-start inline-flex items-center gap-1.5 bg-sky border-neo rounded-full px-3 py-1 text-sm font-extrabold">🧩 Chrome 擴充套件・已上架商店</span>
@@ -705,6 +731,9 @@ export default function PIRLSQuestionCraftPage() {
             </div>
           </NeoCard>
         )}
+
+        {/* v0.4.1：筆電寬度（768～1535px）看得到的擴充套件精簡介紹；大螢幕已有右側卡片、手機平板不能裝 */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && <ExtensionBanner className="mt-5" />}
 
         {/* ===== Workflow：Upload + Settings（idle 階段） ===== */}
         {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
@@ -809,6 +838,16 @@ export default function PIRLSQuestionCraftPage() {
                 <p className="text-base leading-6 min-w-0 break-words">
                   ✅ 已登入：<strong>{authUser?.displayName || authUser?.email}</strong>
                   {authUser?.email && authUser?.displayName ? <span className="text-muted-foreground">（{authUser.email}）</span> : null}
+                  {myQuota && (
+                    <span
+                      className={cn(
+                        'ml-2 inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink px-2.5 py-0.5 text-sm font-extrabold align-middle whitespace-nowrap',
+                        myQuota.dailyRemaining > 0 && myQuota.poolAvailable ? 'bg-sage' : 'bg-coral/20'
+                      )}
+                    >
+                      🔢 今天還可以出題 {myQuota.poolAvailable ? myQuota.dailyRemaining : 0} / {myQuota.dailyLimit} 次
+                    </span>
+                  )}
                 </p>
                 <button
                   type="button"
@@ -852,6 +891,21 @@ export default function PIRLSQuestionCraftPage() {
               題組生成會消耗共用的 Gemini API 額度。需用 Google 帳號登入，每位老師每天最多可生成 3 次（台北時間午夜重置），請確認素材與題數後再產生，避免只是測試或連續重複生成。
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* v0.4.1：還沒按出題就先知道今天用完／本月額度用完 → 直接顯示引導卡；剩最後 1 次 → 先輕輕提醒 */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && isLoggedIn && myQuota && !quotaGuide && (
+          (!myQuota.poolAvailable || myQuota.dailyRemaining === 0) ? (
+            <ExtensionGuideCard
+              className="mt-5"
+              guide={{
+                kind: myQuota.poolAvailable ? 'daily' : 'pool',
+                message: localGuideMessage(myQuota.poolAvailable ? 'daily' : 'pool', myQuota.dailyLimit),
+              }}
+            />
+          ) : myQuota.dailyRemaining === 1 ? (
+            <LastOneHint className="mt-5" />
+          ) : null
         )}
 
         {/* ===== CTA：大型珊瑚紅生成按鈕 ===== */}

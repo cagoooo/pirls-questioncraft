@@ -24,7 +24,9 @@ export type UsageEvent =
   | 'generate-text'
   | 'generate-text-failed'
   | 'share-quiz'
-  | 'submit-quiz';
+  | 'submit-quiz'
+  // v0.4.1：擴充套件引導的點擊（來源-按鈕），例如 guide-daily-store
+  | `guide-${string}-${string}`;
 
 const COLLECTION = 'usageStats';
 const TTL_DAYS = 90;

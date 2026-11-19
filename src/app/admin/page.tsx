@@ -281,6 +281,51 @@ export default function AdminPage() {
             </Card>
           )}
 
+          {/* v0.4.1：擴充套件引導點擊（30 天） */}
+          {stats.guideClicks && (() => {
+            const gc = stats.guideClicks!;
+            const rows: [string, string][] = [
+              ['daily', '今天 3 次用完的引導卡'],
+              ['pool', '本月共用額度用完的引導卡'],
+              ['last-one', '剩最後 1 次的提醒'],
+              ['banner', '首頁筆電寬度橫幅'],
+              ['hero', '首頁大螢幕介紹卡'],
+            ];
+            const n = (src: string, t: string) => gc[`guide-${src}-${t}`] ?? 0;
+            const total = Object.values(gc).reduce((a, b) => a + b, 0);
+            return (
+              <Card className="mb-6">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-xs">🧩 擴充套件引導點擊（30 天，只記次數）</CardDescription>
+                  <CardTitle className="text-2xl text-primary">共 {total} 次</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-muted-foreground">
+                        <th className="py-1 pr-3 font-normal">出現位置</th>
+                        <th className="py-1 px-2 font-normal text-right whitespace-nowrap">加到 Chrome</th>
+                        <th className="py-1 px-2 font-normal text-right whitespace-nowrap">五星好評</th>
+                        <th className="py-1 pl-2 font-normal text-right whitespace-nowrap">安裝說明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(([src, label]) => (
+                        <tr key={src} className="border-t">
+                          <td className="py-1.5 pr-3">{label}</td>
+                          <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'store')}</td>
+                          <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'review')}</td>
+                          <td className="py-1.5 pl-2 text-right tabular-nums">{n(src, 'install')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-muted-foreground mt-2">點了按鈕不代表真的安裝或評分；商店的實際安裝數與評分請到 Chrome 開發人員資訊主頁查看。</p>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {/* 30 天每日活動 */}
           <Card className="mb-6">
             <CardHeader>

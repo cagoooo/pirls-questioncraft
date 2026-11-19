@@ -18,13 +18,14 @@ import type { Response } from 'express';
 import { runGenerateFromImages } from './flows/generate-from-images';
 import { runGenerateFromText } from './flows/generate-from-text';
 import { runRewriteForGrade, isGradeId, gradeInfo } from './flows/rewrite-for-grade';
-import { checkRateLimit, checkDailyUserLimit, getClientIp } from './rate-limit';
+import { checkRateLimit, checkDailyUserLimit, peekDailyUserLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
 import { trackUsage, getRecentUsage } from './usage-tracker';
 import { getAuth } from 'firebase-admin/auth';
 import { runWeeklyDigest } from './weekly-digest';
 import { isValidClientSubmissionId, submitRateKey, SUBMIT_PER_MINUTE } from './submission';
+import { guideClickEvent, GUIDE_SOURCES, GUIDE_TARGETS } from './guide-click';
 import {
   getPoolStatus,
   recordPoolUsage,
@@ -152,6 +153,15 @@ function withCors(handler: (req: Request, res: Response) => Promise<void> | void
 /** 已登入的 Google 使用者（AI 出題端點會掛在 req.pirlsUser） */
 type PirlsUser = { uid: string; name: string; email: string };
 const LOGIN_REQUIRED_MESSAGE = '請先用 Google 帳號登入才能出題';
+
+/** 每位老師每天可用 AI 出題次數（台北午夜重置） */
+const DAILY_AI_LIMIT = 3;
+
+/** 出題成功時一併告訴前端今天還剩幾次 */
+function quotaMeta(req: Request) {
+  const remaining = (req as any).pirlsRemaining;
+  return typeof remaining === 'number' ? { dailyRemaining: remaining, dailyLimit: DAILY_AI_LIMIT } : {};
+}
 
 /** 驗證 Authorization: Bearer <Firebase ID Token>；沒帶、無效或非 Google 登入回 null */
 async function verifyGoogleUser(req: Request): Promise<{ user: PirlsUser | null; reason: string }> {
@@ -409,7 +419,7 @@ export const generateFromImages = onRequest(
             ? [{ label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }]
             : undefined,
         });
-        res.json({ success: true, data: result });
+        res.json({ success: true, data: result, ...quotaMeta(req) });
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-images-failed');
@@ -429,7 +439,7 @@ export const generateFromImages = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 3, sharedPool: true, endpointName: '圖片出題' }
+    { requireGoogleLogin: true, dailyUserLimit: DAILY_AI_LIMIT, sharedPool: true, endpointName: '圖片出題' }
   )
 );
 
@@ -482,7 +492,7 @@ export const generateFromText = onRequest(
             ? [{ label: '🔍 預覽出題結果', uri: previewUrl, style: 'primary' }]
             : undefined,
         });
-        res.json({ success: true, data: result });
+        res.json({ success: true, data: result, ...quotaMeta(req) });
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text-failed');
@@ -502,8 +512,62 @@ export const generateFromText = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 3, sharedPool: true, endpointName: '文字出題' }
+    { requireGoogleLogin: true, dailyUserLimit: DAILY_AI_LIMIT, sharedPool: true, endpointName: '文字出題' }
   )
+);
+
+// ---- v0.4.1：老師查自己今天還剩幾次、擴充套件引導點擊計數 ----
+
+export const getMyQuota = onRequest(
+  withCors(async (req, res) => {
+    const ip = getClientIp(req);
+    const limit = await checkRateLimit(`quota-${ip}`, { limit: 60, windowMs: 60_000 });
+    if (!limit.allowed) {
+      res.status(429).json({ success: false, error: '查詢太頻繁，請稍候再試。' });
+      return;
+    }
+    const { user } = await verifyGoogleUser(req);
+    if (!user) {
+      res.status(401).json({ success: false, error: LOGIN_REQUIRED_MESSAGE, code: 'auth/google-login-required' });
+      return;
+    }
+    const [daily, pool] = await Promise.all([peekDailyUserLimit(user.uid, DAILY_AI_LIMIT), getPoolStatus()]);
+    res.json({
+      success: true,
+      dailyLimit: DAILY_AI_LIMIT,
+      dailyRemaining: daily.remaining,
+      resetAt: daily.resetAt,
+      poolAvailable: pool.allowed,
+      poolResetAt: pool.resetAt,
+    });
+  })
+);
+
+export const trackGuideClick = onRequest(
+  withCors(async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ success: false, error: 'Use POST' });
+      return;
+    }
+    const ip = getClientIp(req);
+    const limit = await checkRateLimit(`guide-${ip}`, { limit: 30, windowMs: 60_000 });
+    if (!limit.allowed) {
+      res.status(429).json({ success: false, error: 'too many' });
+      return;
+    }
+    // 前端用 sendBeacon 送純文字（避免跨網域預檢），這裡兩種格式都收
+    let body: any = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+    const event = guideClickEvent(body?.source, body?.target);
+    if (!event) {
+      res.status(400).json({ success: false, error: `source 要是 ${GUIDE_SOURCES.join('/')}，target 要是 ${GUIDE_TARGETS.join('/')}` });
+      return;
+    }
+    trackUsage(event);
+    res.json({ success: true });
+  })
 );
 
 // ---- Shared quiz storage ----
@@ -916,11 +980,20 @@ export const getAdminStats = onRequest(
 
     const quotaPool = await getPoolStatus();
 
+    // v0.4.1：30 天內擴充套件引導的點擊（guide-來源-按鈕）
+    const guideClicks: Record<string, number> = {};
+    for (const day of dailyStats as any[]) {
+      for (const [k, v] of Object.entries(day)) {
+        if (k.startsWith('guide-') && typeof v === 'number') guideClicks[k] = (guideClicks[k] ?? 0) + v;
+      }
+    }
+
     res.json({
       success: true,
       dailyStats,
       totals,
       quotaPool,
+      guideClicks,
       totalSubmissions,
       avgAccuracy,
       pirlsBreakdown,
