@@ -25,12 +25,15 @@ import { trackUsage, getRecentUsage } from './usage-tracker';
 import { getAuth } from 'firebase-admin/auth';
 import { runWeeklyDigest } from './weekly-digest';
 import {
+  buildMilestoneNotifyFields,
   buildSubmissionNotifyFields,
   extractTeacherKey,
   generateTeacherKey,
   hashTeacherKey,
   isTeacherKeyValid,
   stripTeacherSecrets,
+  submissionNotifyKind,
+  SUBMISSION_NOTIFY_EVERY,
 } from './privacy';
 
 initializeApp();
@@ -569,9 +572,17 @@ export const submitQuizAnswer = onRequest(
         });
       trackUsage('submit-quiz');
 
+      // v0.3.8：只在第 1 位與每滿 10 人時通知；其他交卷只數人數（count 查詢，不讀全班資料）
+      const studentsCol = db.collection(COLLECTION).doc(quizId).collection('students');
+      const countSnap = await studentsCol.count().get();
+      const notifyKind = submissionNotifyKind(countSnap.data().count);
+      if (!notifyKind) {
+        res.json({ success: true, submissionId: ref.id });
+        return;
+      }
+
       // 讀取目前所有 submissions 計算班級即時統計
-      const allSubsSnap = await db.collection(COLLECTION).doc(quizId)
-        .collection('students').get();
+      const allSubsSnap = await studentsCol.get();
       const totalSubs = allSubsSnap.size;
       let classAvgAccuracy = 0;
       const aggregatePirls: Record<string, { correct: number; total: number }> = {};
@@ -600,31 +611,40 @@ export const submitQuizAnswer = onRequest(
       const studentWeakest = studentLevels.sort((a, b) => a.accuracy - b.accuracy)[0];
 
       const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-      const accIcon = accuracy >= 80 ? '🎉' : accuracy >= 60 ? '👍' : '📚';
       const quizTitle = quizData?.questionsOutput?.title ?? '—';
 
+      const classWeakestInfo = weakest
+        ? { label: PIRLS_LEVEL_LABEL[weakest.level] ?? weakest.level, accuracy: weakest.accuracy }
+        : null;
       // v0.3.0：通知不帶學生姓名，也不放儀表板連結（儀表板需老師金鑰）
-      notifyAdminCard({
-        status: 'success',
-        title: `${accIcon} 第 ${totalSubs} 位學生剛交卷`,
-        appName: APP_NAME,
-        fields: buildSubmissionNotifyFields({
-          quizId,
-          quizTitle,
-          studentInfo,
-          correctCount,
-          totalCount,
-          accuracy,
-          studentWeakest: studentWeakest
-            ? { label: PIRLS_LEVEL_LABEL[studentWeakest.level] ?? studentWeakest.level, accuracy: studentWeakest.accuracy }
-            : null,
-          classAvgAccuracy,
-          totalSubs,
-          classWeakest: weakest
-            ? { label: PIRLS_LEVEL_LABEL[weakest.level] ?? weakest.level, accuracy: weakest.accuracy }
-            : null,
-        }),
-      });
+      if (notifyKind === 'first') {
+        notifyAdminCard({
+          status: 'success',
+          title: `🟢 有班級開始交卷（之後每滿 ${SUBMISSION_NOTIFY_EVERY} 人通知一次）`,
+          appName: APP_NAME,
+          fields: buildSubmissionNotifyFields({
+            quizId,
+            quizTitle,
+            studentInfo,
+            correctCount,
+            totalCount,
+            accuracy,
+            studentWeakest: studentWeakest
+              ? { label: PIRLS_LEVEL_LABEL[studentWeakest.level] ?? studentWeakest.level, accuracy: studentWeakest.accuracy }
+              : null,
+            classAvgAccuracy,
+            totalSubs,
+            classWeakest: classWeakestInfo,
+          }),
+        });
+      } else {
+        notifyAdminCard({
+          status: 'success',
+          title: `📊 已有 ${totalSubs} 位學生交卷`,
+          appName: APP_NAME,
+          fields: buildMilestoneNotifyFields({ quizId, quizTitle, classAvgAccuracy, totalSubs, classWeakest: classWeakestInfo }),
+        });
+      }
 
       res.json({ success: true, submissionId: ref.id });
     },

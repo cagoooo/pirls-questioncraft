@@ -88,3 +88,25 @@ test('老師金鑰夠長且每次不同', () => {
   assert.notEqual(a, b);
   assert.ok(a.length >= 32);
 });
+
+// v0.3.8：交卷通知頻率
+const { submissionNotifyKind, buildMilestoneNotifyFields } = require('../lib/privacy');
+
+test('交卷通知只在第 1 位與每滿 10 人時發', () => {
+  assert.equal(submissionNotifyKind(1), 'first');
+  for (const n of [2, 3, 9, 11, 15, 19, 21, 29]) assert.equal(submissionNotifyKind(n), null, `${n} 人不通知`);
+  for (const n of [10, 20, 30, 100]) assert.equal(submissionNotifyKind(n), 'milestone', `${n} 人要通知`);
+  assert.equal(submissionNotifyKind(0), null);
+  const sent = Array.from({ length: 28 }, (_, i) => submissionNotifyKind(i + 1)).filter(Boolean).length;
+  assert.equal(sent, 3, '一班 28 人只通知 3 次（第 1、10、20 位）');
+});
+
+test('每滿 10 人的通知只有全班統計，沒有個別學生資料', () => {
+  const fields = buildMilestoneNotifyFields({
+    quizId: 'abc123', quizTitle: '森林裡的音樂會', classAvgAccuracy: 82.5, totalSubs: 20,
+    classWeakest: { label: '詮釋整合', accuracy: 70 },
+  });
+  const text = JSON.stringify(fields);
+  assert.ok(text.includes('20 人') && text.includes('82.5%') && text.includes('abc123'));
+  assert.ok(!text.includes('班級座號') && !text.includes('個人弱項'));
+});

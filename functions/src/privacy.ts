@@ -70,6 +70,34 @@ function safeText(v: unknown, maxLen: number): string {
   return String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, maxLen) || '—';
 }
 
+/**
+ * 交卷通知頻率（v0.3.8）：其他老師的班級每位學生交卷都通知太吵，
+ * 只在「這份測驗第 1 位交卷」與「每滿 10 人」時通知；其餘交卷照常記錄、不通知。
+ */
+export const SUBMISSION_NOTIFY_EVERY = 10;
+export type SubmissionNotifyKind = 'first' | 'milestone' | null;
+export function submissionNotifyKind(totalSubs: number): SubmissionNotifyKind {
+  if (totalSubs === 1) return 'first';
+  if (totalSubs > 1 && totalSubs % SUBMISSION_NOTIFY_EVERY === 0) return 'milestone';
+  return null;
+}
+
+/** 每滿 10 人的通知：只放全班統計，不放某一位學生的成績 */
+export function buildMilestoneNotifyFields(
+  input: Pick<SubmissionNotifyInput, 'quizId' | 'quizTitle' | 'classAvgAccuracy' | 'totalSubs' | 'classWeakest'>
+): NotifyField[] {
+  return [
+    { icon: '📝', label: '測驗', value: input.quizTitle },
+    { icon: '🆔', label: '測驗代號', value: input.quizId },
+    { icon: '👥', label: '已交卷', value: `${input.totalSubs} 人` },
+    { icon: '📈', label: '班級平均', value: `${input.classAvgAccuracy.toFixed(1)}%` },
+    ...(input.classWeakest
+      ? [{ icon: '🎯', label: '班級弱項', value: `${input.classWeakest.label}（${Math.round(input.classWeakest.accuracy)}%）` }]
+      : []),
+    { icon: '🔕', label: '通知頻率', value: `每滿 ${SUBMISSION_NOTIFY_EVERY} 人通知一次` },
+  ];
+}
+
 /** 交卷通知欄位：只有測驗代號、班級、座號與統計，刻意不讀學生姓名欄位 */
 export function buildSubmissionNotifyFields(input: SubmissionNotifyInput): NotifyField[] {
   const cls = safeText(input.studentInfo?.class, 20);
