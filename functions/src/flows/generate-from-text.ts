@@ -1,4 +1,5 @@
 // 改寫自 src/ai/flows/generate-pirls-questions-from-text.ts
+import type { TokenUsage } from '../quota-pool';
 import { z } from 'genkit';
 import { ai } from '../genkit';
 import { gradeInfo } from './rewrite-for-grade';
@@ -133,14 +134,18 @@ PIRLS 四層次的題數分配不變，只調整每一題的難度。
 });
 
 export async function runGenerateFromText(
-  input: GenerateFromTextInput
+  input: GenerateFromTextInput,
+  /** v0.4.0：回報這次 AI 用了多少 token（記到每月共用額度池） */
+  onUsage?: (u: TokenUsage) => void
 ): Promise<GenerateFromTextOutput> {
-  const { output } = await prompt({
+  const response = await prompt({
     ...input,
     is10QuestionMode: input.questionMode === '10-questions',
     isEnglishMode: input.languageMode === 'en',
     ...(input.grade ? gradeInfo(input.grade) : {}),
   } as any);
+  onUsage?.(response.usage ?? {});
+  const output = response.output;
 
   if (output && output.questions) {
     const order: Record<PirlsQuestion['pirlsLevel'], number> = {

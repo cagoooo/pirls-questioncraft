@@ -1,6 +1,7 @@
 // 依年級改寫文章：先把原文（或圖片中的文章）改寫成適合指定年級閱讀的版本，
 // 再交給 generate-from-text 依同一個年級出題。
 // ⚠️ 修改這裡的提示詞時，記得同步改擴充套件的 extension/lib/prompt.js（npm test 會檢查）。
+import type { TokenUsage } from '../quota-pool';
 import { z } from 'genkit';
 import { ai } from '../genkit';
 import GRADE_LEVELS from './grade-levels.json';
@@ -99,13 +100,16 @@ const imagesRewritePrompt = ai.definePrompt({
 });
 
 export async function runRewriteForGrade(
-  input: { text: string; grade: GradeId } | { photoDataUris: string[]; grade: GradeId }
+  input: { text: string; grade: GradeId } | { photoDataUris: string[]; grade: GradeId },
+  onUsage?: (u: TokenUsage) => void
 ): Promise<RewriteOutput> {
   const info = gradeInfo(input.grade);
-  const { output } =
+  const response =
     'text' in input
       ? await textRewritePrompt({ text: input.text, ...info } as any)
       : await imagesRewritePrompt({ photoDataUris: input.photoDataUris, ...info } as any);
+  onUsage?.(response.usage ?? {});
+  const output = response.output;
   if (!output || !output.articleContent?.trim()) {
     throw new Error('AI 沒有成功改寫文章，請再試一次。');
   }

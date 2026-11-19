@@ -1,5 +1,6 @@
 // 改寫自 src/ai/flows/generate-pirls-questions.ts，
 // 邏輯與 prompt 完全相同，只是搬到 Cloud Functions 內、不再是 Next Server Action。
+import type { TokenUsage } from '../quota-pool';
 import { z } from 'genkit';
 import { ai } from '../genkit';
 
@@ -118,13 +119,17 @@ const prompt = ai.definePrompt({
 });
 
 export async function runGenerateFromImages(
-  input: GenerateFromImagesInput
+  input: GenerateFromImagesInput,
+  /** v0.4.0：回報這次 AI 用了多少 token（記到每月共用額度池） */
+  onUsage?: (u: TokenUsage) => void
 ): Promise<GenerateFromImagesOutput> {
-  const { output } = await prompt({
+  const response = await prompt({
     ...input,
     is10QuestionMode: input.questionMode === '10-questions',
     isEnglishMode: input.languageMode === 'en',
   } as any);
+  onUsage?.(response.usage ?? {});
+  const output = response.output;
 
   if (output && output.questions) {
     const order: Record<PirlsQuestion['pirlsLevel'], number> = {

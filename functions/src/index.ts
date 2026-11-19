@@ -26,6 +26,17 @@ import { getAuth } from 'firebase-admin/auth';
 import { runWeeklyDigest } from './weekly-digest';
 import { isValidClientSubmissionId, submitRateKey, SUBMIT_PER_MINUTE } from './submission';
 import {
+  getPoolStatus,
+  recordPoolUsage,
+  POOL_EXHAUSTED_CODE,
+  POOL_EXHAUSTED_MESSAGE,
+  DAILY_LIMIT_CODE,
+  dailyLimitMessage,
+  EXTENSION_STORE_URL,
+  EXTENSION_REVIEW_URL,
+  type TokenUsage,
+} from './quota-pool';
+import {
   buildMilestoneNotifyFields,
   buildSubmissionNotifyFields,
   extractTeacherKey,
@@ -196,6 +207,8 @@ function withProtection(
     rateKey?: (req: Request, ip: string) => string;
     /** 被限流時給使用者看的訊息 */
     rateLimitMessage?: (limit: number, windowLabel: string) => string;
+    /** v0.4.0：使用開發者每月共用額度池（用完就引導改用 Chrome 擴充套件） */
+    sharedPool?: boolean;
   } = {}
 ) {
   const {
@@ -209,6 +222,7 @@ function withProtection(
     endpointName = 'AI 出題',
     rateKey,
     rateLimitMessage,
+    sharedPool = false,
   } = opts;
   return withCors(async (req, res) => {
     const ip = getClientIp(req);
@@ -236,6 +250,22 @@ function withProtection(
       }
     }
 
+    // 1.5) 每月共用額度池：用完就不再呼叫 AI（放在人機驗證與每日計次之前，老師的次數不會被扣）
+    if (sharedPool) {
+      const pool = await getPoolStatus();
+      if (!pool.allowed) {
+        res.status(429).json({
+          success: false,
+          error: POOL_EXHAUSTED_MESSAGE,
+          code: POOL_EXHAUSTED_CODE,
+          extensionUrl: EXTENSION_STORE_URL,
+          reviewUrl: EXTENSION_REVIEW_URL,
+          resetAt: pool.resetAt,
+        });
+        return;
+      }
+    }
+
     // 2) Turnstile 人機驗證（保留）
     if (needTurnstile) {
       const verify = await verifyTurnstile(req, process.env.TURNSTILE_SECRET, ip);
@@ -251,7 +281,10 @@ function withProtection(
       if (!daily.allowed) {
         res.status(429).json({
           success: false,
-          error: `為了保護共用的 Gemini API 額度，每位老師每天最多可生成 ${dailyUserLimit} 次，明天（台北時間午夜後）就能再使用。`,
+          error: dailyLimitMessage(dailyUserLimit),
+          code: DAILY_LIMIT_CODE,
+          extensionUrl: EXTENSION_STORE_URL,
+          reviewUrl: EXTENSION_REVIEW_URL,
           resetAt: daily.resetAt,
         });
         return;
@@ -271,6 +304,38 @@ function userField(req: Request) {
     { icon: '👤', label: '使用者', value: u ? `${u.name}${u.email ? `（${u.email}）` : ''}` : '未登入' },
     ...(typeof remaining === 'number' ? [{ icon: '🔢', label: '今日剩餘', value: `${remaining} 次` }] : []),
   ];
+}
+
+/**
+ * v0.4.0：把這次 AI 用量記到每月共用額度池；跨過 80%／100% 時發一次通知給阿凱老師。
+ * 回傳通知卡用的欄位。一定要在回應前 await（Cloud Functions 回應後可能被凍結）。
+ */
+async function settlePool(usages: TokenUsage[]) {
+  const r = await recordPoolUsage(usages);
+  if (!r) return [];
+  const fmt = (n: number) => `NT$${n.toFixed(1)}`;
+  if (r.notify) {
+    notifyAdminCard({
+      status: r.notify === 100 ? 'failed' : 'warning',
+      title: r.notify === 100
+        ? `本月共用額度已用完（${r.month}）`
+        : `本月共用額度已用到 8 成（${r.month}）`,
+      appName: APP_NAME,
+      alwaysLine: true,
+      fields: [
+        { icon: '💰', label: '已用', value: `${fmt(r.after)} / ${fmt(r.budgetTwd)}` },
+        {
+          icon: '🧭',
+          label: '接下來',
+          value: r.notify === 100
+            ? '老師按出題會看到「改用 Chrome 擴充套件＋五星好評」的引導，下個月 1 日自動恢復'
+            : '用完後會引導老師改用 Chrome 擴充套件',
+        },
+      ],
+      footerNote: '想加碼：Firestore appConfig/quotaPool 的 budgetTwd 改大即可（1 分鐘內生效）',
+    });
+  }
+  return [{ icon: '💰', label: '本月共用額度', value: `${fmt(r.after)} / ${fmt(r.budgetTwd)}` }];
 }
 
 /** 取要監看的 secrets（給 onRequest 的 secrets 陣列用） */
@@ -299,16 +364,19 @@ export const generateFromImages = onRequest(
         res.status(400).json({ success: false, error: 'photoDataUris 不可為空。' });
         return;
       }
+      const usages: TokenUsage[] = [];
+      const onUsage = (u: TokenUsage) => { usages.push(u); };
       try {
         // 選了年級：先依年級改寫圖片中的文章，再依同一個年級出題
         const result = grade
           ? await runGenerateFromText({
-              text: (await runRewriteForGrade({ photoDataUris, grade })).articleContent,
+              text: (await runRewriteForGrade({ photoDataUris, grade }, onUsage)).articleContent,
               questionMode,
               languageMode,
               grade,
-            })
-          : await runGenerateFromImages({ photoDataUris, questionMode, languageMode });
+            }, onUsage)
+          : await runGenerateFromImages({ photoDataUris, questionMode, languageMode }, onUsage);
+        const poolFields = await settlePool(usages);
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-images');
         // 估圖片總大小（base64 ≈ 4/3 原始 bytes）
@@ -325,6 +393,7 @@ export const generateFromImages = onRequest(
           appName: APP_NAME,
           fields: [
             ...userField(req),
+            ...poolFields,
             { icon: '📷', label: '圖片', value: `${photoDataUris.length} 張（${estKB} KB）` },
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '文章', value: `${result.articleContent.length} 字` },
@@ -344,6 +413,7 @@ export const generateFromImages = onRequest(
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-images-failed');
+        await settlePool(usages);
         notifyAdminCard({
           status: 'failed',
           title: '圖片出題失敗',
@@ -359,7 +429,7 @@ export const generateFromImages = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 3, endpointName: '圖片出題' }
+    { requireGoogleLogin: true, dailyUserLimit: 3, sharedPool: true, endpointName: '圖片出題' }
   )
 );
 
@@ -379,9 +449,12 @@ export const generateFromText = onRequest(
         res.status(400).json({ success: false, error: 'text 不可為空。' });
         return;
       }
+      const usages: TokenUsage[] = [];
+      const onUsage = (u: TokenUsage) => { usages.push(u); };
       try {
-        const article = grade ? (await runRewriteForGrade({ text, grade })).articleContent : text;
-        const result = await runGenerateFromText({ text: article, questionMode, languageMode, grade });
+        const article = grade ? (await runRewriteForGrade({ text, grade }, onUsage)).articleContent : text;
+        const result = await runGenerateFromText({ text: article, questionMode, languageMode, grade }, onUsage);
+        const poolFields = await settlePool(usages);
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text');
 
@@ -394,6 +467,7 @@ export const generateFromText = onRequest(
           appName: APP_NAME,
           fields: [
             ...userField(req),
+            ...poolFields,
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '字數', value: grade ? `${text.length} → ${article.length}` : `${text.length}` },
             { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
@@ -412,6 +486,7 @@ export const generateFromText = onRequest(
       } catch (e: any) {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
         trackUsage('generate-text-failed');
+        await settlePool(usages);
         notifyAdminCard({
           status: 'failed',
           title: '文字出題失敗',
@@ -427,7 +502,7 @@ export const generateFromText = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 3, endpointName: '文字出題' }
+    { requireGoogleLogin: true, dailyUserLimit: 3, sharedPool: true, endpointName: '文字出題' }
   )
 );
 
@@ -839,10 +914,13 @@ export const getAdminStats = onRequest(
       { imageGen: 0, textGen: 0, imageGenFailed: 0, textGenFailed: 0, shares: 0, submits: 0 }
     );
 
+    const quotaPool = await getPoolStatus();
+
     res.json({
       success: true,
       dailyStats,
       totals,
+      quotaPool,
       totalSubmissions,
       avgAccuracy,
       pirlsBreakdown,

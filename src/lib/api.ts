@@ -38,7 +38,14 @@ interface ApiOk<T> {
 interface ApiErr {
   success: false;
   error: string;
+  /** v0.4.0：額度用完時的代碼（quota/daily-limit、quota/pool-exhausted） */
+  code?: string;
+  extensionUrl?: string;
+  reviewUrl?: string;
 }
+
+/** postJSON 丟出的錯誤：帶 HTTP 狀態碼與後端的錯誤代碼 */
+export type ApiError = Error & { status?: number; code?: string; extensionUrl?: string; reviewUrl?: string };
 type ApiRes<T> = ApiOk<T> | ApiErr;
 
 async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
@@ -56,8 +63,13 @@ async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
     error: `伺服器回應非 JSON（${res.status}）`,
   })) as ApiRes<T>;
   if (!res.ok || !json.success) {
-    const err = new Error('error' in json ? json.error : `HTTP ${res.status}`) as Error & { status?: number };
+    const err = new Error('error' in json ? json.error : `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
+    if (!json.success) {
+      err.code = json.code;
+      err.extensionUrl = json.extensionUrl;
+      err.reviewUrl = json.reviewUrl;
+    }
     throw err;
   }
   return (json.data ?? (json as any)) as T;
@@ -243,6 +255,8 @@ export interface AdminStats {
   totalSubmissions: number;
   avgAccuracy: number | null;
   pirlsBreakdown: AdminPirlsBreakdown[];
+  /** v0.4.0：本月開發者共用額度池（舊後端沒有這欄） */
+  quotaPool?: { month: string; spentTwd: number; budgetTwd: number; calls: number; allowed: boolean; resetAt: number };
   generatedAt: number;
 }
 

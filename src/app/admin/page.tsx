@@ -257,6 +257,30 @@ export default function AdminPage() {
             </Card>
           </div>
 
+          {/* v0.4.0：本月共用額度池 */}
+          {stats.quotaPool && (
+            <Card className="mb-6">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs">💰 本月共用額度（{stats.quotaPool.month}，估算）</CardDescription>
+                <CardTitle className={`text-2xl ${stats.quotaPool.allowed ? 'text-primary' : 'text-red-600'}`}>
+                  NT${stats.quotaPool.spentTwd.toFixed(1)} / NT${stats.quotaPool.budgetTwd.toFixed(0)}
+                  {!stats.quotaPool.allowed && <span className="ml-2 text-base">已用完，正在引導老師改用擴充套件</span>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full ${stats.quotaPool.allowed ? 'bg-primary' : 'bg-red-600'}`}
+                    style={{ width: `${Math.min(100, stats.quotaPool.budgetTwd > 0 ? (stats.quotaPool.spentTwd / stats.quotaPool.budgetTwd) * 100 : 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  本月 AI 呼叫 {stats.quotaPool.calls} 次・下個月 1 日自動歸零・依 Gemini 回報的 token 數估算，實際以 Google 帳單為準
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 30 天每日活動 */}
           <Card className="mb-6">
             <CardHeader>

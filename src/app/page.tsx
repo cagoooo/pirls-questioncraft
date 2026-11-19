@@ -12,6 +12,7 @@ import { QuizView } from '@/components/QuizView';
 import { TurnstileGate } from '@/components/TurnstileGate';
 import { ShareDialog } from '@/components/ShareDialog';
 import { HelpDialog } from '@/components/HelpDialog';
+import { ExtensionGuideCard, quotaGuideKind, type QuotaGuide } from '@/components/ExtensionGuideCard';
 import { NeoCard, PillBtn, Star, Squiggle, Spark, PIRLS_LEVEL_META, type PirlsLevel } from '@/components/Neo';
 import {
   generatePirlsQuestions,
@@ -154,6 +155,8 @@ export default function PIRLSQuestionCraftPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [generatedQuestionsOutput, setGeneratedQuestionsOutput] = useState<GeneratePirlsQuestionsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // v0.4.0：共用次數用完時改顯示「改用 Chrome 擴充套件＋五星好評」引導卡
+  const [quotaGuide, setQuotaGuide] = useState<QuotaGuide | null>(null);
   const [readingSource, setReadingSource] = useState<ReadingSource>({ text: '', images: [] });
 
   const [fileGenerationProgress, setFileGenerationProgress] = useState(0);
@@ -312,6 +315,7 @@ export default function PIRLSQuestionCraftPage() {
     }
     setIsLoading(true);
     setError(null);
+    setQuotaGuide(null);
     setGeneratedQuestionsOutput(null);
     setIsQuizActive(false);
     setCurrentShareLink('');
@@ -376,8 +380,17 @@ export default function PIRLSQuestionCraftPage() {
       }
     } catch (err: any) {
       const errorMessage = err.message || '發生未知錯誤，請稍後再試。';
-      setError(errorMessage);
-      toast({ title: '生成失敗', description: errorMessage, variant: 'destructive' });
+      const guideKind = quotaGuideKind(err?.code);
+      if (guideKind) {
+        setQuotaGuide({ kind: guideKind, message: errorMessage, extensionUrl: err.extensionUrl, reviewUrl: err.reviewUrl });
+        toast({
+          title: guideKind === 'pool' ? '本月共用額度用完了' : '今天的共用次數用完了',
+          description: '可以改用 Chrome 擴充套件繼續出題，說明在下方。',
+        });
+      } else {
+        setError(errorMessage);
+        toast({ title: '生成失敗', description: errorMessage, variant: 'destructive' });
+      }
       updateDisplayProgress(loadingProgress, '處理時發生錯誤');
       setTurnstileResetSignal(s => s + 1);
     } finally {
@@ -903,6 +916,12 @@ export default function PIRLSQuestionCraftPage() {
         )}
 
         {/* ===== Error ===== */}
+        {quotaGuide && !isLoading && (
+          <div className="mt-6">
+            <ExtensionGuideCard guide={quotaGuide} />
+          </div>
+        )}
+
         {error && !isLoading && (
           <div className="mt-6">
             <Alert variant="destructive" className="border-[1.5px] border-ink rounded-[18px] shadow-neo-sm">
