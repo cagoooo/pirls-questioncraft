@@ -295,7 +295,7 @@ export default function PIRLSQuestionCraftPage() {
     if (!isGoogleUser(authUser)) {
       toast({
         title: '請先用 Google 帳號登入',
-        description: 'AI 出題需要登入，每位老師每天最多可生成 5 次。按下方「使用 Google 帳號登入」即可。',
+        description: 'AI 出題需要登入，每位老師每天最多可生成 3 次。按下方「使用 Google 帳號登入」即可。',
         variant: 'destructive',
       });
       void handleGoogleLogin();
@@ -809,7 +809,7 @@ export default function PIRLSQuestionCraftPage() {
               <>
                 <p className="text-base leading-6 min-w-0">
                   🔒 <strong>請先用 Google 帳號登入才能出題</strong>
-                  <span className="block text-sm text-muted-foreground">任何 Google 帳號都可以，每位老師每天最多 5 次；學生作答不需要登入。</span>
+                  <span className="block text-sm text-muted-foreground">任何 Google 帳號都可以，每位老師每天最多 3 次；學生作答不需要登入。</span>
                 </p>
                 <button
                   type="button"
@@ -836,7 +836,7 @@ export default function PIRLSQuestionCraftPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>請珍惜 AI 出題額度</AlertTitle>
             <AlertDescription className="leading-6">
-              題組生成會消耗共用的 Gemini API 額度。需用 Google 帳號登入，每位老師每天最多可生成 5 次（台北時間午夜重置），請確認素材與題數後再產生，避免只是測試或連續重複生成。
+              題組生成會消耗共用的 Gemini API 額度。需用 Google 帳號登入，每位老師每天最多可生成 3 次（台北時間午夜重置），請確認素材與題數後再產生，避免只是測試或連續重複生成。
             </AlertDescription>
           </Alert>
         )}

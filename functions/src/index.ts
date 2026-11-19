@@ -359,7 +359,7 @@ export const generateFromImages = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 5, endpointName: '圖片出題' }
+    { requireGoogleLogin: true, dailyUserLimit: 3, endpointName: '圖片出題' }
   )
 );
 
@@ -427,7 +427,7 @@ export const generateFromText = onRequest(
         throw e;
       }
     },
-    { requireGoogleLogin: true, dailyUserLimit: 5, endpointName: '文字出題' }
+    { requireGoogleLogin: true, dailyUserLimit: 3, endpointName: '文字出題' }
   )
 );
 
