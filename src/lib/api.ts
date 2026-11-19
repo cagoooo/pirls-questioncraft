@@ -56,7 +56,9 @@ async function postJSON<T>(endpoint: string, body: unknown): Promise<T> {
     error: `伺服器回應非 JSON（${res.status}）`,
   })) as ApiRes<T>;
   if (!res.ok || !json.success) {
-    throw new Error('error' in json ? json.error : `HTTP ${res.status}`);
+    const err = new Error('error' in json ? json.error : `HTTP ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return (json.data ?? (json as any)) as T;
 }
@@ -181,6 +183,8 @@ export interface StudentAnswerSubmission {
   correctCount: number;
   totalCount: number;
   pirlsLevelStats: Record<string, { correct: number; total: number }>;
+  /** v0.3.9：學生端產生的交卷編號，重送時沿用，後端只存一筆 */
+  clientSubmissionId?: string;
 }
 
 export async function submitQuizAnswer(args: StudentAnswerSubmission): Promise<{ submissionId: string }> {

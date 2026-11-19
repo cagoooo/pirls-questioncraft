@@ -57,6 +57,33 @@ export function clearQuizProgress(quizId: string): void {
   try { localStorage.removeItem(PROGRESS_PREFIX + quizId); } catch { /* ignore */ }
 }
 
+// ---- 交卷編號（v0.3.9）----
+// 同一份作答重送時沿用同一個編號，後端用它當文件 ID，就不會存成兩筆。
+// 存在 localStorage：送到一半頁面被關掉，重開後再交卷也還是同一個編號。
+const SUBMIT_ID_PREFIX = 'pirls_submit_id_';
+
+function randomId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function getOrCreateSubmitId(quizId: string): string {
+  try {
+    const old = localStorage.getItem(SUBMIT_ID_PREFIX + quizId);
+    if (old && /^[A-Za-z0-9_-]{12,64}$/.test(old)) return old;
+    const id = randomId();
+    localStorage.setItem(SUBMIT_ID_PREFIX + quizId, id);
+    return id;
+  } catch {
+    return randomId();
+  }
+}
+
+export function clearSubmitId(quizId: string): void {
+  try { localStorage.removeItem(SUBMIT_ID_PREFIX + quizId); } catch { /* ignore */ }
+}
+
 // ---- 正在作答旗標 ----
 const ANSWERING_EVENT = 'pirls-quiz-answering';
 let answering = false;

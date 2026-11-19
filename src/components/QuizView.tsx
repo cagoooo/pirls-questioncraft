@@ -24,10 +24,11 @@ import {
 import { Progress } from '@/components/ui/progress';
 import type { Toast } from '@/hooks/use-toast';
 import { exportQuizResultsToPDF } from '@/lib/generateQuizResultsPdf';
-import { submitQuizAnswer } from '@/lib/api';
+import { submitQuizAnswer, type StudentAnswerSubmission } from '@/lib/api';
 import type { StudentInfo } from '@/app/quiz/page';
 import { QuizEndScreen } from '@/components/QuizEndScreen';
-import { saveQuizProgress, clearQuizProgress, setQuizAnswering } from '@/lib/quizSession';
+import { saveQuizProgress, clearQuizProgress, setQuizAnswering, getOrCreateSubmitId, clearSubmitId } from '@/lib/quizSession';
+import { SubmitStatusBox, type SubmitStatus } from '@/components/SubmitStatusBox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,7 +120,21 @@ export function QuizView({
   const [isCurrentQuestionAnswered, setIsCurrentQuestionAnswered] = useState(false);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   const [endedEarly, setEndedEarly] = useState(false);
-  const [wasSubmitted, setWasSubmitted] = useState(false);
+  // v0.3.9：交卷狀態（送出中／已送到／送不出去），送不出去時讓學生按「再送一次」
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('none');
+  const pendingSubmissionRef = useRef<StudentAnswerSubmission | null>(null);
+  const submitRunRef = useRef(0);
+
+  // 送出中或送不出去時，關頁面前先提醒
+  useEffect(() => {
+    if (submitStatus !== 'sending' && submitStatus !== 'failed') return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [submitStatus]);
 
 
   // State for quiz image dialog
@@ -321,14 +336,11 @@ export function QuizView({
     });
     setQuizResults(results);
     setQuizState(nextState);
-    // 已經交卷／結束：暫存的進度用不到了，清掉，下次開頁不會再問「要接著作答嗎」
-    if (quizId) clearQuizProgress(quizId);
 
     // B.16: 從共享連結進入且有 studentInfo → 寫一筆 submission，best-effort（失敗不擋學生看結果）
     // 提早結束、一題都沒答時不送，避免老師儀表板多一筆 0 分紀錄
     const answeredCount = selectedAnswers.filter(a => a !== null).length;
     if (quizId && studentInfo && answeredCount > 0) {
-      setWasSubmitted(true);
       const correctCount = results.filter(r => r.isCorrect).length;
       const totalCount = results.length;
       const pirlsLevelStats: Record<string, { correct: number; total: number }> = {};
@@ -338,18 +350,50 @@ export function QuizView({
         if (r.isCorrect) stat.correct += 1;
         pirlsLevelStats[r.pirlsLevel] = stat;
       });
-      submitQuizAnswer({
+      pendingSubmissionRef.current = {
         quizId,
         studentInfo,
         answers: selectedAnswers,
         correctCount,
         totalCount,
         pirlsLevelStats,
-      }).catch(err => {
-        // 純 log，不打擾學生
-        console.warn('submitQuizAnswer failed:', err?.message);
-      });
+        clientSubmissionId: getOrCreateSubmitId(quizId),
+      };
+      // 作答進度等送成功才清掉：送不出去時學生重開頁面還能接回來再交一次
+      void sendSubmission();
+    } else if (quizId) {
+      // 已經結束、沒有要送的（一題都沒答或老師預覽）：暫存的進度用不到了，清掉
+      clearQuizProgress(quizId);
     }
+  };
+
+  /** 交卷：失敗自動重試 3 次（2、5、10 秒後），還是不行就顯示「再送一次」 */
+  const sendSubmission = async () => {
+    const payload = pendingSubmissionRef.current;
+    if (!payload) return;
+    const run = ++submitRunRef.current;
+    setSubmitStatus('sending');
+    const delays = [0, 2000, 5000, 10000];
+    for (const delay of delays) {
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+      if (run !== submitRunRef.current) return; // 學生按了「再做一次」，這次的送出作廢
+      try {
+        await submitQuizAnswer(payload);
+        if (run !== submitRunRef.current) return;
+        setSubmitStatus('sent');
+        clearQuizProgress(payload.quizId);
+        clearSubmitId(payload.quizId);
+        return;
+      } catch (err: any) {
+        console.warn('submitQuizAnswer failed:', err?.status, err?.message);
+        // 測驗已過期或被刪除：重送也沒用
+        if (err?.status === 404) {
+          if (run === submitRunRef.current) setSubmitStatus('expired');
+          return;
+        }
+      }
+    }
+    if (run === submitRunRef.current) setSubmitStatus('failed');
   };
 
   const handleFinishQuiz = () => {
@@ -364,7 +408,11 @@ export function QuizView({
     setQuizState('answering');
     setIsCurrentQuestionAnswered(false);
     setEndedEarly(false);
-    setWasSubmitted(false);
+    // 「再做一次」是新的一份作答：作廢還在送的這次、換一個新的交卷編號
+    submitRunRef.current++;
+    pendingSubmissionRef.current = null;
+    setSubmitStatus('none');
+    if (quizId) clearSubmitId(quizId);
   };
 
   // 作答中按「退出測驗」：學生頁先跳確認視窗；老師預覽維持直接離開
@@ -449,7 +497,8 @@ export function QuizView({
         studentInfo={studentInfo}
         quizTitle={questionsOutput.title}
         endedEarly={endedEarly}
-        submitted={wasSubmitted}
+        submitStatus={submitStatus}
+        onRetrySubmit={() => void sendSubmission()}
         onRestart={handleRestartQuiz}
         onDownloadPdf={handleShareResultsPdf}
         isPdfBusy={isSharingPdfInternal || isGeneratingQuizResultsPdf}
@@ -518,6 +567,11 @@ export function QuizView({
             </Button>
           </div>
         </CardHeader>
+        {endScreen && submitStatus !== 'none' && (
+          <div className="px-6 pb-2">
+            <SubmitStatusBox status={submitStatus} onRetry={() => void sendSubmission()} />
+          </div>
+        )}
         <CardContent className="space-y-6">
            {studentInfo && (
             <Card className="mb-4 bg-muted/50 dark:bg-muted/20">

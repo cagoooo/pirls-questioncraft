@@ -24,6 +24,7 @@ import { notifyAdminCard } from './notify-line';
 import { trackUsage, getRecentUsage } from './usage-tracker';
 import { getAuth } from 'firebase-admin/auth';
 import { runWeeklyDigest } from './weekly-digest';
+import { isValidClientSubmissionId, submitRateKey, SUBMIT_PER_MINUTE } from './submission';
 import {
   buildMilestoneNotifyFields,
   buildSubmissionNotifyFields,
@@ -191,6 +192,10 @@ function withProtection(
     /** 每位登入使用者每天最多幾次（台北午夜重置）；設定後取代 IP 限流 */
     dailyUserLimit?: number;
     endpointName?: string;
+    /** 限流計數用的鍵（預設是網路位址） */
+    rateKey?: (req: Request, ip: string) => string;
+    /** 被限流時給使用者看的訊息 */
+    rateLimitMessage?: (limit: number, windowLabel: string) => string;
   } = {}
 ) {
   const {
@@ -202,6 +207,8 @@ function withProtection(
     requireGoogleLogin = false,
     dailyUserLimit,
     endpointName = 'AI 出題',
+    rateKey,
+    rateLimitMessage,
   } = opts;
   return withCors(async (req, res) => {
     const ip = getClientIp(req);
@@ -218,11 +225,11 @@ function withProtection(
       user = verified.user;
       (req as any).pirlsUser = user;
     } else {
-      const rateLimit = await checkRateLimit(ip, { limit, windowMs });
+      const rateLimit = await checkRateLimit(rateKey ? rateKey(req, ip) : ip, { limit, windowMs });
       if (!rateLimit.allowed) {
         res.status(429).json({
           success: false,
-          error: `為了保護共用的 Gemini API 額度，題組生成目前限制每個使用者每${windowLabel}最多 ${limit} 次。請稍候再試，並把生成次數留給實際備課或教學使用。`,
+          error: rateLimitMessage ? rateLimitMessage(limit, windowLabel) : `為了保護共用的 Gemini API 額度，題組生成目前限制每個使用者每${windowLabel}最多 ${limit} 次。請稍候再試，並把生成次數留給實際備課或教學使用。`,
           resetAt: rateLimit.resetAt,
         });
         return;
@@ -542,7 +549,7 @@ export const submitQuizAnswer = onRequest(
         res.status(405).json({ success: false, error: 'Use POST' });
         return;
       }
-      const { quizId, studentInfo, answers, correctCount, totalCount, pirlsLevelStats } = req.body ?? {};
+      const { quizId, studentInfo, answers, correctCount, totalCount, pirlsLevelStats, clientSubmissionId } = req.body ?? {};
       if (!quizId || !studentInfo || !Array.isArray(answers)) {
         res.status(400).json({ success: false, error: '缺少必要欄位 quizId / studentInfo / answers。' });
         return;
@@ -558,8 +565,11 @@ export const submitQuizAnswer = onRequest(
       // 作答 doc TTL：跟測驗 + 7 天（讓老師事後也能看 dashboard）
       const submissionExpiresAt = Timestamp.fromMillis(quizExpiresAt + 7 * 24 * 60 * 60 * 1000);
 
-      const ref = await db.collection(COLLECTION).doc(quizId)
-        .collection('students').add({
+      // v0.3.9：學生端帶交卷編號 → 用它當文件 ID，網路不穩重送時同一份作答只存一筆
+      const studentsRef = db.collection(COLLECTION).doc(quizId).collection('students');
+      const ref = isValidClientSubmissionId(clientSubmissionId) ? studentsRef.doc(clientSubmissionId) : studentsRef.doc();
+      try {
+        await ref.create({
           studentInfo,
           answers,
           correctCount: correctCount ?? 0,
@@ -570,10 +580,18 @@ export const submitQuizAnswer = onRequest(
           // 測驗本體 60 分鐘後會被清掉，作答紀錄自己也帶一份雜湊，老師 7 天內仍可驗證
           ...(typeof quizData.teacherKeyHash === 'string' ? { teacherKeyHash: quizData.teacherKeyHash } : {}),
         });
+      } catch (err: any) {
+        // 6 = ALREADY_EXISTS：上一次其實已經存進去了（只是回應沒傳回學生端），當作成功、不重複通知
+        if (err?.code === 6) {
+          res.json({ success: true, submissionId: ref.id, duplicate: true });
+          return;
+        }
+        throw err;
+      }
       trackUsage('submit-quiz');
 
       // v0.3.8：只在第 1 位與每滿 10 人時通知；其他交卷只數人數（count 查詢，不讀全班資料）
-      const studentsCol = db.collection(COLLECTION).doc(quizId).collection('students');
+      const studentsCol = studentsRef;
       const countSnap = await studentsCol.count().get();
       const notifyKind = submissionNotifyKind(countSnap.data().count);
       if (!notifyKind) {
@@ -648,7 +666,13 @@ export const submitQuizAnswer = onRequest(
 
       res.json({ success: true, submissionId: ref.id });
     },
-    { perMinute: 5, needTurnstile: false }
+    {
+      // v0.3.9：全校平板共用同一個對外網路位址，改用「位址＋測驗代號」計數，每分鐘 60 份
+      perMinute: SUBMIT_PER_MINUTE,
+      needTurnstile: false,
+      rateKey: (req, ip) => submitRateKey(ip, req.body?.quizId),
+      rateLimitMessage: () => '同一時間交卷的人比較多，請等幾秒再送一次。',
+    }
   )
 );
 

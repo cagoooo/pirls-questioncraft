@@ -127,7 +127,7 @@ export async function checkDailyUserLimit(uid: string, limit: number): Promise<R
 
 function sanitizeIp(ip: string): string {
   // Firestore doc id 不能含 /，且不可超過 1500 bytes
-  return ip.replace(/[^\w.:-]/g, '_').slice(0, 64);
+  return ip.replace(/[^\w.:-]/g, '_').slice(0, 128);
 }
 
 /** 從 Express request 抽出真正 client IP（Cloud Functions 有多層 proxy） */

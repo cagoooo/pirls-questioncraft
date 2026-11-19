@@ -2,6 +2,7 @@
 // 學生按「退出測驗」後的結束畫面：清楚告訴學生「測驗已經結束」，並給一份題目回饋總結。
 "use client";
 
+import { SubmitStatusBox, type SubmitStatus } from '@/components/SubmitStatusBox';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge, badgeVariants } from '@/components/ui/badge';
@@ -37,8 +38,9 @@ interface QuizEndScreenProps {
   studentInfo?: StudentInfo;
   quizTitle?: string;
   endedEarly: boolean;
-  /** 作答有送到老師的儀表板（共享連結進來且至少答了一題） */
-  submitted: boolean;
+  /** 作答送給老師的狀態（共享連結進來且至少答了一題才會送） */
+  submitStatus: SubmitStatus;
+  onRetrySubmit: () => void;
   onRestart: () => void;
   onDownloadPdf: () => void;
   isPdfBusy: boolean;
@@ -68,7 +70,8 @@ export function QuizEndScreen({
   studentInfo,
   quizTitle,
   endedEarly,
-  submitted,
+  submitStatus,
+  onRetrySubmit,
   onRestart,
   onDownloadPdf,
   isPdfBusy,
@@ -278,7 +281,11 @@ export function QuizEndScreen({
 
       {/* 結尾動作 */}
       <section className="rounded-[24px] border-neo bg-cream text-ink shadow-neo px-5 py-5 sm:px-8 text-center space-y-3">
-        <p className="font-bold">{submitted ? '你的作答已經送給老師，現在可以關閉這個頁面了。' : '現在可以關閉這個頁面了。'}</p>
+        {submitStatus === 'none' ? (
+          <p className="font-bold">現在可以關閉這個頁面了。</p>
+        ) : (
+          <SubmitStatusBox status={submitStatus} onRetry={onRetrySubmit} />
+        )}
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           <Button variant="outline" onClick={onDownloadPdf} disabled={isPdfBusy} className="border-neo rounded-full">
             {isPdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
