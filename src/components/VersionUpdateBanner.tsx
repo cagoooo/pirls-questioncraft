@@ -6,7 +6,8 @@
 //  2. 每 5 分鐘 fetch version.json 比對，發現新版彈 toast banner 讓使用者主動點（學生作答中不彈，結束後才出現）
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Spark } from '@/components/Neo';
+import { cn } from '@/lib/utils';
 import { RefreshCw, Sparkles, X } from 'lucide-react';
 import { isQuizAnswering, onQuizAnsweringChange } from '@/lib/quizSession';
 
@@ -20,6 +21,13 @@ interface VersionInfo {
   version: string;
   sha?: string;
   builtAt?: string;
+}
+
+/** 20261120-0712cd2 → { label: '11/20 更新', sha: '0712cd2' }；看不懂的格式就原樣顯示 */
+function prettyVersion(v: string): { label: string; sha?: string } {
+  const m = /^(\d{4})(\d{2})(\d{2})-(\w+)$/.exec(v);
+  if (!m) return { label: v };
+  return { label: `${Number(m[2])}/${Number(m[3])} 更新`, sha: m[4] };
 }
 
 export function VersionUpdateBanner() {
@@ -169,41 +177,68 @@ export function VersionUpdateBanner() {
     window.location.reload();
   };
 
+  const pretty = prettyVersion(latestVersion);
+
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[calc(100%-2rem)] bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-4">
-      <div className="flex items-start gap-3">
-        <Sparkles className="h-5 w-5 mt-0.5 flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold">有新版本可用</p>
-          <p className="text-xs text-white/80 mt-1">
-            {latestVersion}（目前 {currentVersion}）
-          </p>
-          <div className="flex gap-2 mt-3">
-            <Button
-              size="sm"
-              onClick={handleUpdate}
-              className="bg-background text-primary hover:bg-secondary"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              立即更新
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDismissed(true)}
-              className="text-white hover:bg-white/10"
-            >
-              稍後
-            </Button>
-          </div>
-        </div>
-        <button
-          onClick={() => setDismissed(true)}
-          className="p-1 rounded hover:bg-white/10"
-          aria-label="關閉"
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'fixed z-[100] left-4 right-4 bottom-4 sm:right-auto sm:left-6 sm:bottom-6 sm:w-[25rem]',
+        'motion-safe:animate-in motion-safe:slide-in-from-bottom-6 motion-safe:fade-in motion-safe:duration-300'
+      )}
+    >
+      <div
+        className="relative bg-card text-ink border-neo rounded-[22px] p-4 sm:p-5"
+        style={{ boxShadow: '0 6px 0 hsl(var(--border)), 0 22px 44px -14px rgba(61, 46, 30, 0.45)' }}
+      >
+        {/* 角落貼紙 */}
+        <span
+          aria-hidden
+          className="absolute -top-3 left-6 rotate-[-4deg] bg-coral text-white border-neo rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wider shadow-neo-sm"
         >
-          <X className="h-4 w-4" />
-        </button>
+          NEW
+        </span>
+        <Spark size={14} color="#F2C14E" className="absolute top-3 right-12 opacity-90" />
+
+        <div className="flex items-start gap-3.5">
+          <div className="shrink-0 w-12 h-12 rounded-2xl bg-lemon border-neo shadow-neo-sm flex items-center justify-center -rotate-3">
+            <Sparkles className="h-6 w-6" strokeWidth={2.4} />
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-lg font-extrabold leading-tight">有新版本可以用了！</p>
+            <p className="text-sm text-ink/75 mt-1 leading-snug">
+              重新整理一下就是最新版。正在輸入的文章請先存好再更新。
+            </p>
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-cream border-[1.5px] border-ink px-2.5 py-0.5 text-xs font-bold">
+              <span>🆕 {pretty.label}</span>
+              {pretty.sha && <span className="font-mono text-ink/60">{pretty.sha}</span>}
+            </p>
+          </div>
+          <button
+            onClick={() => setDismissed(true)}
+            className="shrink-0 -mr-1 -mt-1 w-8 h-8 rounded-full flex items-center justify-center hover:bg-cream-deep transition-colors"
+            aria-label="關閉更新提示"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex gap-2.5 mt-4">
+          <button
+            onClick={handleUpdate}
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-coral text-white border-neo rounded-full px-4 py-2.5 text-base font-extrabold shadow-neo-sm neo-press hover:-translate-y-px hover:shadow-neo transition-all"
+          >
+            <RefreshCw className="h-4 w-4" strokeWidth={2.6} />
+            立即更新
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="inline-flex items-center justify-center bg-card text-ink border-neo rounded-full px-5 py-2.5 text-base font-bold shadow-neo-sm neo-press hover:-translate-y-px hover:shadow-neo transition-all"
+          >
+            稍後
+          </button>
+        </div>
       </div>
     </div>
   );
