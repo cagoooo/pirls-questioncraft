@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } 
 import { XCircle, CheckCircle2, Trash2, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { ScreenCaptureButton } from '@/components/ScreenCapture';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -424,6 +425,15 @@ export function FileUpload({ onFilesSelected, isLoading }: FileUploadProps) {
           disabled={isLoading || !canUploadMore}
           className="sr-only"
         />
+
+        {/* v0.4.2：直接擷取 Chrome 分頁或視窗（電腦版才有），擷取後可框選範圍 */}
+        {canUploadMore && (
+          <ScreenCaptureButton
+            disabled={isLoading}
+            onCaptured={(file) => processNewFiles([file])}
+            onError={(message) => toast({ title: '擷取畫面沒有成功', description: message, variant: 'destructive' })}
+          />
+        )}
 
         {/* 已上傳的大預覽（可放大、刪除） */}
         {selectedFiles.length > 0 && (

@@ -90,7 +90,10 @@ export function HelpDialog({ trigger }: HelpDialogProps) {
     try {
       const seen = window.localStorage.getItem(STORAGE_KEY);
       if (!seen) {
-        timer = setTimeout(() => setOpen(true), AUTO_OPEN_DELAY_MS);
+        // 老師已經打開別的視窗（例如擷取畫面的框選視窗）就不要蓋上去
+        timer = setTimeout(() => {
+          if (!document.querySelector('[role="dialog"][data-state="open"]')) setOpen(true);
+        }, AUTO_OPEN_DELAY_MS);
       }
     } catch {
       // localStorage 不可用（隱私模式 / 第三方 cookie 阻擋）就不自動彈
