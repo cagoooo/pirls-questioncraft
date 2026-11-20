@@ -27,6 +27,8 @@ export interface RateLimitResult {
   remaining: number;
   resetAt: number;
   reason?: string;
+  /** 每日次數用：這次扣的是哪一天（台北日期），退回時用同一天 */
+  day?: string;
 }
 
 /**
@@ -117,11 +119,29 @@ export async function checkDailyUserLimit(uid: string, limit: number): Promise<R
         { count: current + 1, uid, day, expiresAt: Timestamp.fromMillis(resetAt + 24 * 60 * 60 * 1000) },
         { merge: true }
       );
-      return { allowed: true, remaining: limit - current - 1, resetAt };
+      return { allowed: true, remaining: limit - current - 1, resetAt, day };
     });
   } catch (e) {
     console.error('daily user limit check failed, fail-open:', e);
     return { allowed: true, remaining: limit, resetAt };
+  }
+}
+
+/**
+ * v0.4.4：AI 出題失敗（或請求內容有誤）時把剛扣的 1 次退回去。
+ * 用扣次數當下的日期，避免剛好跨過午夜退到隔天的帳上；失敗只記 log，不影響回應。
+ */
+export async function refundDailyUserLimit(uid: string, day: string): Promise<void> {
+  const db = getFirestore();
+  const ref = db.collection(COLLECTION).doc(`user_${uid.replace(/[^\w-]/g, '_').slice(0, 128)}_${day}`);
+  try {
+    await db.runTransaction(async (tx: Transaction) => {
+      const snap = await tx.get(ref);
+      const current = (snap.exists && (snap.data() as any)?.count) || 0;
+      if (current > 0) tx.update(ref, { count: current - 1 });
+    });
+  } catch (e) {
+    console.error('refund daily user limit failed:', e);
   }
 }
 

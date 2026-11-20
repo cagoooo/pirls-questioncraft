@@ -96,9 +96,12 @@ async function getJSON<T>(
 
 export type GradeId = '1' | '2' | '3' | '4' | '5' | '6';
 
+/** v0.4.4：題數（5 題快速版／8 題標準／10 題延伸） */
+export type QuestionMode = '5-questions' | '8-questions' | '10-questions';
+
 export interface GenerateFromImagesArgs {
   photoDataUris: string[];
-  questionMode: '8-questions' | '10-questions';
+  questionMode: QuestionMode;
   languageMode: 'zh-TW' | 'en';
   /** 依年級改寫：'1'～'6'；不傳就照原文出題 */
   grade?: GradeId;
@@ -108,7 +111,7 @@ export interface GenerateFromImagesArgs {
 
 export interface GenerateFromTextArgs {
   text: string;
-  questionMode: '8-questions' | '10-questions';
+  questionMode: QuestionMode;
   languageMode: 'zh-TW' | 'en';
   /** 依年級改寫：'1'～'6'；不傳就照原文出題 */
   grade?: GradeId;

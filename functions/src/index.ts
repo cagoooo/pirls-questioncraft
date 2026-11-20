@@ -18,7 +18,7 @@ import type { Response } from 'express';
 import { runGenerateFromImages } from './flows/generate-from-images';
 import { runGenerateFromText } from './flows/generate-from-text';
 import { runRewriteForGrade, isGradeId, gradeInfo } from './flows/rewrite-for-grade';
-import { checkRateLimit, checkDailyUserLimit, peekDailyUserLimit, getClientIp } from './rate-limit';
+import { checkRateLimit, checkDailyUserLimit, peekDailyUserLimit, refundDailyUserLimit, getClientIp } from './rate-limit';
 import { verifyTurnstile } from './turnstile';
 import { notifyAdminCard } from './notify-line';
 import { trackUsage, getRecentUsage } from './usage-tracker';
@@ -286,6 +286,7 @@ function withProtection(
     }
 
     // 3) 每位登入使用者每天的次數（通過人機驗證才計次）
+    let countedDay: string | undefined;
     if (user && dailyUserLimit) {
       const daily = await checkDailyUserLimit(user.uid, dailyUserLimit);
       if (!daily.allowed) {
@@ -300,9 +301,21 @@ function withProtection(
         return;
       }
       (req as any).pirlsRemaining = daily.remaining;
+      countedDay = daily.day;
     }
 
-    await handler(req, res);
+    // v0.4.4：AI 失敗（拋出錯誤）或請求內容有誤（4xx／5xx）→ 退回剛扣的 1 次
+    let threw = false;
+    try {
+      await handler(req, res);
+    } catch (e) {
+      threw = true;
+      throw e;
+    } finally {
+      if (user && countedDay && (threw || res.statusCode >= 400)) {
+        await refundDailyUserLimit(user.uid, countedDay);
+      }
+    }
   });
 }
 
@@ -408,7 +421,7 @@ export const generateFromImages = onRequest(
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '文章', value: `${result.articleContent.length} 字` },
             { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
-            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : questionMode === '5-questions' ? '5 題' : '8 題' },
             { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
             { icon: '🌍', label: '來源', value: ip },
@@ -481,7 +494,7 @@ export const generateFromText = onRequest(
             { icon: '📝', label: '標題', value: result.title },
             { icon: '📏', label: '字數', value: grade ? `${text.length} → ${article.length}` : `${text.length}` },
             { icon: '🎒', label: '年級', value: grade ? `改寫成${gradeInfo(grade).gradeLabel}` : '原文' },
-            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : '8 題' },
+            { icon: '🎯', label: '題數', value: questionMode === '10-questions' ? '10 題' : questionMode === '5-questions' ? '5 題' : '8 題' },
             { icon: '⚖️', label: 'PIRLS', value: summarizePirlsDistribution(result.questions) },
             { icon: '🌐', label: '語言', value: languageMode === 'en' ? 'English' : '繁體中文' },
             { icon: '🌍', label: '來源', value: ip },

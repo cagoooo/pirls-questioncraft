@@ -6,7 +6,7 @@ import { gradeInfo } from './rewrite-for-grade';
 
 const InputSchema = z.object({
   text: z.string(),
-  questionMode: z.enum(['8-questions', '10-questions']),
+  questionMode: z.enum(['5-questions', '8-questions', '10-questions']),
   languageMode: z.enum(['zh-TW', 'en']),
   grade: z.enum(['1', '2', '3', '4', '5', '6']).optional(),
 });
@@ -37,9 +37,9 @@ type PirlsQuestion = z.infer<typeof PirlsQuestionSchema>;
 const prompt = ai.definePrompt({
   name: 'generatePirlsQuestionsFromTextPrompt',
   // B.15 升級：lite → flash，指令遵守度顯著提升、仍在免費層內
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-3.5-flash-lite',
   // 2026-11-15 省錢：關閉思考（思考字詞按輸出價計費），出題品質由提示詞與結構化輸出把關
-  config: { thinkingConfig: { thinkingBudget: 0 } },
+  config: { thinkingConfig: { thinkingLevel: 'MINIMAL' } },
   input: { schema: InputSchema },
   output: { schema: OutputSchema },
   prompt: `# 📥 給你的文章（這是你唯一可以使用的內容來源）
@@ -62,6 +62,13 @@ const prompt = ai.definePrompt({
 
 # 📋 題數與層次
 
+{{#if is5QuestionMode}}
+**共 5 題**（快速版）：
+- locate & retrieve（訊息提取）：**2 題**
+- make straightforward inferences（直接推論）：**1 題**
+- interpret & integrate（詮釋整合）：**1 題**
+- evaluate & critique（評估批判）：**1 題**
+{{else}}
 {{#if is10QuestionMode}}
 **共 10 題**：
 - locate & retrieve（訊息提取）：**3 題**
@@ -74,6 +81,7 @@ const prompt = ai.definePrompt({
 - make straightforward inferences（直接推論）：**2 題**
 - interpret & integrate（詮釋整合）：**2 題**
 - evaluate & critique（評估批判）：**2 題**
+{{/if}}
 {{/if}}
 
 {{#if gradeLabel}}
@@ -140,6 +148,7 @@ export async function runGenerateFromText(
 ): Promise<GenerateFromTextOutput> {
   const response = await prompt({
     ...input,
+    is5QuestionMode: input.questionMode === '5-questions',
     is10QuestionMode: input.questionMode === '10-questions',
     isEnglishMode: input.languageMode === 'en',
     ...(input.grade ? gradeInfo(input.grade) : {}),

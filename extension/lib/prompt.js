@@ -40,12 +40,22 @@ export const LEVEL_LABEL = {
 };
 
 export function expectedDistribution(questionMode) {
+  if (questionMode === '5-questions') {
+    return { 'locate & retrieve': 2, 'make straightforward inferences': 1, 'interpret & integrate': 1, 'evaluate & critique': 1 };
+  }
   return questionMode === '10-questions'
     ? { 'locate & retrieve': 3, 'make straightforward inferences': 3, 'interpret & integrate': 2, 'evaluate & critique': 2 }
     : { 'locate & retrieve': 2, 'make straightforward inferences': 2, 'interpret & integrate': 2, 'evaluate & critique': 2 };
 }
 
 function countBlock(questionMode) {
+  if (questionMode === '5-questions') {
+    return `**共 5 題**（快速版）：
+- locate & retrieve（訊息提取）：**2 題**
+- make straightforward inferences（直接推論）：**1 題**
+- interpret & integrate（詮釋整合）：**1 題**
+- evaluate & critique（評估批判）：**1 題**`;
+  }
   return questionMode === '10-questions'
     ? `**共 10 題**：
 - locate & retrieve（訊息提取）：**3 題**

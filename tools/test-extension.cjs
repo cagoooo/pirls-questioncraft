@@ -219,7 +219,7 @@ function backendLines(file) {
 (async () => {
   const prompt = await import(path.join(root, 'extension/lib/prompt.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
   const gemini = await import(path.join(root, 'extension/lib/gemini.js').replace(/\\/g, '/').replace(/^/, 'file:///'));
-  const opts = [['8-questions', 'zh-TW'], ['10-questions', 'en']];
+  const opts = [['8-questions', 'zh-TW'], ['10-questions', 'en'], ['5-questions', 'zh-TW']];
   const imageAll = opts.map(([questionMode, languageMode]) => prompt.imagePrompt({ questionMode, languageMode })).join('\n');
   const textAll = [
     ...opts.map(([questionMode, languageMode]) => prompt.textPrompt({ text: 'X', questionMode, languageMode })),

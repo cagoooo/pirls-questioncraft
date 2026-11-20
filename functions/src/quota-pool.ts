@@ -17,8 +17,9 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 export const DEFAULT_BUDGET_TWD = 50;
 
 /**
- * Gemini 2.5 Flash 付費方案標準價格（美元／每百萬 token）。
- * 2026-11-19 查 Google AI Studio 價格頁：輸入（文字／圖片）$0.30、輸出（含思考 token）$2.50。
+ * Gemini 付費方案標準價格（美元／每百萬 token）。
+ * 2026-11-20 起改用 gemini-3.5-flash-lite（gemini-2.5-flash 於 2026-12-01 停用並自動轉過去），
+ * 查 Google AI Studio 價格頁「Gemini 3.5 Flash-Lite」Standard：輸入 $0.30、輸出（含思考 token）$2.50，與 2.5 Flash 相同。
  * 換模型時要一起改。
  */
 export const PRICE_USD_PER_M = { input: 0.3, output: 2.5 };

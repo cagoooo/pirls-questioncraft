@@ -25,7 +25,7 @@ import {
   rememberTeacherKey,
   buildDashboardUrl,
 } from '@/lib/api';
-import type { GeneratePirlsQuestionsOutput, GradeId } from '@/lib/api';
+import type { GeneratePirlsQuestionsOutput, GradeId, QuestionMode } from '@/lib/api';
 import GRADE_LEVELS from '@/lib/gradeLevels.json';
 import { exportPIRLStoPDF } from '@/lib/generatePdf';
 import { PlatformExportDialog } from '@/components/PlatformExportDialog';
@@ -140,11 +140,27 @@ const resizeImage = (file: File, maxSize: number = 1600, quality: number = 0.85)
   });
 };
 
+/** v0.4.4：三種題數與 PIRLS 四層次分配（與後端提示詞一致） */
+const QUESTION_MODES: Record<QuestionMode, { n: number; d: string; dist: [string, number, string][] }> = {
+  '5-questions': {
+    n: 5, d: '提取 2・推論 1・詮釋 1・評估 1（暖身、短文）',
+    dist: [['訊息提取', 2, 'bg-sky/50'], ['直接推論', 1, 'bg-sage/50'], ['詮釋整合', 1, 'bg-lemon/70'], ['評估批判', 1, 'bg-peach/70']],
+  },
+  '8-questions': {
+    n: 8, d: '提取 2・推論 2・詮釋 2・評估 2（四層次各 2 題）',
+    dist: [['訊息提取', 2, 'bg-sky/50'], ['直接推論', 2, 'bg-sage/50'], ['詮釋整合', 2, 'bg-lemon/70'], ['評估批判', 2, 'bg-peach/70']],
+  },
+  '10-questions': {
+    n: 10, d: '提取 3・推論 3・詮釋 2・評估 2（加強提取與推論）',
+    dist: [['訊息提取', 3, 'bg-sky/50'], ['直接推論', 3, 'bg-sage/50'], ['詮釋整合', 2, 'bg-lemon/70'], ['評估批判', 2, 'bg-peach/70']],
+  },
+};
+
 export default function PIRLSQuestionCraftPage() {
   const [inputMode, setInputMode] = useState<InputMode>('image');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [inputText, setInputText] = useState('');
-  const [questionMode, setQuestionMode] = useState<'8-questions' | '10-questions'>('8-questions');
+  const [questionMode, setQuestionMode] = useState<QuestionMode>('8-questions');
   const [languageMode, setLanguageMode] = useState<'zh-TW' | 'en'>('zh-TW');
   // 依年級改寫：'' = 照原文出題；'1'～'6' = 先改寫成該年級的文章再出題
   const [grade, setGrade] = useState<GradeId | ''>('');
@@ -414,7 +430,9 @@ export default function PIRLSQuestionCraftPage() {
         });
       } else {
         setError(errorMessage);
-        toast({ title: '生成失敗', description: errorMessage, variant: 'destructive' });
+        toast({ title: '生成失敗', description: `${errorMessage}（這次沒有扣掉今天的出題次數）`, variant: 'destructive' });
+        // v0.4.4：後端已把這次的次數退回，重新查一次讓登入列的數字正確
+        if (isGoogleUser(authUser)) void getMyQuota().then((q) => { if (q) setMyQuota(q); });
       }
       updateDisplayProgress(loadingProgress, '處理時發生錯誤');
       setTurnstileResetSignal(s => s + 1);
@@ -795,11 +813,12 @@ export default function PIRLSQuestionCraftPage() {
                 emoji="🧩"
                 color="bg-sage"
                 value={questionMode}
-                onChange={(v) => !isLoading && setQuestionMode(v as '8-questions' | '10-questions')}
+                onChange={(v) => !isLoading && setQuestionMode(v as QuestionMode)}
                 disabled={isLoading || isAnyDownloading}
                 options={[
-                  { id: '8-questions', t: '標準 8 題', d: '四層次各 2 題' },
-                  { id: '10-questions', t: '延伸 10 題', d: '加強提取與推論' },
+                  { id: '5-questions', t: '快速 5 題', d: QUESTION_MODES['5-questions'].d },
+                  { id: '8-questions', t: '標準 8 題', d: QUESTION_MODES['8-questions'].d },
+                  { id: '10-questions', t: '延伸 10 題', d: QUESTION_MODES['10-questions'].d },
                 ]}
               />
               <SettingCard
@@ -906,6 +925,19 @@ export default function PIRLSQuestionCraftPage() {
           ) : myQuota.dailyRemaining === 1 ? (
             <LastOneHint className="mt-5" />
           ) : null
+        )}
+
+        {/* v0.4.4：產出前再確認一次題數與 PIRLS 四層次分配 */}
+        {!isQuizActive && !generatedQuestionsOutput && !isLoading && (
+          <div className="mt-5 flex flex-wrap items-center gap-2 px-4 py-3 rounded-[18px] border-[1.5px] border-ink bg-white shadow-neo-sm">
+            <span className="text-base font-extrabold mr-1">📋 即將產生 {QUESTION_MODES[questionMode].n} 題：</span>
+            {QUESTION_MODES[questionMode].dist.map(([label, n, color]) => (
+              <span key={label} className={cn('inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink px-2.5 py-0.5 text-sm font-bold', color)}>
+                {label} <b className="tabular-nums">{n}</b> 題
+              </span>
+            ))}
+            <span className="text-sm text-muted-foreground">（可在上方「題組數量」改成 5／8／10 題）</span>
+          </div>
         )}
 
         {/* ===== CTA：大型珊瑚紅生成按鈕 ===== */}
