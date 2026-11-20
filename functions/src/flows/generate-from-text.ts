@@ -14,6 +14,8 @@ const InputSchema = z.object({
 const PirlsQuestionSchema = z.object({
   question: z.string(),
   options: z.array(z.string()).length(4),
+  // 答案依據：只給老師看（工作台、老師畫面、教師講義），學生端與匯出檔都不放；放在正解前面，讓 AI 先找依據再選答案
+  answerEvidence: z.string(),
   correctAnswerIndex: z.number().min(0).max(3),
   explanation: z.string(),
   pirlsLevel: z.enum([
@@ -99,9 +101,19 @@ PIRLS 四層次的題數分配不變，只調整每一題的難度。
 {{#if isEnglishMode}}
 - \`question\` / \`options\`：**英文**
 - \`explanation\`：**繁體中文（台灣常用語彙）**
+- \`answerEvidence\`：**繁體中文**說明，引用原文時保留原文的語言
 {{else}}
 - 所有文字欄位：**繁體中文（台灣常用語彙）**
 {{/if}}
+
+# 🔍 answerEvidence 的寫法（答案依據：只給老師看）
+
+\`answerEvidence\` **只給老師檢查題目用，學生完全看不到、也不會匯出**，所以這裡要清楚寫出答案的依據。
+請**先寫好 \`answerEvidence\`，再決定 \`correctAnswerIndex\`**：
+- 引用文章中支持正確答案的原文：寫出第幾段，原句用「」標出，一到兩句即可。
+- 推論、詮釋、評估題：引用相關原句後，再用一句話說明怎麼從原文推到正確答案。
+- 寫完再確認：\`correctAnswerIndex\` 指向的選項，和這段依據說的是同一件事。
+- 這裡可以寫出答案；但 \`explanation\`（閱讀引導）仍然不可以。
 
 # ✍️ explanation 的寫法（閱讀引導：不可說出答案）
 
@@ -134,12 +146,14 @@ PIRLS 四層次的題數分配不變，只調整每一題的難度。
 - [ ] 我的每一題是否引用了文章中真實出現的字詞？
 - [ ] 我的 PIRLS 四層次題數是否完全符合上面的分配？
 - [ ] 每題的 \`explanation\` 是否都是「閱讀引導」：有指出回到哪一段、提示找什麼或怎麼想，而且**完全沒有寫出正確答案或它的意思**？
+- [ ] 每題的 \`answerEvidence\` 是否引用了原文，而且和 \`correctAnswerIndex\` 指向的選項說的是同一件事？
 
 # 📐 其他規則
 
 - 每題 4 個選項，僅一個正確答案
 - 干擾選項要合理但明確錯誤
 - \`explanation\` 依照上方「閱讀引導」的寫法，不可說出答案
+- \`answerEvidence\` 依照上方「答案依據」的寫法（只給老師看）
 - 「評估與批判」題仍要有單一最合理答案，不是開放題
 
 請輸出符合 schema 的 JSON 物件。

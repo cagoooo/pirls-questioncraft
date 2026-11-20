@@ -9,6 +9,8 @@ export interface PirlsQuestion {
   options: string[];
   correctAnswerIndex: number;
   explanation: string;
+  /** 答案依據：只給老師看（老師畫面、教師講義），學生端與匯出檔都不放；舊題組沒有這欄 */
+  answerEvidence?: string;
   pirlsLevel:
     | 'locate & retrieve'
     | 'make straightforward inferences'

@@ -100,7 +100,7 @@ def fake_questions(n=8):
     levels = FIVE_LEVELS if n == 5 else [LEVELS[i // 2] for i in range(n)]
     return {"title": "小水滴的旅行", "articleContent": "清晨，小水滴躺在荷葉上。\n雲越來越重，小水滴又變成雨。",
             "questions": [{"question": f"模擬第{i+1}題：小水滴在哪裡？", "options": ["荷葉上", "石頭上", "樹枝上", "屋頂上"],
-                           "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "pirlsLevel": levels[i]} for i in range(n)]}
+                           "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "answerEvidence": f"依據測試{i+1}：第 1 段「清晨，小水滴躺在荷葉上。」", "pirlsLevel": levels[i]} for i in range(n)]}
 
 YT_ID = "9hE5-98ZeCg"
 def youtube_route(route):
@@ -314,6 +314,8 @@ with sync_playwright() as p:
     check("提醒 AI 講解不要用 ABCD 代稱選項", "不要用 A、B、C、D" in parts[-1].get("text", ""))
     check("出題要求 JSON schema", body.get("generationConfig", {}).get("responseMimeType") == "application/json")
     check("顯示 8 題", bench.locator("#questions .q").count() == 8)
+    ev = bench.locator("#questions .q").first.locator("[data-f=answerEvidence]")
+    check("每題顯示「答案依據（只有老師看得到）」", bench.locator("#questions .q [data-f=answerEvidence]").count() == 8 and ev.input_value().startswith("依據測試1") and "只有老師看得到" in bench.locator("#questions .q .exp.evid").first.inner_text(), ev.input_value())
     check("分類預設：科目改成國語、冊次 115上、章節＝標題",
           [bench.input_value("#catSubject"), bench.input_value("#catBook"), bench.input_value("#catChapter")] == ["國語", "115上", "小水滴的旅行"],
           str([bench.input_value("#catSubject"), bench.input_value("#catBook"), bench.input_value("#catChapter")]))

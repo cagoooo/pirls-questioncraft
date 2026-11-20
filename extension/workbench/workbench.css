@@ -63,6 +63,8 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
 .opt.correct .letter { background: var(--sage); }
 .opt.correct input[type=text] { border-color: var(--sage-deep); background: #F1F8EF; }
 .q .exp > span { font-size: var(--fs-sm); font-weight: 700; display: block; margin-bottom: 4px; }
+.q .exp.evid { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(76, 140, 220, .08); border: 1px dashed rgba(76, 140, 220, .55); }
+.q .exp.evid > span { color: #2f6db5; }
 
 .howto { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; font-size: var(--fs-sm); }
 .howto summary { cursor: pointer; font-weight: 700; }

@@ -264,6 +264,7 @@ export async function exportPIRLStoPDF({
     q.options.forEach(opt => { questionBlockNeededHeight += doc.splitTextToSize(opt, contentWidth - 10).length * 5; });
     questionBlockNeededHeight += 18; 
     questionBlockNeededHeight += doc.splitTextToSize(q.explanation, contentWidth).length * 5;
+    if (q.answerEvidence) questionBlockNeededHeight += 7 + doc.splitTextToSize(q.answerEvidence, contentWidth - 8).length * 5;
 
     checkPageBreak(questionBlockNeededHeight);
     
@@ -304,6 +305,20 @@ export async function exportPIRLStoPDF({
     checkPageBreak(7);
     doc.text(correctAnswerText, margin, yPos);
     yPos += 7;
+
+    // 答案依據（教師講義才有；舊題組沒有這欄就略過）
+    if (q.answerEvidence) {
+      doc.setFont('NotoSansTC', 'bold');
+      doc.setFontSize(10);
+      checkPageBreak(5);
+      doc.text('答案依據：', margin, yPos);
+      yPos += 5;
+      doc.setFont('NotoSansTC', 'normal');
+      const evidenceLines = doc.splitTextToSize(q.answerEvidence, contentWidth - 8);
+      checkPageBreak(evidenceLines.length * 5 + 2);
+      doc.text(evidenceLines, margin + 5, yPos);
+      yPos += evidenceLines.length * 5 + 2;
+    }
     
     doc.setFont('NotoSansTC', 'bold');
     doc.setFontSize(10);

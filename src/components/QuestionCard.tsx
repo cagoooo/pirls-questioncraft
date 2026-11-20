@@ -100,12 +100,24 @@ export function QuestionCard({ questionItem, questionNumber, className, style, .
         {/* 黃色解析框 */}
         <div className="bg-lemon/55 border-neo rounded-[14px] px-4 py-3.5">
           <div className="text-sm font-extrabold mb-1 flex items-center gap-1.5">
-            <span>💡</span> 解析說明
+            <span>💡</span> 閱讀引導（學生作答後看到）
           </div>
           <div className="text-sm leading-[1.7] text-ink-soft whitespace-pre-wrap">
             {questionItem.explanation}
           </div>
         </div>
+
+        {/* 答案依據：只給老師對照正解（學生畫面、匯出檔都不放） */}
+        {questionItem.answerEvidence && (
+          <div className="mt-3 bg-sky/25 border-neo-dashed rounded-[14px] px-4 py-3" data-testid="answer-evidence">
+            <div className="text-sm font-extrabold mb-1 flex items-center gap-1.5">
+              <span>🔍</span> 答案依據（只有老師看得到）
+            </div>
+            <div className="text-sm leading-[1.7] text-ink-soft whitespace-pre-wrap">
+              {questionItem.answerEvidence}
+            </div>
+          </div>
+        )}
       </AccordionContent>
     </AccordionItem>
   );

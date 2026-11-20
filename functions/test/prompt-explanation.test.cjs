@@ -73,3 +73,31 @@ test('學生端只在作答後顯示閱讀引導，標題已改名', () => {
   assert.ok(!/答後講解/.test(quiz));
   assert.match(quiz, /閱讀引導：/);
 });
+
+// v0.4.6 答案依據（answerEvidence）：只給老師看，先寫依據再選正解
+const EVID_HEAD = '# 🔍 answerEvidence 的寫法（答案依據：只給老師看）';
+function evidence(src, from = 0) {
+  const start = src.indexOf(EVID_HEAD, from);
+  const end = src.indexOf('# ✍️ explanation 的寫法', start);
+  return start >= 0 && end > start ? src.slice(start, end) : '';
+}
+
+test('答案依據段落：網站文字、截圖與擴充功能兩份逐字相同，寫明只給老師看、先依據再正解', () => {
+  const s = evidence(FLOWS[0].src);
+  assert.ok(s, '缺少答案依據段落');
+  assert.match(s, /學生完全看不到、也不會匯出/);
+  assert.match(s, /先寫好 .{0,3}answerEvidence.{0,3}，再決定 .{0,3}correctAnswerIndex/);
+  assert.match(s, /explanation.{0,3}（閱讀引導）仍然不可以/);
+  assert.equal(evidence(FLOWS[1].src), s);
+  assert.equal(evidence(EXT), s);
+  assert.equal(evidence(EXT, EXT.indexOf(EVID_HEAD) + 1), s);
+  assert.match(EXT.slice(EXT.lastIndexOf(EVID_HEAD)), /影片時間點/);
+});
+
+test('輸出格式：answerEvidence 是必填，而且排在 correctAnswerIndex 前面', () => {
+  for (const { name, src } of FLOWS) {
+    const i = src.indexOf('answerEvidence: z.string()');
+    assert.ok(i > 0, `${name} 缺少 answerEvidence`);
+    assert.ok(i < src.indexOf('correctAnswerIndex: z.number()'), `${name} 答案依據要在正解前面`);
+  }
+});

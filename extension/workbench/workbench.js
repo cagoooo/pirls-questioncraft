@@ -667,9 +667,11 @@ function renderDraft() {
             <input type="text" data-opt="${j}" aria-label="第 ${i + 1} 題選項 ${'ABCD'[j]}">
           </label>`).join('')}
       </div>
-      <label class="exp"><span>閱讀引導（學生作答後看到：回到哪一段、找什麼，不說出答案）</span><textarea data-f="explanation" rows="2"></textarea></label>`;
+      <label class="exp"><span>閱讀引導（學生作答後看到：回到哪一段、找什麼，不說出答案）</span><textarea data-f="explanation" rows="2"></textarea></label>
+      <label class="exp evid"><span>🔍 答案依據（只有老師看得到，不會匯出）：先對一下和打勾的正解是不是同一件事</span><textarea data-f="answerEvidence" rows="2"></textarea></label>`;
     el.querySelector('[data-f=question]').value = q.question;
     el.querySelector('[data-f=explanation]').value = q.explanation;
+    el.querySelector('[data-f=answerEvidence]').value = q.answerEvidence ?? '';
     el.querySelectorAll('[data-opt]').forEach((inp) => { inp.value = q.options[Number(inp.dataset.opt)] ?? ''; });
     box.appendChild(el);
   });

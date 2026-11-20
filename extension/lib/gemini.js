@@ -153,6 +153,7 @@ export function normalize(raw) {
       options: Array.isArray(q?.options) ? q.options.map(s) : [],
       correctAnswerIndex: Number(q?.correctAnswerIndex),
       explanation: s(q?.explanation),
+      answerEvidence: s(q?.answerEvidence),
       pirlsLevel: s(q?.pirlsLevel),
     })),
   };
@@ -181,7 +182,7 @@ export function checkResult(data, questionMode) {
   return { fatal, warnings };
 }
 
-const FORMAT_HINT = `JSON 格式：{"title": 文章標題, "articleContent": 文章全文, "questions": [{"question": 題幹, "options": [四個選項], "correctAnswerIndex": 正解索引 0～3, "explanation": 解析, "pirlsLevel": ${PIRLS_LEVELS.map((l) => `"${l}"`).join(' | ')}}]}`;
+const FORMAT_HINT = `JSON 格式：{"title": 文章標題, "articleContent": 文章全文, "questions": [{"question": 題幹, "options": [四個選項], "answerEvidence": 答案依據（只給老師看，引用原文）, "correctAnswerIndex": 正解索引 0～3, "explanation": 解析, "pirlsLevel": ${PIRLS_LEVELS.map((l) => `"${l}"`).join(' | ')}}]}`;
 
 const FORMAT_HINT_TEXT = FORMAT_HINT.replace('"articleContent": 文章全文, ', '');
 const OPTION_ORDER_NOTE = '（補充說明：題目上傳到 PaGamO 後，選項順序會被隨機打亂。所以 explanation 裡不要用 A、B、C、D 或「第幾個選項」來指稱選項；explanation 是閱讀引導，也不可以寫出答案，只指出要回到哪裡、找什麼。）';

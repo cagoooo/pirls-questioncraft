@@ -341,6 +341,35 @@ function backendLines(file) {
   assert.equal(upd.STORE_URL, 'https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp');
   checks++;
 
+  // 答案依據（answerEvidence）只給老師看：AI 回傳會保留在題組裡，但任何匯出檔都不能出現
+  {
+    const SECRET = '答案依據測試字串XYZ';
+    const withEvidence = make(8);
+    withEvidence.questions.forEach((q) => { q.answerEvidence = `${SECRET}：第 1 段「原句」`; });
+    const norm = gemini.normalize(JSON.parse(JSON.stringify(withEvidence)));
+    assert.ok(norm.questions.every((q) => q.answerEvidence.startsWith(SECRET)), 'normalize 要保留答案依據');
+    assert.equal(gemini.normalize(make(1)).questions[0].answerEvidence, '', '舊題組沒有答案依據時是空字串');
+    const item = prompt.RESPONSE_SCHEMA.properties.questions.items;
+    assert.ok(item.required.includes('answerEvidence'));
+    assert.ok(item.propertyOrdering.indexOf('answerEvidence') < item.propertyOrdering.indexOf('correctAnswerIndex'), '答案依據要排在正解前面');
+    const flat = (wb) => JSON.stringify(rowsOf(roundtrip(wb)));
+    const outputs = {
+      '擴充 PaGamO 選擇題': flat(buildWorkbook(withEvidence, { group: false })),
+      '擴充 PaGamO 題組': flat(buildWorkbook(withEvidence, { group: true })),
+      '擴充 LoiLoNote 題組': flat(loilo.buildWorkbook(withEvidence)),
+      '擴充 LoiLoNote 九欄': flat(loilo.buildLegacyWorkbook(withEvidence)),
+      '網站 PaGamO 選擇題': flat(buildPaGamOWorkbook(withEvidence, false)),
+      '網站 PaGamO 題組': flat(buildPaGamOWorkbook(withEvidence, true)),
+    };
+    const { buildPlatformWorkbook: bpw } = load('src/lib/platformExports.ts');
+    for (const fmt of ['wayground', 'loilonote', 'wordwall', 'kahoot']) {
+      const tpl = ['kahoot', 'wayground'].includes(fmt) ? XLSX.readFile(path.join(root, 'public/export-templates', `${fmt}.xlsx`)) : undefined;
+      outputs[`網站 ${fmt}`] = flat(bpw(withEvidence, fmt, 60, tpl));
+    }
+    for (const [name, text] of Object.entries(outputs)) assert.ok(!text.includes(SECRET), `${name} 匯出檔不可以出現答案依據`);
+    checks++;
+  }
+
   // ZIP 打包：版本要與 CHANGELOG 最新一筆一致
   const manifest = JSON.parse(fs.readFileSync(ext('manifest.json'), 'utf8'));
   const changelog = JSON.parse(fs.readFileSync(ext('CHANGELOG.json'), 'utf8'));
