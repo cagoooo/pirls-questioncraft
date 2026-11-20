@@ -211,7 +211,7 @@ export function VersionUpdateBanner() {
               重新整理一下就是最新版。正在輸入的文章請先存好再更新。
             </p>
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-cream border-[1.5px] border-ink px-2.5 py-0.5 text-xs font-bold">
-              <span>🆕 {pretty.label}</span>
+              <span>📦 {pretty.label}</span>
               {pretty.sha && <span className="font-mono text-ink/60">{pretty.sha}</span>}
             </p>
           </div>
