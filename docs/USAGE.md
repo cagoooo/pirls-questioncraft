@@ -10,12 +10,12 @@
 
 **PIRLS QuestionCraft（PIRLS 閱讀素養題組生成站）** 是一個 AI 輔助出題工具，把任意一篇文章或課文圖片，自動轉成符合 **PIRLS 國際閱讀素養評量四層次** 的選擇題，支援多種匯出與線上施測：
 
-| PIRLS 層次 | 中文對照 | 8 題模式 | 10 題模式 |
-|---|---|---|---|
-| Locate & Retrieve | 訊息提取 | 2 | 3 |
-| Make Straightforward Inferences | 直接推論 | 2 | 3 |
-| Interpret & Integrate | 詮釋整合 | 2 | 2 |
-| Evaluate & Critique | 評估批判 | 2 | 2 |
+| PIRLS 層次 | 中文對照 | 5 題模式 | 8 題模式 | 10 題模式 |
+|---|---|---|---|---|
+| Locate & Retrieve | 訊息提取 | 2 | 2 | 3 |
+| Make Straightforward Inferences | 直接推論 | 1 | 2 | 3 |
+| Interpret & Integrate | 詮釋整合 | 1 | 2 | 2 |
+| Evaluate & Critique | 評估批判 | 1 | 2 | 2 |
 
 線上網址（GitHub Pages）：`https://cagoooo.github.io/pirls-questioncraft/`
 
@@ -181,7 +181,7 @@ firebase --account=ipad@mail2.smes.tyc.edu.tw \
 1. 開 `https://cagoooo.github.io/pirls-questioncraft/`
 2. 切到「圖片」分頁，拖放 / 點擊 / **Ctrl+V** 貼上截圖（最多 4 張）
 3. 圖片自動壓縮到長邊 1600px、JPEG 0.85
-4. 選 **8 題 / 10 題** 與 **中文 / 英文** 模式
+4. 選 **5 題 / 8 題 / 10 題** 與 **中文 / 英文** 模式
 5. 按「生成 PIRLS 題目」→ 前端 fetch `generateFromImages` Cloud Function
 6. AI 完成 OCR、重組分段、生成標題、出題
 7. 顯示文章 + 題卡列表（PIRLS 層次 + 解題引導但不洩答）

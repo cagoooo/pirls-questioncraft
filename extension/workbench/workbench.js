@@ -30,7 +30,7 @@ async function init() {
   renderVideoSource();
   $('sourceText').value = store[KEYS.text]?.text ?? '';
   renderTextMeta(store[KEYS.text]);
-  document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`).checked = true;
+  (document.querySelector(`input[name=qmode][value="${settings.questionMode}"]`) ?? document.querySelector('input[name=qmode][value="8-questions"]')).checked = true;
   document.querySelector(`input[name=lmode][value="${settings.languageMode}"]`).checked = true;
   for (const g of GRADE_LEVELS) $('gradeSel').add(new Option(g.label, g.id));
   $('gradeSel').value = gradeOf(settings.grade) ? settings.grade : '';
@@ -633,7 +633,7 @@ function renderDraft() {
   const d = draft.data;
   const when = new Date(draft.generatedAt).toLocaleString('zh-TW', { hour12: false });
   const g = gradeOf(draft.grade);
-  $('resultMeta').textContent = `${when} 產生｜${draft.questionMode === '10-questions' ? '10' : '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}${g ? `｜改寫成${g.label}` : ''}｜模型 ${draft.model}`;
+  $('resultMeta').textContent = `${when} 產生｜${({ '5-questions': '5', '10-questions': '10' })[draft.questionMode] ?? '8'} 題｜${draft.languageMode === 'en' ? '英文題目' : '中文'}${g ? `｜改寫成${g.label}` : ''}｜模型 ${draft.model}`;
   $('gradeNote').classList.toggle('hidden', !g);
   $('gradeNote').textContent = g ? `🎒 下面的文章已經改寫成${g.label}的版本，學生在 PaGamO／LoiLoNote 題組裡讀到的就是這段。AI 改寫難免有疏漏，請先讀過一次，確認沒有改錯原文的意思。` : '';
   const warn = $('resultWarn');

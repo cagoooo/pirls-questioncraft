@@ -95,10 +95,12 @@ def pagamo_route(route):
     return route.fulfill(body="<!doctype html><meta charset=utf-8><title>PaGamO 首頁</title><h1>首頁</h1>", content_type="text/html; charset=utf-8")
 
 LEVELS = ["locate & retrieve", "make straightforward inferences", "interpret & integrate", "evaluate & critique"]
+FIVE_LEVELS = [LEVELS[0], LEVELS[0], LEVELS[1], LEVELS[2], LEVELS[3]]  # 5 題：提取 2・推論 1・詮釋 1・評估 1
 def fake_questions(n=8):
+    levels = FIVE_LEVELS if n == 5 else [LEVELS[i // 2] for i in range(n)]
     return {"title": "小水滴的旅行", "articleContent": "清晨，小水滴躺在荷葉上。\n雲越來越重，小水滴又變成雨。",
             "questions": [{"question": f"模擬第{i+1}題：小水滴在哪裡？", "options": ["荷葉上", "石頭上", "樹枝上", "屋頂上"],
-                           "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "pirlsLevel": LEVELS[i // 2]} for i in range(n)]}
+                           "correctAnswerIndex": i % 4, "explanation": f"請回到第一段找線索 {i+1}", "pirlsLevel": levels[i]} for i in range(n)]}
 
 YT_ID = "9hE5-98ZeCg"
 def youtube_route(route):
@@ -134,7 +136,7 @@ def gemini_mock(route):
     if "改寫成適合" in json.dumps(body, ensure_ascii=False) and "題數與層次" not in json.dumps(body, ensure_ascii=False):
         text = json.dumps({"title": "小水滴的旅行", "articleContent": REWRITTEN}, ensure_ascii=False)
     elif "responseMimeType" in body.get("generationConfig", {}):
-        text = json.dumps(fake_questions(), ensure_ascii=False)
+        text = json.dumps(fake_questions(5 if "共 5 題" in json.dumps(body, ensure_ascii=False) else 8), ensure_ascii=False)
     else:
         text = "OK"
     return route.fulfill(json={"candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": "STOP"}]})
@@ -471,6 +473,24 @@ with sync_playwright() as p:
     check("格式規定被拒時自動退回 JSON 模式", len(gen) == 2 and "responseSchema" in gen[0]["generationConfig"]
           and "responseSchema" not in gen[1]["generationConfig"] and "JSON 格式" in json.dumps(gen[1], ensure_ascii=False), str(len(gen)))
     reject["on"] = False
+
+    # 10b2. 快速 5 題：提示詞帶 5 題分配、結果標示 5 題、分配正確不跳警告；之後切回 8 題
+    check("題數有 5／8／10 三個選項", bench.locator("input[name=qmode]").count() == 3 and bench.locator("input[name=qmode][value='5-questions']").count() == 1)
+    bench.click("label:has(input[name=qmode][value='5-questions'])")
+    bench.wait_for_timeout(300)
+    check("5 題設定會記住", bench.evaluate("chrome.storage.local.get('settings').then(r => r.settings.questionMode)") == "5-questions")
+    bench.once("dialog", lambda d: d.accept())
+    n_before = len(calls)
+    bench.click("#generate")
+    bench.wait_for_selector("#genStatus:has-text('完成')", timeout=20000)
+    gen = [json.loads(c["body"]) for c in calls[n_before:] if ":generateContent" in c["url"]]
+    p5 = json.dumps(gen[-1], ensure_ascii=False) if gen else ""
+    check("5 題提示詞：提取 2、推論 1、詮釋 1、評估 1", "共 5 題" in p5 and "直接推論）：**1 題**" in p5 and "訊息提取）：**2 題**" in p5)
+    check("結果標示 5 題", "5 題" in bench.inner_text("#resultMeta"), bench.inner_text("#resultMeta"))
+    check("5 題分配正確時不跳題數警告", not bench.is_visible("#resultWarn") or "預期" not in bench.inner_text("#resultWarn"), bench.inner_text("#resultWarn"))
+    bench.screenshot(path=str(HERE / "five-questions.png"))
+    bench.click("label:has(input[name=qmode][value='8-questions'])")
+    bench.wait_for_timeout(300)
 
     # 10c. 依年級改寫（文字）：先改寫、再用改寫後的文章依年級出題
     check("年級預設「原文」", bench.input_value("#gradeSel") == "" and "照原文出題" in bench.inner_text("#gradeHint"))
