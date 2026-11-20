@@ -307,7 +307,7 @@ export async function exportPIRLStoPDF({
     
     doc.setFont('NotoSansTC', 'bold');
     doc.setFontSize(10);
-    const explanationHeaderText = "答案說明：";
+    const explanationHeaderText = "閱讀引導：";
     checkPageBreak(5);
     doc.text(explanationHeaderText, margin, yPos);
     yPos += 5;

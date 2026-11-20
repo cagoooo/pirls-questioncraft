@@ -458,7 +458,7 @@ function progressStart({ video, grade, usual }) {
   progress.steps = [
     { key: 'read', text: video ? '讀取影片網址與片段' : mode === 'image' ? '讀取截圖' : '讀取文章' },
     ...(g ? [{ key: 'rewrite', text: `改寫成${g.label}讀得懂的版本` }] : []),
-    { key: 'gen', text: video ? '看影片，依 PIRLS 四層次出題' : '依 PIRLS 四層次出題，寫答後講解' },
+    { key: 'gen', text: video ? '看影片，依 PIRLS 四層次出題' : '依 PIRLS 四層次出題，寫閱讀引導' },
     { key: 'check', text: '檢查題目格式與正解' },
   ];
   $('resultEmpty').classList.add('hidden');
@@ -667,7 +667,7 @@ function renderDraft() {
             <input type="text" data-opt="${j}" aria-label="第 ${i + 1} 題選項 ${'ABCD'[j]}">
           </label>`).join('')}
       </div>
-      <label class="exp"><span>答後講解（學生作答後才看得到：線索、正解理由、其他選項錯在哪）</span><textarea data-f="explanation" rows="2"></textarea></label>`;
+      <label class="exp"><span>閱讀引導（學生作答後看到：回到哪一段、找什麼，不說出答案）</span><textarea data-f="explanation" rows="2"></textarea></label>`;
     el.querySelector('[data-f=question]').value = q.question;
     el.querySelector('[data-f=explanation]').value = q.explanation;
     el.querySelectorAll('[data-opt]').forEach((inp) => { inp.value = q.options[Number(inp.dataset.opt)] ?? ''; });
