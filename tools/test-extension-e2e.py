@@ -1,7 +1,7 @@
 # 擴充套件端對端測試：Playwright 載入未封裝擴充套件，模擬老師操作（Gemini 以模擬回應代替，另含一次「無效金鑰」真連線）。
 # 需求：pip install playwright openpyxl pillow ＆ python -m playwright install chromium
 # 執行：python -X utf8 tools/test-extension-e2e.py （截圖與下載檔會放在暫存資料夾，結尾會印出位置）
-import json, shutil, sys, tempfile, time, base64, pathlib, zipfile, io
+import json, re, shutil, sys, tempfile, time, base64, pathlib, zipfile, io
 from playwright.sync_api import sync_playwright
 import openpyxl
 from PIL import Image
@@ -157,6 +157,9 @@ with sync_playwright() as p:
         "download": remote.get("download", "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip"),
         "install": remote.get("install", "https://cagoooo.github.io/pirls-questioncraft/extension/")}))
     ctx.route("https://www.pagamo.org/**", pagamo_route)
+    # LoiLoNote：下載測驗卡後會自動開分頁，換成模擬頁面，不連到真的網站
+    #（擴充功能用 chrome.tabs.create 開的第一個網址可能在攔截生效前就載入真站；真站之後的程式檔一律擋掉，避免跑真站程式）
+    ctx.route(re.compile(r"^https://([a-z0-9-]+\.)?loilonote\.app/.*"), lambda r: r.fulfill(body="<!doctype html><title>LoiLoNote 模擬</title><p>LoiLoNote</p>", content_type="text/html; charset=utf-8") if r.request.resource_type == "document" else r.abort())
     ctx.route("https://www.youtube.com/**", youtube_route)
     ctx.route("https://i.ytimg.com/**", thumb_route)
     ctx.route("https://pirls-test.example/**", lambda r: r.fulfill(body=BLOG_HTML if "blog" in r.request.url else ARTICLE_HTML, content_type="text/html; charset=utf-8"))
@@ -397,8 +400,13 @@ with sync_playwright() as p:
     check("選擇題版第 11 列是第 1 題", r[0] == 1 and r[1:4] == ["國語", "115上", "小水滴的旅行（修訂）"] and r[17] == "C", str(r[:6]))
     check("選擇題檔預設選項隨機排列（v）", r[20] == "v", str(r[20]))
     # LoiLoNote 題組檔（與網站相同的九欄）：第 1 列欄名、第 2 列起題目
+    loilo_pages = lambda: [p for p in ctx.pages if p.url.startswith("https://loilonote.app")]
     with bench.expect_download() as dl_l9:
         bench.click("#dlLoilo")
+    for _ in range(30):
+        if loilo_pages(): break
+        bench.wait_for_timeout(200)
+    check("LoiLoNote 下載後自動開 loilonote.app 新分頁", len(loilo_pages()) == 1, str([p.url for p in ctx.pages]))
     p9 = OUT / ("loilo9_" + dl_l9.value.suggested_filename); dl_l9.value.save_as(str(p9))
     ws9 = openpyxl.load_workbook(p9).active
     h9, q9 = [c.value for c in ws9[1]], [c.value for c in ws9[2]]
@@ -408,6 +416,7 @@ with sync_playwright() as p:
     # LoiLoNote 含文章版（v1.2.0）：A1 版本、第 3 列文章 questionOnly、第 4 列起單選題
     with bench.expect_download() as dl_loilo:
         bench.click("#dlLoiloArticle")
+    bench.wait_for_timeout(1500)
     pl = OUT / ("loilo_" + dl_loilo.value.suggested_filename); dl_loilo.value.save_as(str(pl))
     wl = openpyxl.load_workbook(pl)
     wsl = wl["Import"] if "Import" in wl.sheetnames else wl.active
@@ -418,6 +427,9 @@ with sync_playwright() as p:
     check("LoiLoNote 第 4 列是改過的第 1 題、正解 3", l4[0] == "radio" and str(l4[1]).startswith("老師改過") and l4[2:5] == [1, 1, 3], str(l4[:5])[:80])
     check("LoiLoNote 共 2+1+8 列", wsl.max_row == 11, str(wsl.max_row))
     check("LoiLoNote 下載後在按鈕下方顯示匯入說明", bench.is_visible("#loiloMsg") and "文件匯入" in bench.inner_text("#loiloMsg"), bench.inner_text("#loiloMsg"))
+    check("再下載含文章版不會重複開 LoiLoNote 分頁", len(loilo_pages()) == 1, str([p.url for p in ctx.pages]))
+    for p_ in loilo_pages(): p_.close()
+    bench.bring_to_front()
     # 切到「固定」再下載：要寫 x
     bench.click("label:has(input[name=optorder][value=fixed])")
     bench.wait_for_timeout(300)
@@ -804,7 +816,8 @@ with sync_playwright() as p:
     check("老師手動選的模型不會被換掉", m == "gemini-2.5-flash", m)
 
     # 400 來自第 2 步故意送無效金鑰；pagamo.org 開頭的是 PaGamO 網站自己的程式錯誤（擴充套件換網址時可能連到真站的登入頁）
-    sw_errors = [e for e in errors if "favicon" not in e and "status of 400" not in e and not e.startswith("https://www.pagamo.org")]
+    # loilonote.app 開頭的是 LoiLoNote 網站自己的錯誤：擴充功能用 chrome.tabs.create 開的分頁攔不到，會連到真站登入頁
+    sw_errors = [e for e in errors if "favicon" not in e and "status of 400" not in e and not e.startswith(("https://www.pagamo.org", "https://loilonote.app"))]
     check("沒有任何 JavaScript 錯誤", not sw_errors, "\n".join(sw_errors[:10]))
     ctx.close()
 

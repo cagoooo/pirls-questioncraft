@@ -912,6 +912,21 @@ $('dlGroup').addEventListener('click', () => exportFile(true));
 $('dlChoice').addEventListener('click', () => exportFile(false));
 
 // LoiLoNote 測驗卡：題組檔＝與網站相同的九欄格式；含文章版＝v1.2.0（文章＋單選題）。不需要 PaGamO 的科目／冊次／章節
+// 下載成功後幫老師打開 LoiLoNote（v0.10.10）：直接到下一關登入、匯入。
+// 同一個工作台已經開過的 LoiLoNote 分頁就切過去，不重複開；網址寫死，不用網路上讀到的資料。
+const LOILO_URL = 'https://loilonote.app/';
+let loiloTabId = null;
+async function openLoilo() {
+  await new Promise((r) => setTimeout(r, 700)); // 先讓下載開始、老師看到成功訊息
+  if (loiloTabId !== null) {
+    try {
+      const t = await chrome.tabs.update(loiloTabId, { active: true });
+      if (t) { await chrome.windows.update(t.windowId, { focused: true }); return; }
+    } catch { /* 分頁已經關掉：重新開一個 */ }
+  }
+  const t = await chrome.tabs.create({ url: LOILO_URL, active: true });
+  loiloTabId = t.id;
+}
 function exportLoilo(withArticle) {
   const msg = $('loiloMsg');
   try {
@@ -921,7 +936,8 @@ function exportLoilo(withArticle) {
     const parts = withArticle ? globalThis.PirlsLoilo.passageItems(data.title, data.articleContent).length : 0;
     const note = parts > 1 ? `文章較長，已分成 ${parts} 段放在題目前面。` : '';
     msg.className = 'notice ok';
-    msg.innerHTML = `✅ 已下載「${escapeHtml(name)}」。${note}到 LoiLoNote 測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。`;
+    msg.innerHTML = `✅ 已下載「${escapeHtml(name)}」。${note}已幫你打開 <a href="${LOILO_URL}" target="_blank" rel="noopener">LoiLoNote</a>（新分頁）：登入後到測驗卡點「…」→「文件匯入」，預覽確認後按「使用此文件創建」。`;
+    openLoilo();
   } catch (e) {
     logError('匯出 LoiLoNote', e);
     msg.className = 'notice error';
