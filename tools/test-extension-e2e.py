@@ -637,7 +637,9 @@ with sync_playwright() as p:
     logp.click("#logClear"); logp.wait_for_selector("#logEmpty:not(.hidden)")
     logp.close()
 
-    # 14. 讀取部落格全文
+    # 14. 讀取部落格全文（先切回截圖分頁：重現「文字分頁藏著時收到文章，文字框被量成一條線」）
+    bench.click(".tab[data-mode=image]")
+    bench.wait_for_timeout(300)
     blog = ctx.new_page()
     blog.goto("https://pirls-test.example/blog.html")
     blog.bring_to_front()
@@ -653,6 +655,8 @@ with sync_playwright() as p:
     bench.bring_to_front()
     bench.wait_for_timeout(500)
     check("工作台顯示來源（讀取全文）", "讀取全文" in bench.inner_text("#textMeta") and bench.input_value("#sourceText") == txt, bench.inner_text("#textMeta"))
+    h = bench.evaluate("document.getElementById('sourceText').getBoundingClientRect().height")
+    check("讀取全文後文字框有正常高度（不是一條線）", h >= 150, str(h))
 
     # 14b. 載入新素材時右邊舊題組要先收起來，可一鍵還原
     check("讀取新文章後右邊舊題組被收起", bench.is_visible("#resultEmpty") and bench.is_hidden("#resultBody"))

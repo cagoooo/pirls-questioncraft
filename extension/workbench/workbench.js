@@ -89,6 +89,8 @@ function renderMode() {
   $('panel-image').classList.toggle('hidden', mode !== 'image');
   $('panel-text').classList.toggle('hidden', mode !== 'text');
   $('panel-video').classList.toggle('hidden', mode !== 'video');
+  // 切到文字分頁時才量得到高度：「讀取這頁全文」會同時送來文章和切換分頁，文章先到時分頁還藏著
+  if (mode === 'text') autoGrow($('sourceText'));
 }
 
 // ---------- 素材：YouTube 影片（v0.9.0） ----------
@@ -679,6 +681,8 @@ function renderDraft() {
 }
 
 function autoGrow(t) {
+  // 藏起來的分頁量不到高度（scrollHeight 是 0）：不要把它縮成 4px，先清掉，等顯示時再量（v0.10.8）
+  if (!t.offsetParent) { t.style.height = ''; return; }
   t.style.height = 'auto';
   t.style.height = `${Math.min(t.scrollHeight + 4, 900)}px`;
 }
