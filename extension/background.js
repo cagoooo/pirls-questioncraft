@@ -155,13 +155,16 @@ async function useVideo(tab) {
 }
 
 // ---------- 讀取這頁全文 ----------
+const DRIVE_PDF_VIEW = /^https:\/\/drive\.google\.com\/file\/d\/[^/]+\/(view|preview)/;
 async function readFullPage(tab) {
   if (!tab?.id) return { ok: false, error: '找不到目前的分頁。' };
   let result;
   try {
+    // Google 雲端硬碟的 PDF 預覽：捲到才載入文字，要先自動捲完全部頁面（v0.10.11）
+    const drivePdf = DRIVE_PDF_VIEW.test(tab.url || '');
     const res = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ['vendor/Readability.js', 'content/extract-article.js'],
+      files: drivePdf ? ['content/extract-drive-pdf.js'] : ['vendor/Readability.js', 'content/extract-article.js'],
     });
     result = res?.[res.length - 1]?.result;
   } catch (e) {
@@ -181,6 +184,10 @@ async function readFullPage(tab) {
     [KEYS.text]: { text, title: result.title || tab.title || '', url: result.url || tab.url || '', ts: Date.now(), from: 'page' },
     sourceMode: 'text',
   });
+  // 雲端硬碟 PDF 沒讀滿全部頁數（例如捲動逾時）：提醒老師檢查最後幾頁
+  if (result.method === 'drive-pdf' && result.totalPages && result.pages < result.totalPages) {
+    await chrome.storage.local.set({ lastNotice: `雲端硬碟 PDF 只讀到 ${result.pages}／${result.totalPages} 頁，請檢查文章最後面有沒有缺；缺的部分可以改用「截取這個畫面」補上。` });
+  }
   await openWorkbench();
   return { ok: true, length: text.length };
 }

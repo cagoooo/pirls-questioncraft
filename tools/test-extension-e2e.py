@@ -81,6 +81,25 @@ def fake_overview():
     cards = "".join(f'<div class="ant-card"><div class="ant-card-body"><div>ID {i}</div><div>{t}</div><span>題組</span></div></div>'
                     for i, t in [(7790001, pagamo_state["overview_title"]), (7788837, "鑰匙不會分身"), (7780000, pagamo_state["old_title"])] if t)
     return f"<!doctype html><html><meta charset=utf-8><title>PaGamO</title><body><p>共 2 題</p>{cards}</body></html>"
+DRIVE_PDF_HTML = """<!doctype html><meta charset="utf-8"><title>測試規定.pdf - Google 雲端硬碟</title>
+<style>body{margin:0}#sc{height:600px;overflow-y:auto}.pg{height:1100px;border-bottom:1px solid #ccc}</style>
+<div id="sc">""" + "".join(f'<div class="pg" data-n="{i}"></div>' for i in range(1, 6)) + """</div>
+<script>
+const sc = document.getElementById('sc');
+const body = (n) => `第 ${n} 頁，共 5 頁
+測試小學閱讀資料
+第${n}段開頭，這一句話很長很長，被PDF檔案的版面切成
+兩行，後面還有。
+第 ${n} 頁，共 5 頁`;
+function load() {
+  document.querySelectorAll('.pg:not(.ok)').forEach((p) => {
+    if (p.getBoundingClientRect().top < innerHeight + 100) { p.classList.add('ok'); p.innerText = body(p.dataset.n); }
+  });
+}
+sc.addEventListener('scroll', () => setTimeout(load, 150));
+load();
+</script>"""
+
 def pagamo_route(route):
     url = route.request.url
     if "questions/overview" in url:
@@ -157,6 +176,8 @@ with sync_playwright() as p:
         "download": remote.get("download", "https://cagoooo.github.io/pirls-questioncraft/extension/pirls-helper-extension.zip"),
         "install": remote.get("install", "https://cagoooo.github.io/pirls-questioncraft/extension/")}))
     ctx.route("https://www.pagamo.org/**", pagamo_route)
+    # 雲端硬碟 PDF 預覽：5 頁，捲到才載入文字；每頁有頁碼標籤與重複頁首，句子被 PDF 切成兩行
+    ctx.route("https://drive.google.com/file/d/**", lambda r: r.fulfill(body=DRIVE_PDF_HTML, content_type="text/html; charset=utf-8"))
     # LoiLoNote：下載測驗卡後會自動開分頁，換成模擬頁面，不連到真的網站
     #（擴充功能用 chrome.tabs.create 開的第一個網址可能在攔截生效前就載入真站；真站之後的程式檔一律擋掉，避免跑真站程式）
     ctx.route(re.compile(r"^https://([a-z0-9-]+\.)?loilonote\.app/.*"), lambda r: r.fulfill(body="<!doctype html><title>LoiLoNote 模擬</title><p>LoiLoNote</p>", content_type="text/html; charset=utf-8") if r.request.resource_type == "document" else r.abort())
@@ -802,6 +823,28 @@ with sync_playwright() as p:
     bench.evaluate("chrome.storage.local.remove('updateCheck')")
     bench.reload(); bench.wait_for_selector("#shotCount"); bench.wait_for_timeout(1200)
     check("已是最新版時不顯示提醒", bench.is_hidden("#updateBanner"))
+
+    # 19b. 雲端硬碟 PDF 預覽「讀取這頁全文」：要自動捲完全部頁面（v0.10.11）
+    drive = ctx.new_page()
+    drive.goto("https://drive.google.com/file/d/TESTPDF/view")
+    drive.bring_to_front()
+    check("模擬雲端硬碟一開始只載入第 1 頁", drive.evaluate("document.querySelectorAll('.pg.ok').length") == 1)
+    pg = open_popup_for("https://drive.google.com/file/d/*")
+    pg.click("#readPage", no_wait_after=True)
+    dtxt = ""
+    for _ in range(60):
+        bench.wait_for_timeout(500)
+        st = bench.evaluate("chrome.storage.local.get('sourceText')")
+        dtxt = (st.get("sourceText") or {}).get("text", "")
+        if "第5段開頭" in dtxt: break
+    check("雲端硬碟 PDF：5 頁都讀到", all(f"第{n}段開頭" in dtxt for n in range(1, 6)), dtxt[:200])
+    check("雲端硬碟 PDF：清掉「第 N 頁，共 5 頁」", "共 5 頁" not in dtxt, dtxt[:200])
+    check("雲端硬碟 PDF：重複的頁首只留一次", dtxt.count("測試小學閱讀資料") == 1, str(dtxt.count("測試小學閱讀資料")))
+    check("雲端硬碟 PDF：被切斷的句子接回同一段", "版面切成兩行，後面還有。" in dtxt, dtxt[:200])
+    check("雲端硬碟 PDF：讀完捲回第一頁", drive.evaluate("document.getElementById('sc').scrollTop") == 0)
+    check("雲端硬碟 PDF：標題去掉「.pdf - Google 雲端硬碟」", bench.evaluate("chrome.storage.local.get('sourceText').then(r => r.sourceText.title)") == "測試規定")
+    drive.close()
+    bench.bring_to_front()
 
     # 16. 舊版設定（Flash）升級：打開工作台就自動換成 Flash-Lite；手動選過的不動
     bench.evaluate("""async () => { const r = await chrome.storage.local.get('settings');

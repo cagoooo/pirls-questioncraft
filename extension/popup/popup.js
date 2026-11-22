@@ -30,12 +30,15 @@ const $ = (id) => document.getElementById(id);
 async function send(type, busyText, btn) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   document.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-  btn.textContent = busyText;
+  // 雲端硬碟 PDF 要先自動捲完全部頁面（約 10～20 秒），讓老師知道在做什麼（v0.10.11）
+  const drivePdf = type === 'READ_PAGE' && /^https:\/\/drive\.google\.com\/file\/d\//.test(tab?.url || '');
+  btn.textContent = drivePdf ? '⏳ 雲端硬碟 PDF：正在自動翻完全部頁面…（約 10～20 秒）' : busyText;
   try {
-    // 背景程式 10 秒沒回應就直接說明，不再默默沒反應
+    // 背景程式太久沒回應就直接說明，不再默默沒反應；讀取全文（雲端硬碟 PDF 要捲完全部頁面）給 60 秒
+    const limit = type === 'READ_PAGE' ? 60000 : 10000;
     const res = await Promise.race([
       chrome.runtime.sendMessage({ type, tab }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('背景程式沒有回應。請把 Chrome 全部關掉再重新打開後再試一次。')), 10000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('背景程式沒有回應。請把 Chrome 全部關掉再重新打開後再試一次。')), limit)),
     ]);
     if (res && res.ok === false && res.error && !/too-short/.test(res.error)) {
       // 失敗時背景程式通常已經打開工作台並寫好說明；這裡也留一行訊息
