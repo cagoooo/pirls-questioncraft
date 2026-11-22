@@ -473,9 +473,10 @@ function progressStart({ video, grade, usual }) {
   progressStep(g ? 'rewrite' : 'gen', 'active');
   progressTick();
   progress.timer = setInterval(progressTick, 1000);
-  // 窄螢幕（上下排）時，結果區在下面：捲過去讓老師看得到進度
+  // 按下出題就帶老師去看進度（v0.10.9）：結果區的標題不在畫面上半部就捲過去。
+  // 原本只在「結果區在畫面下方」時才捲；老師往下捲去按按鈕時，結果區標題已經跑到畫面上方，就沒有捲。
   const r = $('resultCard').getBoundingClientRect();
-  if (r.top > innerHeight * 0.6 || r.bottom < 0) $('resultCard').scrollIntoView({ behavior: smoothScroll(), block: 'start' });
+  if (r.top < 0 || r.top > innerHeight * 0.4) $('resultCard').scrollIntoView({ behavior: smoothScroll(), block: 'start' });
 }
 
 function progressTick() {

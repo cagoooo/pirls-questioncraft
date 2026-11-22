@@ -56,6 +56,7 @@ kbd { border: 1px solid var(--ink-soft); border-bottom-width: 2px; border-radius
 .q header select { width: auto; padding: 4px 10px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 700; }
 .lv-0 { background: #E1EEF9; } .lv-1 { background: #E3F0E1; } .lv-2 { background: #FDF0D0; } .lv-3 { background: #FBE4E9; }
 .q textarea { min-height: 64px; }
+#resultCard { scroll-margin-top: 12px; } /* 捲到結果區時上方留一點空間 */
 #sourceText { min-height: 12em; } /* 文章框至少約 6 行，避免被量成一條線 */
 .opts { display: grid; gap: 8px; margin: 10px 0; }
 .opt { display: grid; grid-template-columns: auto 34px 1fr; gap: 8px; align-items: center; }

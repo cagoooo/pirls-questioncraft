@@ -452,12 +452,25 @@ with sync_playwright() as p:
     bench.evaluate("""(t) => chrome.storage.local.set({ sourceText: { text: t, title: '測試文章頁' }, sourceMode: 'text' })""", article)
     bench.wait_for_timeout(500)
     check("右鍵帶入的文字出現在文字分頁", bench.input_value("#sourceText") == article and bench.is_visible("#panel-text"))
+    # 按下出題就捲到進度區：先把頁面捲到最下面（結果區標題跑到畫面上方），記錄進度面板出現時有沒有捲過去
+    bench.evaluate("""() => {
+      window.__sc = []; window.__pg = null;
+      const orig = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (...a) { window.__sc.push([this.id, performance.now()]); return orig.apply(this, a); };
+      const box = document.getElementById('genProgress');
+      new MutationObserver(() => { if (!box.classList.contains('hidden') && window.__pg === null) window.__pg = performance.now(); }).observe(box, { attributes: true });
+      scrollTo(0, document.documentElement.scrollHeight);
+    }""")
+    bench.wait_for_timeout(300)
+    top_before = bench.evaluate("document.getElementById('resultCard').getBoundingClientRect().top")
     bench.once("dialog", lambda d: d.accept())
     n_before = len(calls)
     bench.click("#generate")
     bench.wait_for_selector("#genStatus:has-text('完成')", timeout=20000)
     gen = [c for c in calls[n_before:] if ":generateContent" in c["url"]]
     body = json.loads(gen[-1]["body"]) if gen else {}
+    sc = bench.evaluate("[window.__pg, window.__sc]")
+    check("按下出題後馬上捲到「檢查與修改題目」進度區", top_before < 0 and sc[0] is not None and any(i == "resultCard" and abs(t - sc[0]) < 300 for i, t in sc[1]), str([top_before, sc]))
     parts = body.get("contents", [{}])[0].get("parts", [])
     check("文字出題用 <ARTICLE> 提示詞、沒有圖片", len(parts) == 3 and "<ARTICLE>" in parts[0]["text"] and article in parts[0]["text"] and "不需要輸出 articleContent" in parts[1]["text"])
     sch = body.get("generationConfig", {}).get("responseSchema", {})
