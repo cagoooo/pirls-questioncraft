@@ -37,6 +37,14 @@ jobs:
         working-directory: functions
         run: node --test test/privacy.test.cjs test/prompt-explanation.test.cjs
 
+      - name: List functions to deploy (named deploy only)
+        id: fns
+        working-directory: functions
+        run: |
+          FNS=$(node -e 'const m=require("./"+(require("./package.json").main||"index.js"));const k=Object.keys(m);if(!k.length)process.exit(1);console.log(k.map(f=>"functions:"+f).join(","));process.exit(0)')
+          echo "list=$FNS" >> "$GITHUB_OUTPUT"
+          echo "將點名部署：$FNS"
+
       - name: Auth to GCP
         id: auth
         uses: google-github-actions/auth@v2
@@ -50,7 +58,8 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
 
+      # 點名部署：只更新本 repo 匯出的函式，不會把專案裡其他系統的函式比對成「多餘」而刪掉
       - name: Deploy Cloud Functions
-        run: npx -y firebase-tools deploy --only functions --project pirls-questioncraft --non-interactive
+        run: npx -y firebase-tools deploy --only "${{ steps.fns.outputs.list }}" --project pirls-questioncraft --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
