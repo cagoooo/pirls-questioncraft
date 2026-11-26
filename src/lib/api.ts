@@ -168,7 +168,7 @@ export async function getMyQuota(): Promise<MyQuota | null> {
 }
 
 export type GuideSource = 'daily' | 'pool' | 'last-one' | 'banner' | 'hero';
-export type GuideTarget = 'store' | 'review' | 'install';
+export type GuideTarget = 'store' | 'review' | 'install' | 'skill' | 'skill-guide';
 
 /** 記一次引導按鈕點擊（只記次數，不記是誰）；用 sendBeacon，頁面跳走也送得出去 */
 export function trackGuideClick(source: GuideSource, target: GuideTarget): void {

@@ -3,13 +3,23 @@
 // 不只顯示錯誤，而是引導老師改用 Chrome 擴充套件（用自己的免費 Gemini 金鑰繼續出題），
 // 並請老師到商店給五星好評，讓更多老師知道這個工具。
 // v0.4.1：每個按鈕記點擊次數（只記次數，不記是誰）；另有筆電寬度的精簡橫幅、剩最後 1 次的提醒。
+// 2026-11-26：引導卡加第二條路「下載 Gemini 技能（pagamo-reading-set）裝進學校帳號的 Gemini 繼續出題」，
+// 技能檔與安裝教學都在 PaGamO 題組下載器（cagoooo.github.io/pagamo-gemini）；下載後同一次點擊自動開 Gemini 技能頁。
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { trackGuideClick, type GuideSource } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/cfbehdinangicblpbnockoofeccmoidp';
 export const EXTENSION_REVIEW_URL = `${EXTENSION_STORE_URL}/reviews`;
+
+/** Gemini 技能「pagamo-reading-set」：放在 PaGamO 題組下載器（同一個 cagoooo.github.io 網域，download 屬性有效） */
+export const PAGAMO_GEMINI_URL = 'https://cagoooo.github.io/pagamo-gemini/';
+export const GEMINI_SKILL_FILE_URL = `${PAGAMO_GEMINI_URL}skill/pagamo-reading-set/SKILL.md`;
+export const GEMINI_SKILL_GUIDE_URL = `${PAGAMO_GEMINI_URL}skill.html`;
+/** Gemini 技能安裝頁（2026-11-26 實測：/skills 會轉到這裡） */
+export const GEMINI_SKILLS_PAGE_URL = 'https://gemini.google.com/customize/skills';
 
 export type QuotaGuideKind = 'daily' | 'pool';
 
@@ -56,27 +66,85 @@ export function ExtensionGuideCard({ guide, className }: { guide: QuotaGuide; cl
         {guide.kind === 'pool' ? '🌙 本月共用額度用完了' : '🔢 今天的共用出題次數用完了'}
       </span>
       <p className="text-lg sm:text-xl font-extrabold leading-snug">
-        改用 Chrome 擴充套件「PIRLS 閱讀題組小幫手」，<br className="hidden sm:inline" />
-        用你自己的免費 Gemini 金鑰繼續出題 🧩
+        還想繼續出題？有兩種免費的方法，不用等 🙌
       </p>
       <p className="text-base leading-relaxed">{guide.message}</p>
-      <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-        <a href={storeUrl} target="_blank" rel="noopener noreferrer" className={cn(btn, 'bg-sky')}
-          onClick={() => trackGuideClick(source, 'store')}>
-          🧩 免費加到 Chrome
-        </a>
-        <a href={reviewUrl} target="_blank" rel="noopener noreferrer" className={cn(btn, 'bg-lemon')}
-          onClick={() => trackGuideClick(source, 'review')}>
-          ⭐⭐⭐⭐⭐ 給我們五星好評
-        </a>
-        <Link href="/extension/" className={cn(btn, 'bg-card')} onClick={() => trackGuideClick(source, 'install')}>
-          📖 看安裝與金鑰申請說明
-        </Link>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* 方法一：Chrome 擴充套件 */}
+        <section className="flex flex-col gap-3 rounded-[18px] border-[1.5px] border-ink bg-sky/25 p-4">
+          <h3 className="text-base sm:text-lg font-extrabold leading-snug">
+            方法一：Chrome 擴充套件「PIRLS 閱讀題組小幫手」🧩
+          </h3>
+          <p className="text-base leading-relaxed">
+            用你自己的免費 Gemini 金鑰繼續出題，次數不受限制；在任何網頁截圖或讀全文出題，還能一鍵送到 PaGamO。
+          </p>
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+            <a href={storeUrl} target="_blank" rel="noopener noreferrer" className={cn(btn, 'bg-sky')}
+              onClick={() => trackGuideClick(source, 'store')}>
+              🧩 免費加到 Chrome
+            </a>
+            <a href={reviewUrl} target="_blank" rel="noopener noreferrer" className={cn(btn, 'bg-lemon')}
+              onClick={() => trackGuideClick(source, 'review')}>
+              ⭐⭐⭐⭐⭐ 給我們五星好評
+            </a>
+            <Link href="/extension/" className={cn(btn, 'bg-card')} onClick={() => trackGuideClick(source, 'install')}>
+              📖 看安裝與金鑰申請說明
+            </Link>
+          </div>
+          <p className="text-sm opacity-80">
+            小提醒：擴充套件要用<b>電腦版 Chrome</b> 安裝（手機、平板的 Chrome 不能裝）。裝好後在設定頁貼上自己的 Gemini 金鑰（免費申請，步驟在安裝說明頁）。
+          </p>
+        </section>
+        {/* 方法二：Gemini 技能 */}
+        <GeminiSkillOption source={source} />
       </div>
-      <p className="text-sm opacity-80">
-        小提醒：擴充套件要用<b>電腦版 Chrome</b> 安裝（手機、平板的 Chrome 不能裝）。裝好後在設定頁貼上自己的 Gemini 金鑰（免費申請，步驟在安裝說明頁），就能在任何網頁截圖或讀全文出題，還能一鍵送到 PaGamO。
-      </p>
     </div>
+  );
+}
+
+/** 2026-11-26：方法二「下載 Gemini 技能」—— 下載 SKILL.md 的同一次點擊自動開 Gemini 技能頁，並提示下一步按哪裡 */
+function GeminiSkillOption({ source }: { source: GuideSource }) {
+  const { toast } = useToast();
+  const onDownload = () => {
+    // 必須在點擊當下同步呼叫，放進 await／setTimeout 之後會被當成彈出視窗擋掉
+    window.open(GEMINI_SKILLS_PAGE_URL, '_blank', 'noopener,noreferrer');
+    trackGuideClick(source, 'skill');
+    toast({
+      title: '已下載 SKILL.md，正在開啟 Gemini 技能頁',
+      description: '在新分頁按右上角「建立 ▾」→「上傳」→「檔案」，選剛下載的 SKILL.md，再按「上傳」。沒看到新分頁？按下面步驟 ① 的連結。',
+      duration: 10000,
+    });
+  };
+  return (
+    <section className="flex flex-col gap-3 rounded-[18px] border-[1.5px] border-ink bg-sage/25 p-4">
+      <h3 className="text-base sm:text-lg font-extrabold leading-snug">
+        方法二：把「PaGamO 閱讀題組」技能裝進 Gemini ✨
+      </h3>
+      <p className="text-base leading-relaxed">
+        用<b>學校 Google 帳號</b>的 Gemini 繼續出題，<b>不用申請金鑰</b>：貼上文章，Gemini 就照 PIRLS 四層次出好題組，
+        還能轉成可以直接上傳 PaGamO 的 Excel。安裝只要做一次，大約 2 分鐘。
+      </p>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+        <a href={GEMINI_SKILL_FILE_URL} download="SKILL.md" className={cn(btn, 'bg-sage')} onClick={onDownload}>
+          ⬇ 下載 Gemini 技能檔 SKILL.md
+        </a>
+        <a href={GEMINI_SKILL_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={cn(btn, 'bg-card')}
+          onClick={() => trackGuideClick(source, 'skill-guide')}>
+          📖 看 Gemini 技能安裝教學
+        </a>
+      </div>
+      <ol className="list-decimal pl-5 text-sm leading-6 space-y-0.5">
+        <li>
+          按下載後會自動開新分頁到 Gemini 技能頁（沒看到新分頁？
+          <a href={GEMINI_SKILLS_PAGE_URL} target="_blank" rel="noopener noreferrer" className="font-extrabold underline underline-offset-2">
+            按這裡打開
+          </a>
+          ）。右上角頭像要是學校帳號。
+        </li>
+        <li>按右上角「建立 ▾」→「上傳」→「檔案」，選剛下載的 SKILL.md，再按右下角「上傳」。</li>
+        <li>開新對話，輸入框打 <b>@pag</b> 選「pagamo-reading-set」，貼上文章就能出題。</li>
+      </ol>
+    </section>
   );
 }
 

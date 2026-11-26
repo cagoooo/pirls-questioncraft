@@ -4,8 +4,8 @@
 
 /** 引導出現的位置 */
 export const GUIDE_SOURCES = ['daily', 'pool', 'last-one', 'banner', 'hero'] as const;
-/** 點了哪個按鈕：商店頁、評論頁、安裝說明 */
-export const GUIDE_TARGETS = ['store', 'review', 'install'] as const;
+/** 點了哪個按鈕：商店頁、評論頁、安裝說明、下載 Gemini 技能、Gemini 技能安裝教學（2026-11-26） */
+export const GUIDE_TARGETS = ['store', 'review', 'install', 'skill', 'skill-guide'] as const;
 
 export type GuideSource = (typeof GUIDE_SOURCES)[number];
 export type GuideTarget = (typeof GUIDE_TARGETS)[number];

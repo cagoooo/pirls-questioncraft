@@ -296,7 +296,7 @@ export default function AdminPage() {
             return (
               <Card className="mb-6">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-xs">🧩 擴充套件引導點擊（30 天，只記次數）</CardDescription>
+                  <CardDescription className="text-xs">🧩 擴充套件／Gemini 技能引導點擊（30 天，只記次數）</CardDescription>
                   <CardTitle className="text-2xl text-primary">共 {total} 次</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
@@ -306,7 +306,9 @@ export default function AdminPage() {
                         <th className="py-1 pr-3 font-normal">出現位置</th>
                         <th className="py-1 px-2 font-normal text-right whitespace-nowrap">加到 Chrome</th>
                         <th className="py-1 px-2 font-normal text-right whitespace-nowrap">五星好評</th>
-                        <th className="py-1 pl-2 font-normal text-right whitespace-nowrap">安裝說明</th>
+                        <th className="py-1 px-2 font-normal text-right whitespace-nowrap">安裝說明</th>
+                        <th className="py-1 px-2 font-normal text-right whitespace-nowrap">下載 Gemini 技能</th>
+                        <th className="py-1 pl-2 font-normal text-right whitespace-nowrap">技能教學</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -315,12 +317,14 @@ export default function AdminPage() {
                           <td className="py-1.5 pr-3">{label}</td>
                           <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'store')}</td>
                           <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'review')}</td>
-                          <td className="py-1.5 pl-2 text-right tabular-nums">{n(src, 'install')}</td>
+                          <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'install')}</td>
+                          <td className="py-1.5 px-2 text-right tabular-nums">{n(src, 'skill')}</td>
+                          <td className="py-1.5 pl-2 text-right tabular-nums">{n(src, 'skill-guide')}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <p className="text-xs text-muted-foreground mt-2">點了按鈕不代表真的安裝或評分；商店的實際安裝數與評分請到 Chrome 開發人員資訊主頁查看。</p>
+                  <p className="text-xs text-muted-foreground mt-2">點了按鈕不代表真的安裝或評分；商店的實際安裝數與評分請到 Chrome 開發人員資訊主頁查看。Gemini 技能兩欄只會出現在「用完」的兩種引導卡。</p>
                 </CardContent>
               </Card>
             );
