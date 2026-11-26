@@ -49,9 +49,10 @@ test('通知門檻：跨過 8 成通知一次、跨過上限通知一次', () =>
   assert.equal(crossedThreshold(0, 1, 0), null);
 });
 
-test('引導訊息：提到 Chrome 擴充套件、自己的免費金鑰、五星好評', () => {
+test('引導訊息：提到 Chrome 擴充套件、Gemini 技能、自己的免費金鑰、五星好評', () => {
   for (const msg of [POOL_EXHAUSTED_MESSAGE, dailyLimitMessage(3)]) {
     assert.match(msg, /Chrome 擴充套件/);
+    assert.match(msg, /Gemini 技能「PaGamO 閱讀題組」/);
     assert.match(msg, /免費 Gemini 金鑰/);
     assert.match(msg, /五星好評/);
   }

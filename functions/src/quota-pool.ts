@@ -32,16 +32,19 @@ export const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/cfb
 export const EXTENSION_REVIEW_URL = `${EXTENSION_STORE_URL}/reviews`;
 
 export const POOL_EXHAUSTED_CODE = 'quota/pool-exhausted';
+// 2026-11-26：用完訊息同時推薦兩條路：Chrome 擴充套件、Gemini 技能「PaGamO 閱讀題組」
 export const POOL_EXHAUSTED_MESSAGE =
-  '開發者提供的本月共用額度池已經用完了。請改用我們開發的 Chrome 擴充套件「PIRLS 閱讀題組小幫手」，' +
-  '用你自己的免費 Gemini 金鑰繼續出題；用得順手的話，也請到商店給我們五星好評 ⭐⭐⭐⭐⭐，讓更多老師知道這個工具！' +
-  '共用額度會在下個月 1 日（台北時間）重新開放。';
+  '開發者提供的本月共用額度池已經用完了，下個月 1 日（台北時間）會重新開放。現在有兩種免費的方法可以繼續出題：' +
+  '一是改用我們開發的 Chrome 擴充套件「PIRLS 閱讀題組小幫手」，用你自己的免費 Gemini 金鑰；' +
+  '二是下載我們做好的 Gemini 技能「PaGamO 閱讀題組」，裝進學校帳號的 Gemini，不用申請金鑰。' +
+  '用得順手的話，也請到商店給我們五星好評 ⭐⭐⭐⭐⭐，讓更多老師知道這個工具！';
 
-/** 今天的次數用完時：一樣引導改用擴充套件（讓老師早點習慣到擴充套件出題） */
+/** 今天的次數用完時：一樣引導改用擴充套件或 Gemini 技能（讓老師早點習慣不靠共用額度出題） */
 export const DAILY_LIMIT_CODE = 'quota/daily-limit';
 export function dailyLimitMessage(limit: number): string {
   return `你今天的 ${limit} 次共用出題已經用完了，明天（台北時間午夜後）會再給你 ${limit} 次。` +
-    '想現在繼續出題，可以改用我們開發的 Chrome 擴充套件「PIRLS 閱讀題組小幫手」，用你自己的免費 Gemini 金鑰，次數不受限制；' +
+    '想現在繼續出題，有兩種免費的方法：一是改用我們開發的 Chrome 擴充套件「PIRLS 閱讀題組小幫手」，用你自己的免費 Gemini 金鑰，次數不受限制；' +
+    '二是下載我們做好的 Gemini 技能「PaGamO 閱讀題組」，裝進學校帳號的 Gemini，不用申請金鑰。' +
     '用得順手的話，也請到商店給我們五星好評 ⭐⭐⭐⭐⭐，讓更多老師知道這個工具！';
 }
 
